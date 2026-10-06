@@ -80,6 +80,8 @@ Questions are printed for human inspection, not sent to coding agents.
 - [Claim template](docs/claim-template.md)
 - [Hackathon demo and acceptance criteria](docs/demo.md)
 - [Open design decisions](docs/design-decisions.md)
+- [Shared vocabulary and proposed workflows (Mermaid)](docs/flowchart.md)
+- [Illustrated workflow reference (PDF)](docs/midflight-workflows.pdf)
 
 This repository includes a local claim-checking prototype and tests. Shared-plan
 checking, model reasoning, propagation, diff verification, GitHub integration,
