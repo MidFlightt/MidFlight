@@ -50,13 +50,40 @@ data model, and deployment details still need design decisions.
 
 ## Start here
 
+### Run the local prototype
+
+Requires Python 3.10 or newer; no packages, credentials, or AWS account needed.
+Run these commands from the repository root:
+
+```sh
+python3 -m midflight demo
+python3 -m midflight check examples/claims.json
+python3 -m unittest discover -s tests -v
+```
+
+Claims require an ID, owner, and goal. Files and shared interface names are
+optional. Omitted or null lists mean unknown; an empty list explicitly declares
+no items. Use consistent, exact names such as `user-api` across related claims.
+The checker does not infer relationships, expand path patterns, or inspect code.
+
+The command processes claims in order against earlier open claims. Resubmitting
+the same ID and owner refines that claim in memory. Reviews are snapshots at
+submission time; earlier reviews are not automatically refreshed. Nothing is
+saved between runs. Owner labels are not authenticated identities.
+
+Results are `needs_clarification` for declared overlap, `unknown` for missing
+information, or `no_declared_overlap` when complete declarations have no exact
+matches. None grants permission to proceed or proves semantic compatibility.
+Questions are printed for human inspection, not sent to coding agents.
+
 - [Team workflow](CONTRIBUTING.md)
 - [Claim template](docs/claim-template.md)
 - [Hackathon demo and acceptance criteria](docs/demo.md)
 - [Open design decisions](docs/design-decisions.md)
 
-This initial repository contains project and collaboration documentation. There
-is no application, test suite, or AWS deployment yet.
+This repository includes a local claim-checking prototype and tests. Shared-plan
+checking, model reasoning, propagation, diff verification, GitHub integration,
+and AWS deployment remain unimplemented.
 
 ## Learning with VibeWise
 

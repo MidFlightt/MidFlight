@@ -1,0 +1,21 @@
+[
+  {
+    "id": "backend",
+    "owner": "Somesh",
+    "goal": "Build the user API",
+    "files": ["api/users.py"],
+    "interfaces": ["user-api"]
+  },
+  {
+    "id": "screen",
+    "owner": "Frederik",
+    "goal": "Build the profile screen",
+    "files": ["ui/profile.tsx"],
+    "interfaces": ["user-api"]
+  },
+  {
+    "id": "explore",
+    "owner": "Mithilesh",
+    "goal": "Explore activity history"
+  }
+]

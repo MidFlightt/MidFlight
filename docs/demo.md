@@ -24,6 +24,9 @@ Demonstrate a coherent Claim → Check → Propagate → Verify workflow.
 5. Push the corrected implementation and show the passing status.
 6. Simulate a GitHub failure and show stale state suppressing suggestions.
 
-The harness, assertions, fixtures, GitHub integration, and AWS runtime are not
-implemented yet. A convincing demo must distinguish simulated failures from live
-API behavior and must not equate file overlap with semantic incompatibility.
+The local claim prototype includes synthetic examples and tests for overlap,
+independent declarations, refinements, and missing information. It implements
+clarification questions, not the full acceptance scenarios above. Shared-plan
+checks, model reasoning, GitHub integration, and AWS runtime remain unimplemented.
+A convincing demo must distinguish simulated failures from live API behavior
+and must not equate file overlap with semantic incompatibility.
