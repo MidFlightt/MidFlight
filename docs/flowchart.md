@@ -1,8 +1,8 @@
 # Midflight: shared vocabulary and coordination workflows
 
-Version: 1.0 | October 6, 2026 | Design reference, not implemented functionality
+Version: 1.1 | October 6, 2026 | Design reference, not implemented functionality
 
-This document describes the brainstormed coordination service and complements the [open design decisions](design-decisions.md). The diagrams assume a GitHub-connected project and participating coding agents that consult Midflight at supported checkpoints.
+This document describes the brainstormed coordination service and complements the [open design decisions](design-decisions.md) and [proposed system architecture](../systemarchitecture.md). It does not amend the [draft project requirements](../PROJECT_REQUIREMENTS.md); the documents illustrate different proposed requirement-change examples until the team selects one. The diagrams assume a GitHub-connected project and participating coding agents that consult Midflight at supported checkpoints.
 
 The current prototype only compares declared overlap and asks for clarification; it does not implement the approvals, semantic checks, propagation, or verification below. Claims can begin broad and be refined when dependencies emerge. The detailed checkout claims illustrate a shared interface after discovery, not a requirement to enumerate every implementation detail upfront. See the [README](../README.md) for current capabilities.
 
@@ -26,14 +26,36 @@ An assumption is not automatically an error. Different local variable names are 
 
 ## Legend and reading guide
 
-- **Uppercase labels** identify vocabulary categories; names such as Alice and Bob identify the actor.
-- **Numbered stages 1-8** are the normal coordination and verification path.
-- **Stages C1-C4** are the requirement-change path, which can start at any time.
-- **Solid arrows** show process flow or an update passed to another stage.
-- **Dashed arrows** show a possible mid-work change, not a mandatory step.
-- **Arrow labels** explain conditional outcomes and return paths.
-- The PDF uses blue for shared intent, purple for coordination, amber for decisions/changes, and green for evidence/verification. Labels carry the meaning even without color.
-- Acknowledged means the agent received an update. Verified means evidence supports the checked behavior. Neither means the entire application is correct.
+Color identifies the **workflow**, not the actor. The owner label inside every node identifies **who performs the action**. A purple border additionally highlights nodes where **MIDFLIGHT** has a direct role; shared labels identify shared responsibility.
+
+| Color | Workflow | What to follow |
+| --- | --- | --- |
+| Blue | Initial planning and implementation | Plan, claims, comparison, agreement, delivery, and building. |
+| Amber | Requirement change | Proposal, human approval, impact analysis, and replanning affected work. |
+| Green | Evidence and verification | Collect implementation evidence, review it, and publish a scoped pass. |
+| Red | Correction loop | An evidenced mismatch produces a correction directive and another implementation attempt. |
+| Gray | Waiting or unaffected work | Missing evidence remains unverified; unrelated work continues. |
+
+- **MIDFLIGHT owner label + purple outline:** Midflight executes or coordinates this stage.
+- **HUMANS:** own product decisions and approve requirement changes.
+- **CODING AGENTS:** declare, accept technical agreements under team policy, acknowledge, and implement.
+- **GITHUB / CI:** supply repository events, commit-specific code, and test evidence.
+- **Shared owner labels:** each actor has a distinct part; for example, humans approve a change and Midflight records the new version.
+- **Numbered stages 1-8:** normal coordination and verification. **C1-C4:** requirement-change path, available at any time.
+- **Solid arrows:** process flow or update delivery. **Dashed arrows:** a possible change during work. **Arrow labels:** outcomes and return paths.
+- Acknowledged means received, not implemented. Verified covers checked behavior, not the entire app.
+
+## Where Midflight comes in
+
+| Stage | Midflight's responsibility | Responsibility retained elsewhere |
+| --- | --- | --- |
+| 3: Compare | Map dependencies, inspect claims and known interfaces, and identify discrepancies or unresolved assumptions. | Agents must report their intentions; Midflight cannot see unreported local plans. |
+| 4: Create an agreement | Reuse an authoritative contract if one exists; otherwise propose a shared contract, coordinate acceptance, and record the agreed version. | Agents accept technical details under team policy. Humans resolve ambiguous product behavior. A proposal is not an agreement until accepted. |
+| 5: Deliver updates | Create scoped directives, expose them at checkpoints, track acknowledgment, and re-review revised claims. | Coding agents retrieve, acknowledge, and implement; Midflight does not write their code or force an immediate interruption. |
+| C2: Record approval | Record the human-approved change as a new plan version. | Humans approve the product change. |
+| C3-C4: Propagate change | Find affected tasks, invalidate obsolete approvals, request revised claims, and leave unrelated work alone. | Agents replan and pick up updates at their next checkpoint. |
+| 8: Verify | Compare evidence with current decisions and publish a scoped result. | GitHub/CI supply evidence; passing does not prove every behavior works. |
+| Correction and waiting | Explain an evidenced mismatch, issue a correction directive, or keep a review unresolved when evidence is missing. | Agents correct the code; humans review unresolved questions when needed. |
 
 ## Flowchart 1: workflow with definitions
 
@@ -41,29 +63,57 @@ Read the normal path first. Follow C1-C4 when a requirement changes. Affected ta
 
 ```mermaid
 flowchart TD
-    P["1 · PLAN + REQUIREMENTS<br/>Approved product behavior and division of work"]
-    P --> C["2 · TASKS + CLAIMS<br/>Agents declare intended work and identify ASSUMPTIONS"]
-    C --> D["3 · DEPENDENCIES + DISCREPANCIES<br/>Compare connected claims with current requirements<br/>Identify incompatible or unresolved shared assumptions"]
-    D --> A["4 · AGREEMENT / CONTRACT<br/>Use existing authoritative decisions or resolve a new agreement<br/>Humans decide unclear product behavior"]
-    A --> U["5 · DIRECTIVES + ACKNOWLEDGMENT<br/>Affected agents retrieve updates at a checkpoint<br/>Acknowledge and revise claims; re-review changed claims"]
-    U --> B["6 · IMPLEMENTATION<br/>Build against the current agreement"]
-    B --> E["7 · EVIDENCE<br/>Pushed code and relevant tests for a specific commit"]
-    E --> V["8 · VERIFICATION<br/>Compare evidence with the current plan and agreements"]
+    P["1 · PLAN + REQUIREMENTS<br/>OWNER: HUMANS<br/>Approve product behavior and divide the work"]
+    P --> C["2 · TASKS + CLAIMS<br/>OWNER: CODING AGENTS<br/>Declare intended work and identify ASSUMPTIONS"]
+    C --> D["3 · DEPENDENCIES + DISCREPANCIES<br/>OWNER: MIDFLIGHT<br/>Compare connected claims and current requirements"]
+    D --> A["4 · AGREEMENT / CONTRACT<br/>OWNER: MIDFLIGHT + AGENTS<br/>Midflight reuses or proposes a contract, coordinates acceptance, and records it<br/>Humans decide ambiguous product behavior"]
+    A --> U["5 · DIRECTIVES + ACKNOWLEDGMENT<br/>OWNER: MIDFLIGHT + AGENTS<br/>Midflight sends scoped updates and tracks acknowledgment<br/>Agents retrieve at checkpoints and revise claims; Midflight re-reviews"]
+    U --> B["6 · IMPLEMENTATION<br/>OWNER: CODING AGENTS<br/>Build against the current agreement"]
+    B --> E["7 · EVIDENCE<br/>OWNER: AGENTS + GITHUB / CI<br/>Push code and supply relevant tests for that commit"]
+    E --> V["8 · VERIFICATION<br/>OWNER: MIDFLIGHT<br/>Compare evidence with the current plan and agreements"]
 
-    B -.->|"A change may be proposed during work"| CP["C1 · PROPOSED REQUIREMENT CHANGE<br/>Describe the new product behavior"]
-    CP --> AP["C2 · HUMAN APPROVAL + PLAN VERSION<br/>Clarify and approve; preserve the previous version<br/>Unapproved proposals do not replace the current plan"]
-    AP --> IM["C3 · IMPACT CHECK<br/>Follow dependencies to identify affected tasks"]
-    IM -->|"Affected"| RP["C4 · REPLAN<br/>Invalidate affected approvals<br/>Request revised claims; agents pick up changes at checkpoints"]
+    B -.->|"Change proposed during work"| CP["C1 · PROPOSED REQUIREMENT CHANGE<br/>OWNER: HUMANS<br/>Describe the new product behavior"]
+    CP --> AP["C2 · APPROVAL + NEW PLAN VERSION<br/>OWNER: HUMANS + MIDFLIGHT<br/>Humans approve; Midflight records the new version<br/>Unapproved proposals do not replace the plan"]
+    AP --> IM["C3 · IMPACT CHECK<br/>OWNER: MIDFLIGHT<br/>Follow dependencies to identify affected tasks"]
+    IM -->|"Affected"| RP["C4 · REPLAN<br/>OWNER: MIDFLIGHT + AGENTS<br/>Midflight invalidates affected approvals and requests revised claims<br/>Agents retrieve the update and replan at checkpoints"]
     RP --> C
-    IM -->|"Unaffected"| UC["Continue existing work<br/>Do not send irrelevant updates"]
+    IM -->|"Unaffected"| UC["CONTINUE EXISTING WORK<br/>OWNER: CODING AGENTS<br/>No irrelevant updates"]
 
-    V -->|"Matches and still current"| OK["PASS<br/>Checked behavior verified for this commit and plan version"]
-    V -->|"Mismatch"| F["DISCREPANCY<br/>Create an evidence-backed correction"]
+    V -->|"Matches and current"| OK["PASS<br/>OWNER: MIDFLIGHT<br/>Publish verification for this commit and plan version"]
+    V -->|"Mismatch"| F["CORRECTION / DISCREPANCY<br/>OWNER: MIDFLIGHT<br/>Create an evidence-backed correction directive"]
     F --> U
-    V -->|"Missing evidence"| M["UNVERIFIED<br/>Collect evidence or request review"]
+    V -->|"Missing evidence"| M["UNVERIFIED<br/>OWNER: MIDFLIGHT<br/>Request evidence or human review; do not pass"]
     M --> E
-    V -->|"Plan changed during review"| RV["SUPERSEDED REVIEW<br/>Re-evaluate against the current plan"]
+    V -->|"Plan changed during review"| RV["SUPERSEDED REVIEW<br/>OWNER: MIDFLIGHT<br/>Re-evaluate current requirements"]
     RV --> IM
+
+    subgraph LEGEND["LEGEND: fill and arrows = workflow; purple border = Midflight involvement"]
+        direction LR
+        L1["BLUE<br/>Initial plan and implementation"]
+        L2["AMBER<br/>Requirement change"]
+        L3["GREEN<br/>Evidence and verification"]
+        L4["RED<br/>Correction loop"]
+        L5["GRAY<br/>Waiting or unaffected"]
+        L6["PURPLE BORDER<br/>Midflight acts or coordinates<br/>Read OWNER for shared responsibility"]
+    end
+
+    classDef core fill:#EAF2FC,stroke:#245E9D,color:#15283B,stroke-width:1px;
+    classDef change fill:#FFF3DA,stroke:#966419,color:#15283B,stroke-width:1px;
+    classDef verify fill:#E8F4ED,stroke:#2C7050,color:#15283B,stroke-width:1px;
+    classDef fix fill:#FCECEF,stroke:#B23A48,color:#15283B,stroke-width:1px;
+    classDef neutral fill:#F2F5F7,stroke:#697888,color:#15283B,stroke-width:1px;
+    classDef midflight stroke:#7654A3,stroke-width:3px;
+    class P,C,D,A,U,B,L1,L6 core;
+    class CP,AP,IM,RP,RV,L2 change;
+    class E,V,OK,L3 verify;
+    class F,L4 fix;
+    class UC,M,L5 neutral;
+    class D,A,U,AP,IM,RP,V,OK,F,M,RV,L6 midflight;
+    linkStyle 0,1,2,3,4 stroke:#245E9D,stroke-width:2px;
+    linkStyle 5,6,13 stroke:#2C7050,stroke-width:2px;
+    linkStyle 7,8,9,10,11,18,19 stroke:#966419,stroke-width:2px;
+    linkStyle 14,15 stroke:#B23A48,stroke-width:2px;
+    linkStyle 12,16,17 stroke:#697888,stroke-width:2px;
 ```
 
 ## Flowchart 2: checkout example with labeled categories
@@ -72,32 +122,60 @@ The team starts with a normal plan that does not define every interface detail. 
 
 ```mermaid
 flowchart TD
-    P["1 · PLAN + REQUIREMENT v1<br/>Build a shop; checkout displays the backend's final total"]
-    P --> CA["2A · TASK + CLAIM — ALICE<br/>Build backend; return total_cents: 4999<br/>ASSUMPTION: the page understands cents"]
-    P --> CB["2B · TASK + CLAIM — BOB<br/>Build checkout page; expect total: 49.99<br/>ASSUMPTION: the backend returns dollars"]
-    CA --> D["3 · DEPENDENCY + DISCREPANCY<br/>Bob's page consumes Alice's response<br/>Field names and units disagree"]
+    P["1 · PLAN + REQUIREMENT v1<br/>OWNER: HUMANS<br/>Build a shop; checkout displays the backend's final total"]
+    P --> CA["2A · TASK + CLAIM - ALICE<br/>OWNER: ALICE'S CODING AGENT<br/>Return total_cents: 4999<br/>ASSUMPTION: the page understands cents"]
+    P --> CB["2B · TASK + CLAIM - BOB<br/>OWNER: BOB'S CODING AGENT<br/>Expect total: 49.99<br/>ASSUMPTION: the backend returns dollars"]
+    CA --> D["3 · DEPENDENCY + DISCREPANCY<br/>OWNER: MIDFLIGHT<br/>Bob consumes Alice's response<br/>Identify the field-name and unit mismatch"]
     CB --> D
-    D --> A["4 · AGREEMENT / CONTRACT<br/>v1: use integer total_cents<br/>After approved change: v2 also supplies subtotal_cents and tax_cents<br/>Agents coordinate and accept the applicable agreement"]
-    A --> U["5 · DIRECTIVES + ACKNOWLEDGMENT<br/>v1: Bob uses total_cents and matching mock data<br/>v2: Alice adds the breakdown; Bob displays it<br/>Agents receive, acknowledge, and revise claims at checkpoints"]
-    U --> B["6 · IMPLEMENTATION<br/>Both agents build and test against the current agreement"]
-    B --> E["7 · EVIDENCE<br/>Code is pushed; relevant tests run on that commit"]
-    E --> V["8 · VERIFICATION<br/>Check the response AND the page against the current version"]
+    D --> A["4 · AGREEMENT / CONTRACT<br/>OWNER: MIDFLIGHT + AGENTS<br/>Midflight proposes and records the accepted contract<br/>v1: total_cents; after approval, v2 adds subtotal_cents and tax_cents<br/>Agents accept technical details; humans decide unclear behavior"]
+    A --> U["5 · DIRECTIVES + ACKNOWLEDGMENT<br/>OWNER: MIDFLIGHT + AGENTS<br/>Midflight sends targeted updates and tracks receipt<br/>v1: Bob uses total_cents; v2: Alice provides the breakdown and Bob displays it<br/>Agents acknowledge at checkpoints and revise claims"]
+    U --> B["6 · IMPLEMENTATION<br/>OWNER: CODING AGENTS<br/>Build and test the current agreement"]
+    B --> E["7 · EVIDENCE<br/>OWNER: AGENTS + GITHUB / CI<br/>Push code and run relevant tests on that commit"]
+    E --> V["8 · VERIFICATION<br/>OWNER: MIDFLIGHT<br/>Check the response AND page against the current version"]
 
-    B -.->|"Team changes its mind"| CP["C1 · NEW REQUIREMENT<br/>Show subtotal and tax separately before payment"]
-    CP --> AP["C2 · HUMAN APPROVAL + PLAN v2<br/>Keep the final total; also show subtotal and tax<br/>Confirm that their sum equals the final total in this demo"]
-    AP --> IM["C3 · DEPENDENCY / IMPACT CHECK<br/>Backend must provide the breakdown<br/>Checkout page must display it"]
-    IM -->|"Alice and Bob affected"| RP["C4 · REPLAN<br/>Old claims need revision<br/>Propose subtotal_cents and tax_cents alongside total_cents"]
+    B -.->|"Team changes its mind"| CP["C1 · NEW REQUIREMENT<br/>OWNER: HUMANS<br/>Show subtotal and tax separately before payment"]
+    CP --> AP["C2 · APPROVAL + PLAN v2<br/>OWNER: HUMANS + MIDFLIGHT<br/>Humans approve the breakdown; Midflight records v2<br/>For this demo, subtotal plus tax equals total"]
+    AP --> IM["C3 · DEPENDENCY / IMPACT CHECK<br/>OWNER: MIDFLIGHT<br/>Identify Alice's response and Bob's page as affected"]
+    IM -->|"Alice and Bob affected"| RP["C4 · REPLAN<br/>OWNER: MIDFLIGHT + AGENTS<br/>Midflight requests revised claims<br/>Agents propose subtotal_cents and tax_cents alongside total_cents"]
     RP --> CA
     RP --> CB
-    IM -->|"Unrelated task"| UC["Product-description work continues"]
+    IM -->|"Unrelated task"| UC["PRODUCT-DESCRIPTION WORK CONTINUES<br/>OWNER: UNRELATED CODING AGENT"]
 
-    V -->|"Current agreement implemented"| OK["PASS<br/>The checked price behavior follows the current plan"]
-    V -->|"Only total implemented after v2 approval"| F["DISCREPANCY<br/>Code follows v1, but the team approved v2"]
+    V -->|"Current agreement implemented"| OK["PASS<br/>OWNER: MIDFLIGHT<br/>Publish the scoped verification result"]
+    V -->|"Only total implemented after v2 approval"| F["CORRECTION / DISCREPANCY<br/>OWNER: MIDFLIGHT<br/>Explain that code follows v1 while approved v2 needs the breakdown<br/>Send a correction to the affected agent"]
     F --> U
-    V -->|"Insufficient evidence"| M["UNVERIFIED<br/>Request evidence or review"]
+    V -->|"Insufficient evidence"| M["UNVERIFIED<br/>OWNER: MIDFLIGHT<br/>Request evidence or review"]
     M --> E
-    V -->|"Plan changes during review"| RV["SUPERSEDED REVIEW<br/>Recheck current requirements; do not publish an outdated pass"]
+    V -->|"Plan changes during review"| RV["SUPERSEDED REVIEW<br/>OWNER: MIDFLIGHT<br/>Recheck requirements; do not publish an outdated pass"]
     RV --> IM
+
+    subgraph LEGEND["LEGEND: fill and arrows = workflow; purple border = Midflight involvement"]
+        direction LR
+        L1["BLUE<br/>Initial plan and implementation"]
+        L2["AMBER<br/>Requirement change"]
+        L3["GREEN<br/>Evidence and verification"]
+        L4["RED<br/>Correction loop"]
+        L5["GRAY<br/>Waiting or unaffected"]
+        L6["PURPLE BORDER<br/>Midflight acts or coordinates<br/>Read OWNER for shared responsibility"]
+    end
+
+    classDef core fill:#EAF2FC,stroke:#245E9D,color:#15283B,stroke-width:1px;
+    classDef change fill:#FFF3DA,stroke:#966419,color:#15283B,stroke-width:1px;
+    classDef verify fill:#E8F4ED,stroke:#2C7050,color:#15283B,stroke-width:1px;
+    classDef fix fill:#FCECEF,stroke:#B23A48,color:#15283B,stroke-width:1px;
+    classDef neutral fill:#F2F5F7,stroke:#697888,color:#15283B,stroke-width:1px;
+    classDef midflight stroke:#7654A3,stroke-width:3px;
+    class P,CA,CB,D,A,U,B,L1,L6 core;
+    class CP,AP,IM,RP,RV,L2 change;
+    class E,V,OK,L3 verify;
+    class F,L4 fix;
+    class UC,M,L5 neutral;
+    class D,A,U,AP,IM,RP,V,OK,F,M,RV,L6 midflight;
+    linkStyle 0,1,2,3,4,5,6 stroke:#245E9D,stroke-width:2px;
+    linkStyle 7,8,16 stroke:#2C7050,stroke-width:2px;
+    linkStyle 9,10,11,12,13,14,21,22 stroke:#966419,stroke-width:2px;
+    linkStyle 17,18 stroke:#B23A48,stroke-width:2px;
+    linkStyle 15,19,20 stroke:#697888,stroke-width:2px;
 ```
 
 The v1 fields in stages 2A and 2B describe the first pass. On a C4 return, replace those claims with revisions targeting v2; do not recreate the original assumptions. The applicable v2 agreement is established before v2 directives are delivered.
