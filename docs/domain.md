@@ -65,7 +65,7 @@ note under [Invariants](#invariants)).
 | `Task` | id, title, owner, branch, requirement ids, provides (contract ids), consumes (contract ids) |
 | `Contract` | id, version, provider task, consumer tasks, `fields: {name: FieldType}` (at least one) |
 | `InterfaceUse` | contract id, `fields: {name: FieldType}`: one contract a claim provides or consumes, with the types it expects |
-| `Claim` | id, revision, project, task, agent, branch, base SHA, plan version, state, requirement ids, files, provides, consumes (lists of `InterfaceUse`), `no_interfaces` (bool, D12), assumptions (free text), acceptance criteria, reason for the revision, created at |
+| `Claim` | id, revision, project, task, agent, branch, base SHA, plan version, state, requirement ids, files, provides, consumes (lists of `InterfaceUse`), `no_interfaces` (bool, D12), assumptions (free text), acceptance criteria, reason for the revision, findings, created at. `state` plus `findings` is the revision's verdict; only those two change after it is saved. |
 | `Finding` | id, kind, severity, source (`rule` or `reviewer`), affected ids (at least one), evidence, explanation, proposed correction |
 | `Evidence` | kind (`EvidenceKind`), ref, excerpt (at most 500 characters) |
 | `Directive` | id, project, source (`plan_change` or `verification`, D13), task, recipient, plan version, verification id (set exactly when source is `verification`), changed ids, requested adjustment, reason, blocking (default true), state, response, response note, created at. `dedupe_key` is the INV-05 key. |
@@ -147,6 +147,19 @@ stateDiagram-v2
 
 `queued`, `delivered`, and `needs_clarification` are open: a blocking open directive
 refuses a push (UC-16). A superseded directive keeps any earlier answer as history.
+
+How a review decides (`midflight/domain/decide.py`, UC-05 step 5), in order:
+
+1. Missing details: stays `draft` (D5, D12).
+2. A blocking `requirement_conflict`: `human_review_required` (INV-11).
+3. Any other blocking finding: `needs_revision`.
+4. No usable AI review (`reviewer_unavailable`), or the project is stale: stays
+   `pending` (INV-01, INV-09). The review job is marked failed so the lead can retry it.
+5. Otherwise: `approved`.
+
+Rules run first, and the AI reviewer runs only when no rule already blocks.
+`duplicate_provider` counts only approved rivals: the first approval wins, and the
+coord_rev check stops a second one (INV-02).
 
 Verification outcome to GitHub check conclusion (UC-11, `check_conclusion()`):
 
@@ -304,7 +317,9 @@ for tests and local runs. Tests use the fakes only.
   audit events are all saved, or none are. `expected_coord_rev` turns it into a
   compare-and-set (raises `RevisionConflict`), and a repeated `idempotency_key`
   writes nothing and returns `duplicate=True`. Save a claim and its review job in
-  one commit.
+  one commit. Saving a `Project` never changes `coord_rev`; only `bump_coord_rev`
+  does, so a project read earlier can't roll it back. A saved claim revision can only
+  change its `state` and `findings`, and an approved plan can't change at all.
 - **`Reviewer`** returns the model's raw reply. Application code validates it as
   `Finding`s and checks every cited id before using it (INV-01). `ReviewerUnavailable`
   means no review, never approval.
