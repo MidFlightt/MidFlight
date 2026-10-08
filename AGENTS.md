@@ -21,9 +21,11 @@ Team Yoga, AWS Agentic AI hackathon. Planned finish **Sat Oct 10, 2026**; Sun Oc
 is buffer and submission.
 
 **Current state:** the specs; the shared models and ports (S-1); the claim rules
-(S-2); and the claim service with the in-memory store, runners, and clock (S-3). The
+(S-2); the claim service with the in-memory store, runners, and clock (S-3); the YAML
+scenarios (S-4); and the REST API with token auth, plans, check-in, and directive
+answers (M-2). The
 old prototype (`midflight/claims.py`, `__main__.py`) is still there for the README
-commands. The other planned packages (`api/`, `mcp/`, ...) appear as tasks land. Don't
+commands. The other planned packages (`mcp/`, `hooks/`, ...) appear as tasks land. Don't
 assume a module exists. Check first.
 
 ## Where things are
@@ -102,10 +104,11 @@ uv run ruff format .                       # format
 uv run python tests/scenario_report.py     # trace every scenario into docs/pages/scenarios.html
 ```
 
-After M-2 and M-3 (local stack):
+Local stack (the API since M-2; the MCP adapter after M-3). The API seeds the demo
+project and keeps its tokens in `.midflight/local-tokens.json`:
 
 ```sh
-uv run uvicorn midflight.api.app:app --reload   # API at http://127.0.0.1:8000/docs
+uv run uvicorn midflight.api.local:create_local_app --factory --reload   # API at http://127.0.0.1:8000/docs
 uv run python -m midflight.mcp.server           # MCP adapter (stdio)
 ```
 

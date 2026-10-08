@@ -286,7 +286,7 @@ class ClaimService:
         stored_job = self._store.get_job(job.id)
         if stored_job is not None and stored_job.state in (JobState.SUCCEEDED, JobState.FAILED):
             return
-        claim_id, revision = _parse_subject(job.subject_id)
+        claim_id, revision = parse_review_subject(job.subject_id)
         for run in range(1, MAX_REVIEW_RUNS + 1):
             project = self._project(job.project_id)
             claim = self._store.get_claim(claim_id, revision)
@@ -408,6 +408,54 @@ class ClaimService:
             Commit(project_id=project.id, idempotency_key=key, puts=[done], audit=[event])
         )
 
+    def retry_review(self, lead: Participant, job_id: str) -> Job:
+        """Rerun a failed claim review as a new job (UC-14 4a). Lead only."""
+        if lead.role is not Role.LEAD:
+            raise PermissionDenied("only the lead can retry jobs (INV-08)")
+        job = self._store.get_job(job_id)
+        if job is None or job.project_id != lead.project_id:
+            raise NotFound(f"no job {job_id}")
+        if job.kind is not JobKind.CLAIM_REVIEW or job.state is not JobState.FAILED:
+            raise StateConflict(f"job {job_id} is a {job.kind} job in state {job.state}")
+        now = self._clock.now()
+        retry = job.model_copy(
+            update={
+                "id": self._store.next_id(job.project_id, "J"),
+                "state": JobState.QUEUED,
+                "attempts": 0,
+                "error": None,
+                "result_ref": None,
+                "idempotency_key": f"retry:{job.id}",
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
+        event = audit_event(
+            self._store,
+            self._clock,
+            project_id=job.project_id,
+            actor=lead.id,
+            action="job.retried",
+            entity_ids=[job.id, retry.id],
+            reason=f"retry of failed job {job.id}",
+            correlation_id=job.correlation_id,
+            idempotency_key=retry.idempotency_key,
+        )
+        result = self._store.commit(
+            Commit(
+                project_id=job.project_id,
+                idempotency_key=retry.idempotency_key,
+                puts=[retry],
+                audit=[event],
+            )
+        )
+        if result.duplicate:
+            raise StateConflict(f"job {job_id} was already retried")
+        self._runner.submit(retry)
+        saved = self._store.get_job(retry.id)
+        assert saved is not None
+        return saved
+
     # Verdict ---------------------------------------------------------------------------
 
     def verdict(self, claim_id: str, revision: int | None = None) -> Verdict:
@@ -461,7 +509,7 @@ def _subject(claim_id: str, revision: int) -> str:
     return f"{claim_id}/{revision}"
 
 
-def _parse_subject(subject_id: str) -> tuple[str, int]:
+def parse_review_subject(subject_id: str) -> tuple[str, int]:
     claim_id, _, revision = subject_id.rpartition("/")
     return claim_id, int(revision)
 
