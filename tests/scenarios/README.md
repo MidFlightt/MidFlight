@@ -41,3 +41,15 @@ steps:
 | `error`, `hint_contains`, `nothing_saved` | The step is refused with this error, and nothing changed |
 
 Unknown keys are errors, so a typo fails the test instead of skipping a check.
+
+## See every step traced
+
+```sh
+uv run python tests/scenario_report.py
+```
+
+This writes [`docs/pages/scenarios.html`](../../docs/pages/scenarios.html). Open it in a
+browser to see each step as it moved through the review: what the agent sent, the rule
+findings, what the AI reviewer was asked and replied, the decision, every save (with
+the rejected stale saves in the race), the verdict sent back, and the audit trail.
+Regenerate it after changing a scenario or the services.
