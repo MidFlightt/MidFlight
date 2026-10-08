@@ -174,8 +174,11 @@ Never map an outcome to `neutral` or `skipped`.
 
 ## Interfaces
 
-**MCP tools** (decision D3, served by `midflight/mcp/server.py`). Every reply also
-carries the task's unacknowledged directives.
+**MCP tools** (decision D3, served by `midflight/mcp/server.py` on the MCP Python
+SDK 2's `MCPServer`). Every reply ends with the task's open directives, fenced and
+labeled as data. `submit_claim` fills `branch` and `base_sha` from the agent's git
+checkout when they're left out. The adapter reads `MIDFLIGHT_URL` (default
+`http://127.0.0.1:8000`), `MIDFLIGHT_TOKEN`, and `MIDFLIGHT_PROJECT` (default `demo`).
 
 | Tool | Input | Returns |
 | --- | --- | --- |

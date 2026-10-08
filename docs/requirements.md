@@ -297,7 +297,7 @@ These choices come from the [development plan](development-plan.md#architecture-
 | Persistent state | DynamoDB through Boto3 |
 | Background processing | DynamoDB Streams trigger the worker Lambda; SQS dead-letter queue; Powertools idempotency |
 | GitHub | GitHub App through githubkit |
-| Agent adapter | Official MCP Python SDK (FastMCP), local stdio transport, plus git and Claude Code hooks |
+| Agent adapter | Official MCP Python SDK 2.x (`MCPServer`, formerly FastMCP), local stdio transport, plus git and Claude Code hooks |
 | Dashboard | Streamlit; local hosting is acceptable for the hackathon demo |
 | Tests and CI | pytest, GitHub Actions |
 | Deployment and operations | AWS SAM, Secrets Manager, CloudWatch |

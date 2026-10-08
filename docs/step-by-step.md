@@ -191,20 +191,26 @@ tools, hooks, AWS, GitHub. You also review Somesh's pull requests.
 
    ✅ `uv run uvicorn midflight.api.app:app` runs, and `/docs` shows the endpoints.
 6. **The agent tools (MCP adapter).** Paste:
-   > Task M-3. midflight/mcp/server.py using FastMCP with three tools:
+   > Task M-3. midflight/mcp/server.py using the MCP Python SDK's MCPServer (FastMCP before
+   > SDK 2) with three tools:
    > submit_claim (posts the claim, then polls the job every 2 s for up to 60 s and
    > returns the verdict, contract, and findings), check_in, and
    > acknowledge_directive. submit_claim also accepts status withdrawn or closed.
    > Every tool reply must include pending directives. Read MIDFLIGHT_URL,
-   > MIDFLIGHT_TOKEN, and MIDFLIGHT_PROJECT from the environment. Set the FastMCP server's
+   > MIDFLIGHT_TOKEN, and MIDFLIGHT_PROJECT from the environment. Set the server's
    > `instructions` to the "Agent instructions" text in docs/domain.md (decision D10),
    > and repeat the relevant rule in each tool's description, so a connected agent
    > lists its assumptions, plans its own checkpoints, and revises its claim when an
    > assumption changes.
 
-7. **Connect it to Claude Code** and try it:
+7. **Connect it to Claude Code** and try it. Start the local API first:
    ```bash
-   claude mcp add midflight -e MIDFLIGHT_URL=http://127.0.0.1:8000 -e MIDFLIGHT_TOKEN=<token> -e MIDFLIGHT_PROJECT=<project-id> -- uv run --directory <path-to-midflight> python -m midflight.mcp.server
+   uv run uvicorn midflight.api.local:create_local_app --factory --port 8000
+   ```
+   Then, in the folder the agent works in (for example demo-shop), with the token for
+   that agent from `.midflight/local-tokens.json` (`p-t1`, `p-t2`, or `p-t3`):
+   ```bash
+   claude mcp add midflight -e MIDFLIGHT_URL=http://127.0.0.1:8000 -e MIDFLIGHT_TOKEN=<token> -e MIDFLIGHT_PROJECT=demo -- uv run --directory <path-to-midflight> python -m midflight.mcp.server
    ```
    ✅ In Claude Code, `/mcp` shows midflight with three tools. Give the agent a small
    task with no other guidance: it lists its assumptions and checkpoints before coding.

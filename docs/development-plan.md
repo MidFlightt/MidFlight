@@ -57,7 +57,7 @@ behind a port with a fake, so the whole system runs and tests on a laptop.
 ```mermaid
 flowchart TB
     subgraph LOCAL["Laptops"]
-        Agent["Coding agents"] <--> MCP["MCP adapter (FastMCP, stdio)"]
+        Agent["Coding agents"] <--> MCP["MCP adapter (MCPServer, stdio)"]
         Hooks["pre-push hook / Claude Code hook"]
         Dash["Streamlit dashboard"]
     end
@@ -92,7 +92,7 @@ flowchart TB
 | `Clock` | `FixedClock` | system clock |
 
 Libraries: Python 3.12, uv, Pydantic v2, FastAPI, Mangum, MCP Python SDK
-(FastMCP), Strands Agents, boto3, githubkit, Powertools for AWS Lambda
+(v2 `MCPServer`, formerly FastMCP), Strands Agents, boto3, githubkit, Powertools for AWS Lambda
 (logging, idempotency), Streamlit, pytest, moto, respx, ruff, AWS SAM.
 
 ## Repository layout and ownership
