@@ -1,10 +1,14 @@
 # One-shot build prompt: Midflight from zero, in a new repo
 
+> **Archived October 7, 2026.** The team builds from [development-plan.md](../development-plan.md)
+> instead. This prompt predates decisions D11–D15; where it disagrees with
+> [domain.md](../domain.md), domain.md wins.
+
 **How to use:** make an empty folder (for example `Desktop/AWS hackathon/midflight-oneshot`),
 open Claude Code there with the strongest model and highest effort, make sure `gh`,
 `uv`, `git`, and Python 3.12 are installed and `gh auth status` passes, fill in the
 four values in the CONFIG block, then paste everything below the line. It does not
-touch `Trexz14/midflight`. Everything the agent needs is in the prompt itself.
+touch `MidFlightt/MidFlight`. Everything the agent needs is in the prompt itself.
 
 ---
 

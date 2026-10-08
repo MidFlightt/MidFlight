@@ -20,10 +20,21 @@ rules, the commands, and who owns which folder, so the prompts below can stay sh
 
 ## Everyone, right now (20 minutes, on a call)
 
-1. **Pull the latest docs.**
+1. **Get the repo from its new home.** The project moved to the `MidFlightt`
+   organization on Oct 7: <https://github.com/MidFlightt/MidFlight>. If you have no
+   clone yet:
    ```bash
-   git pull
+   git clone https://github.com/MidFlightt/MidFlight.git midflight
    ```
+   If you cloned the old `Trexz14/midflight` repo, point it at the new one instead:
+   ```bash
+   git remote set-url origin https://github.com/MidFlightt/MidFlight.git
+   git fetch origin
+   git checkout main
+   git reset --hard origin/main
+   ```
+   (`reset --hard` throws away local changes in that clone, so commit or copy
+   anything you need first.)
 2. **Look at the use case diagram** at the top of `docs/use-cases.md` on GitHub (5 min).
 3. **Agree on two things.** Everything else uses the defaults in the plan.
    (Already decided: AgentCore is not required, so we don't use it.)
@@ -41,16 +52,8 @@ You also review Mithilesh's pull requests.
 
 ### Today (Wed Oct 7)
 
-1. **Merge the docs branch.**
-   ```bash
-   cd midflight
-   git add -A
-   git commit -m "docs: use cases, sequence diagrams, development plan"
-   git push -u origin docs/use-cases
-   gh pr create --fill --base main
-   gh pr merge --squash
-   ```
-   ✅ The docs are on `main` on GitHub.
+1. ~~**Merge the docs branch.**~~ Done Oct 7: the docs are on `main` of
+   `MidFlightt/MidFlight`. The GitHub App is created too (see Mithilesh's step 12).
 2. **Turn on Bedrock model access.** AWS console → Bedrock → *Model access* → enable
    the current Claude Sonnet and Haiku models in your region. Then check:
    ```bash
@@ -156,7 +159,7 @@ tools, hooks, AWS, GitHub. You also review Somesh's pull requests.
 
 1. **Get the repo.**
    ```bash
-   git clone https://github.com/Trexz14/midflight.git
+   git clone https://github.com/MidFlightt/MidFlight.git midflight
    cd midflight
    ```
 2. **Install uv.**
@@ -237,14 +240,15 @@ tools, hooks, AWS, GitHub. You also review Somesh's pull requests.
 
 ### Sat Oct 10
 
-12. **Create the GitHub App.** GitHub → Settings → Developer settings → GitHub Apps →
-    New:
-    - Webhook URL: `<your API URL>/github/webhook`, with a random webhook secret
-    - Permissions: Checks *read & write*. Contents, Pull requests, Actions, Metadata
-      *read*.
-    - Events: *Workflow run*
-    - Install it on the demo-shop repo. Put the App ID, private key, and webhook
-      secret in Secrets Manager.
+12. **Connect the GitHub App.** Somesh already created it on Oct 7 (settings in
+    [domain.md](domain.md#interfaces), under GitHub). Get your own private key and the
+    webhook secret from him through a password manager, never the chat. Then:
+    - Edit the App's webhook URL from the temporary smee.io URL to
+      `<your API URL>/github/webhook`.
+    - Put the App ID, Installation ID, private key, and webhook secret in Secrets
+      Manager.
+    - Before that, for local testing, forward events to your laptop with
+      `npx smee-client --url <smee URL> --target http://127.0.0.1:8000/github/webhook`.
 13. **Verification plumbing.** Paste:
     > Task M-6. Webhook endpoint that checks the signature (401 if wrong), drops
     > duplicate delivery IDs, and saves a verify job. In the worker, use githubkit to
@@ -282,7 +286,7 @@ and turn it into the video and submission. You don't need to touch Midflight's c
 
 4. **Create the demo shop repo.** This is the fake project our agents will work on.
    ```bash
-   gh repo create midflight-demo-shop --private --clone
+   gh repo create MidFlightt/midflight-demo-shop --private --clone
    cd midflight-demo-shop
    ```
    Paste into your coding agent:

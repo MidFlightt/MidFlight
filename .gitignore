@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 .aws/
+*.pem
 .venv/
 __pycache__/
 *.py[cod]
