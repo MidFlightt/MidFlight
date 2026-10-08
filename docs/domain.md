@@ -4,11 +4,9 @@ The names, states, and rules every part of Midflight must agree on. Three people
 and their coding agents build in parallel, so a state called `queued` in one module
 and `pending` in another is a bug. Use the names here exactly.
 
-- **Before task S-1 lands:** this file is the source of truth for names.
-- **After S-1 lands:** `midflight/domain/models.py` is the source of truth. A PR that
-  changes a name there must update this file in the same PR.
-- Items marked *(proposed)* are not yet in the requirements or use cases. S-1
-  confirms or changes them.
+- **Source of truth:** `midflight/domain/models.py`, `midflight/domain/states.py`,
+  and `midflight/ports.py` (task S-1). This file describes them. A PR that changes a
+  name there must update this file in the same PR, with both programmers' approval.
 
 ## Demo fixture
 
@@ -52,24 +50,31 @@ The demo repository is `MidFlightt/midflight-demo-shop` (separate repo in the
 
 ## Entities
 
-Task S-1 implements these as Pydantic v2 models in `midflight/domain/models.py`.
-Required information comes from [requirements §7](requirements.md#7-minimum-data-model).
+Pydantic v2 models in `midflight/domain/models.py`. Required information comes from
+[requirements §7](requirements.md#7-minimum-data-model). Every model rejects unknown
+fields and is immutable: services save a changed copy. Where a model can check an
+invariant on its own data, it does, so the invalid state can't be built (see the
+note under [Invariants](#invariants)).
 
 | Entity | Key fields |
 | --- | --- |
-| `Project` | id, repository, GitHub installation id, lead, participants, current plan version, `sync_state`, coordination revision |
-| `Participant` | id, project, role (`lead` or `agent`), developer name, agent name, token hash |
+| `Project` | id, repository (`owner/name`), GitHub installation id, lead, participants, current plan version, `sync_state`, sync reason (required when stale), last synced at, coordination revision (`coord_rev`) |
+| `Participant` | id, project, role (`lead` or `agent`), developer name, agent name (required for agents), token hash (SHA-256 hex), revoked at, last check-in at, last check-in revision (the check-in cursor) |
 | `Plan` | project, version, status (`proposed` or `approved`), requirements, tasks, contracts, approved by, approved at, change reason, changed ids |
 | `Requirement` | id, description, acceptance criteria |
 | `Task` | id, title, owner, branch, requirement ids, provides (contract ids), consumes (contract ids) |
-| `Contract` | id, version, provider task, consumer tasks, `fields: {name: type}` |
-| `Claim` | id, revision, task, agent, branch, base SHA, plan version, state, requirement ids, files, provides, consumes (each with field types), `no_interfaces` (bool, D12), assumptions (free text), acceptance criteria |
-| `Finding` | id, kind, severity, source (`rule` or `reviewer`), affected ids, evidence, explanation, proposed correction |
-| `Directive` | id, source (`plan_change` or `verification`, D13), task, recipient, plan version, changed requirement ids, requested adjustment, reason, blocking, state, response |
-| `Escalation` | id, competing requirements, involved claims, evidence, state, resolution, resolved by, reason |
-| `Verification` | id, job, claim revision, plan version, base SHA, head SHA, evidence coverage, findings, test results, outcome, check run id |
-| `Job` | id, kind, idempotency key, attempts, state, error, correlation id |
-| `AuditEvent` | id, actor, action, entity ids and versions, reason, correlation id, timestamp |
+| `Contract` | id, version, provider task, consumer tasks, `fields: {name: FieldType}` (at least one) |
+| `InterfaceUse` | contract id, `fields: {name: FieldType}`: one contract a claim provides or consumes, with the types it expects |
+| `Claim` | id, revision, project, task, agent, branch, base SHA, plan version, state, requirement ids, files, provides, consumes (lists of `InterfaceUse`), `no_interfaces` (bool, D12), assumptions (free text), acceptance criteria, reason for the revision, created at |
+| `Finding` | id, kind, severity, source (`rule` or `reviewer`), affected ids (at least one), evidence, explanation, proposed correction |
+| `Evidence` | kind (`EvidenceKind`), ref, excerpt (at most 500 characters) |
+| `Directive` | id, project, source (`plan_change` or `verification`, D13), task, recipient, plan version, verification id (set exactly when source is `verification`), changed ids, requested adjustment, reason, blocking (default true), state, response, response note, created at. `dedupe_key` is the INV-05 key. |
+| `Escalation` | id, project, competing requirement ids, claim ids, verification id, finding ids, evidence, explanation, state, resolution, resolved by, reason, resolved at, created at. Involves at least one claim or verification. |
+| `Verification` | id, job, project, claim id and revision, plan version, PR number, base SHA, head SHA, evidence coverage, findings, test results, outcome, check run id, superseded by, created at |
+| `EvidenceCoverage` | diff complete, test results present, missing (what couldn't be fetched) |
+| `TestResult` | name, passed, message |
+| `Job` | id, project, kind, subject id (the claim, plan version, or delivery it works on), idempotency key, attempts, state, error, correlation id, result ref, created at, updated at |
+| `AuditEvent` | id, project, actor, action, entity ids, versions, reason, correlation id, idempotency key, timestamp |
 
 ## States and enums
 
@@ -77,15 +82,20 @@ Required information comes from [requirements §7](requirements.md#7-minimum-dat
 | --- | --- | --- |
 | `ClaimState` | `draft`, `pending`, `approved`, `needs_revision`, `human_review_required`, `withdrawn`, `closed` | FR-03, decision D5 adds `draft` |
 | `DirectiveState` | `queued`, `delivered`, `acknowledged`, `rejected`, `needs_clarification`, `superseded` | FR-06, UC-07, UC-09 |
+| `DirectiveResponse` | `acknowledged`, `rejected`, `needs_clarification` | UC-09 |
 | `FindingSeverity` | `blocking`, `info` | UC-05 (file overlap is `info`) |
-| `FindingKind` | Rules: `stale_plan`, `unknown_reference`, `incomplete_claim`, `contract_field_missing`, `contract_type_mismatch`, `unsupported_scope`, `duplicate_provider`, `file_overlap`. Reviewer: `semantic_mismatch`, `requirement_conflict`, `reviewer_unavailable`. Verify: `undeclared_change`, `missing_change`, `test_failure`, `protected_path_changed`, `evidence_missing` *(proposed)* | UC-05, UC-10 |
+| `FindingSource` | `rule` (application code), `reviewer` (the AI) | INV-01 |
+| `FindingKind` | Rules: `stale_plan`, `unknown_reference`, `incomplete_claim`, `contract_field_missing`, `contract_type_mismatch`, `unsupported_scope`, `duplicate_provider`, `file_overlap`. Reviewer: `semantic_mismatch`, `requirement_conflict`, `reviewer_unavailable`. Verify: `undeclared_change`, `missing_change`, `test_failure`, `protected_path_changed`, `evidence_missing`. The reviewer may only propose `semantic_mismatch` and `requirement_conflict`; application code writes `reviewer_unavailable` when the model fails. | UC-05, UC-10 |
+| `FieldType` | `integer`, `number`, `string`, `boolean`, `object`, `array` (JSON Schema names) | Typed contracts |
+| `EvidenceKind` | `plan`, `claim`, `diff`, `file`, `test`, `github` | FR-04, FR-09 |
 | `PlanStatus` | `proposed`, `approved` | FR-02 |
 | `DirectiveSource` | `plan_change`, `verification` | D13 |
 | `VerificationOutcome` | `verified`, `failed`, `needs_review`, `incomplete` | FR-09, UC-10 |
 | `SyncState` | `fresh`, `stale` | UC-15 |
-| `EscalationState` | `open`, `resolved` *(proposed)* | UC-12, UC-13 |
-| `Resolution` | `clarify_plan`, `request_revision`, `dismiss` *(proposed)* | UC-13 |
-| `JobState` | `queued`, `running`, `succeeded`, `failed` *(proposed)* | NFR-06 |
+| `EscalationState` | `open`, `resolved` | UC-12, UC-13 |
+| `Resolution` | `clarify_plan`, `request_revision`, `dismiss` | UC-13 |
+| `JobKind` | `claim_review`, `plan_propagation`, `verification`, `reconcile` | NFR-01 |
+| `JobState` | `queued`, `running`, `succeeded`, `failed` | NFR-06 |
 | `Role` | `lead`, `agent` | FR-01 |
 
 Allowed claim transitions (`midflight/domain/states.py`):
@@ -116,7 +126,29 @@ acceptance criterion, and at least one `provides` or `consumes` entry or
 `no_interfaces: true` (T3 declares this). An incomplete claim is saved as `draft`
 with an `incomplete_claim` finding that names what is missing.
 
-Verification outcome to GitHub check conclusion (UC-11):
+Claims in `draft`, `pending`, `approved`, `needs_revision`, and
+`human_review_required` are active: they reserve work and take part in other claims'
+checks. `withdrawn` and `closed` are final.
+
+Allowed directive transitions (`midflight/domain/states.py`). Agent answers go
+through `respond()`, which records the state and the response together:
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued
+    queued --> delivered: returned in a reply (UC-07)
+    queued --> superseded: newer plan (D13)
+    delivered --> acknowledged: respond (UC-09)
+    delivered --> rejected: respond
+    delivered --> needs_clarification: respond
+    delivered --> superseded: newer plan (D13)
+    needs_clarification --> superseded: lead sends a replacement
+```
+
+`queued`, `delivered`, and `needs_clarification` are open: a blocking open directive
+refuses a push (UC-16). A superseded directive keeps any earlier answer as history.
+
+Verification outcome to GitHub check conclusion (UC-11, `check_conclusion()`):
 
 | Outcome | Check conclusion | Merge |
 | --- | --- | --- |
@@ -239,6 +271,22 @@ your task touches, and name it after the ID, for example `test_inv_02_stale_revi
 | INV-14 | Shared file access alone never blocks. It is an `info` finding. | FR-04 |
 | INV-15 | Edits to contract tests or CI workflows in a reviewed branch are escalated, never passed. | NFR-10, UC-10 |
 
+The models enforce these on their own data, so no service can save a violation
+(tests in `tests/unit/test_models.py`):
+
+- **INV-03:** a `Verification` can't be `verified` without a claim and plan version,
+  a complete diff, test results that all passed, and no blocking findings.
+- **INV-14:** a `file_overlap` finding can only be `info`.
+- **INV-01, in part:** unknown fields are rejected, and a `reviewer` finding can only
+  be `semantic_mismatch` or `requirement_conflict`. Checking that cited ids exist is
+  the service's job.
+- **INV-12, in part:** `token_hash` must be a SHA-256 hex digest, so a raw token
+  can't be stored by mistake.
+
+Services and the store enforce the rest. `Store.commit` gives them the tools: a
+compare-and-set on `coord_rev` (INV-02) and an idempotency key per write (INV-05,
+INV-13).
+
 ## Ports
 
 Every external service sits behind a protocol in `midflight/ports.py`, with a fake
@@ -251,3 +299,14 @@ for tests and local runs. Tests use the fakes only.
 | `Reviewer` | `FakeReviewer` | `BedrockReviewer` (Strands) |
 | `GitHub` | `FakeGitHub` | `GitHubApp` (githubkit) |
 | `Clock` | `FixedClock` | system clock |
+
+- **`Store.commit(Commit)`** is the only write. One commit is atomic: its entities and
+  audit events are all saved, or none are. `expected_coord_rev` turns it into a
+  compare-and-set (raises `RevisionConflict`), and a repeated `idempotency_key`
+  writes nothing and returns `duplicate=True`. Save a claim and its review job in
+  one commit.
+- **`Reviewer`** returns the model's raw reply. Application code validates it as
+  `Finding`s and checks every cited id before using it (INV-01). `ReviewerUnavailable`
+  means no review, never approval.
+- **`GitHub`** raises `GitHubUnavailable` (with `retry_after` when known) on errors,
+  rate limits, and timeouts, which marks the project stale (UC-15).

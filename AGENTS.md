@@ -20,9 +20,11 @@ while they work:
 Team Yoga, AWS Agentic AI hackathon. Planned finish **Sat Oct 10, 2026**; Sun Oct 11
 is buffer and submission.
 
-**Current state:** the repo holds the specs and a small local prototype
-(`midflight/claims.py`). The planned packages (`domain/`, `services/`, `api/`, ...)
-appear as tasks land. Don't assume a module exists. Check first.
+**Current state:** the specs, the shared models and ports from S-1
+(`midflight/domain/models.py`, `states.py`, `midflight/ports.py`), and the old local
+prototype (`midflight/claims.py`, deleted once S-3 lands). The other planned packages
+(`services/`, `api/`, ...) appear as tasks land. Don't assume a module exists. Check
+first.
 
 ## Where things are
 
@@ -88,7 +90,8 @@ python -m midflight check examples/claims.json
 python -m unittest discover -s tests -v
 ```
 
-After task M-1 (uv project on Python 3.12):
+uv project on Python 3.12 (a minimal `pyproject.toml` landed with S-1; M-1 adds the
+remaining dependencies and CI):
 
 ```sh
 uv sync                                    # install
