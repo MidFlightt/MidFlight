@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Midflight Use Cases</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: reading column; UML diagram first, then one spec card per use case, then traceability and review questions */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#18222b; --muted:#56636e; --line:#d5dcdf;
+  --accent:#0d5c73; --accent-soft:#e2eff3;
+  --warn:#94620f; --warn-soft:#fbf0d9; --code-bg:#eef2f3;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111820; --surface:#18222c; --ink:#e3e9ed; --muted:#9aa8b3; --line:#2d3a45;
+  --accent:#6cc3dc; --accent-soft:#16323d; --warn:#e5b65e; --warn-soft:#3a2d14; --code-bg:#0e151b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111820; --surface:#18222c; --ink:#e3e9ed; --muted:#9aa8b3; --line:#2d3a45;
+  --accent:#6cc3dc; --accent-soft:#16323d; --warn:#e5b65e; --warn-soft:#3a2d14; --code-bg:#0e151b; color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:20px;padding-block:28px 80px;display:flex;flex-direction:column;gap:0}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.1;margin:0}
+h1{font-size:clamp(2.3rem,6vw,3.2rem);font-weight:700}
+h2{font-size:1.9rem;font-weight:600}
+h3{font-size:1.3rem;font-weight:600}
+p{margin:0;max-width:70ch}
+code{font-family:var(--f-mono);font-size:.84em;background:var(--code-bg);padding:1px 5px;border-radius:4px}
+.eyebrow{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.05rem;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:16px;padding-top:44px;scroll-margin-top:56px}
+header{display:flex;flex-direction:column;gap:10px}
+
+nav.rail{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-inline:-20px;margin-top:20px;padding:8px 20px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav.rail a{font-family:var(--f-mono);font-size:.76rem;text-decoration:none;color:var(--muted);padding:4px 8px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+nav.rail a:hover,nav.rail a:focus-visible{color:var(--ink);border-color:var(--line);outline:none}
+
+/* actors */
+.actors{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.actor{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.actor b{font-family:var(--f-display);font-size:1.15rem;font-weight:600}
+.actor .k{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.actor span:last-child{font-size:.88rem;color:var(--muted)}
+
+/* diagram */
+figure{margin:0;display:flex;flex-direction:column;gap:10px}
+.canvas{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto}
+.canvas svg{display:block;width:100%;min-width:780px;height:auto;color:var(--ink)}
+figcaption{font-size:.88rem;color:var(--muted);max-width:80ch}
+svg .bound{fill:none;stroke:currentColor;stroke-width:1.5}
+svg .band{stroke:var(--line);stroke-width:1;stroke-dasharray:4 4}
+svg .bandlbl{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;fill:var(--muted)}
+svg .sys{font-family:var(--f-display);font-size:18px;font-weight:700;letter-spacing:.06em;fill:currentColor}
+svg .assoc{stroke:currentColor;stroke-width:1.1;fill:none;opacity:.75}
+svg .dep{stroke:var(--accent);stroke-width:1.3;stroke-dasharray:5 4;fill:none}
+svg .deplbl{font-family:var(--f-mono);font-size:10.5px;fill:var(--accent)}
+svg ellipse.uc{fill:var(--surface);stroke:currentColor;stroke-width:1.3}
+svg ellipse.int{fill:var(--accent-soft);stroke:var(--accent)}
+svg .ucid{font-family:var(--f-mono);font-size:10px;fill:var(--muted)}
+svg .ucname{font-family:var(--f-body);font-size:13px;font-weight:500;fill:currentColor}
+svg .fig{stroke:currentColor;stroke-width:1.6;fill:none}
+svg .alabel{font-family:var(--f-body);font-size:13px;font-weight:600;fill:currentColor}
+svg .stereo{font-family:var(--f-mono);font-size:10px;fill:var(--muted)}
+svg .arrowhead{fill:none;stroke:var(--accent);stroke-width:1.4}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:.84rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.sw{display:inline-block;width:28px;height:14px;border-radius:50%;border:1.3px solid var(--ink);background:var(--surface)}
+.sw.int{background:var(--accent-soft);border-color:var(--accent)}
+.dash{display:inline-block;width:28px;border-top:1.5px dashed var(--accent)}
+
+/* spec cards */
+.group{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:14px}
+.group .cap{font-size:.88rem;color:var(--muted)}
+.spec{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;scroll-margin-top:60px}
+.spec.int{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.spec .hd{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--bg)}
+.spec.int .hd{background:var(--accent-soft)}
+.spec .hd .id{font-family:var(--f-display);font-weight:700;font-size:1.4rem;color:var(--accent);line-height:1}
+.spec .hd h3{flex:1 1 220px}
+.spec .hd .refs{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+.spec .bd{display:grid;grid-template-columns:minmax(0,250px) minmax(0,1fr);gap:0}
+.meta{padding:14px 18px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:10px;font-size:.88rem}
+.meta dt{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.meta dd{margin:2px 0 0}
+.meta dl{margin:0;display:flex;flex-direction:column;gap:10px}
+.flows{padding:14px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.flows h4{margin:0;font-family:var(--f-mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.flows ol{margin:4px 0 0;padding-left:1.4em;display:flex;flex-direction:column;gap:3px}
+.alts{margin:4px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+.alts li{display:grid;grid-template-columns:3.2em 1fr;gap:6px}
+.alts b{font-family:var(--f-mono);font-size:.78rem;font-weight:500;color:var(--accent);padding-top:2px}
+.post{font-size:.9rem;border-top:1px dashed var(--line);padding-top:10px}
+.post b{font-weight:600}
+
+.seq{border-top:1px solid var(--line);padding:14px 18px 18px;display:flex;flex-direction:column;gap:8px}
+.seq h4{margin:0;font-family:var(--f-mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.seq .canvas{padding:8px}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.88rem}
+th,td{text-align:left;vertical-align:top;padding:9px 14px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--bg)}
+tr:last-child td{border-bottom:none}
+td a{font-family:var(--f-mono);font-size:.8rem;color:var(--accent);text-decoration:none;margin-right:6px;white-space:nowrap}
+td a:hover{text-decoration:underline}
+
+.qs{display:flex;flex-direction:column;gap:10px;counter-reset:q;padding:0;margin:0;list-style:none}
+.qs li{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:12px 16px;display:flex;flex-direction:column;gap:4px}
+.qs li b{font-weight:600}
+.qs li span{font-size:.9rem;color:var(--muted)}
+
+@media (max-width:680px){
+  .spec .bd{grid-template-columns:1fr}
+  .meta{border-right:none;border-bottom:1px solid var(--line)}
+}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">Team Yoga · Midflight · v0.2 draft for review · Oct 7, 2026</span>
+  <h1>Midflight Use Cases</h1>
+  <p class="lede">Who uses Midflight, what each of them is trying to get done, and what the system does in the normal and the failure cases. Traced to <code>docs/requirements.md</code> (FR / NFR IDs) and the demo scenarios in §11. The examples use the checkout project: T1 checkout API, T2 checkout page, T3 contributor docs, contract <code>checkout-response</code>.</p>
+</header>
+
+<nav class="rail" aria-label="Sections">
+  <a href="#actors">Actors</a><a href="#diagram">Diagram</a><a href="#delivery">Reaching agents</a><a href="#specs">Specifications</a><a href="#trace">Demo traceability</a><a href="#questions">Review questions</a>
+</nav>
+
+<!-- ACTORS -->
+<section id="actors">
+  <span class="eyebrow">Actors</span>
+  <h2>Three primary actors, two supporting systems</h2>
+  <div class="actors">
+    <div class="actor"><span class="k">Primary · human</span><b>Integration Lead</b><span>Owns the plan. Approves changes, resolves conflicts, reads the dashboard.</span></div>
+    <div class="actor"><span class="k">Primary · human</span><b>Developer</b><span>Owns a task. Connects their coding agent, installs the hooks, and reads its status.</span></div>
+    <div class="actor"><span class="k">Primary · software</span><b>Coding Agent</b><span>Claude Code, Cursor, etc. Calls Midflight through the MCP adapter at checkpoints.</span></div>
+    <div class="actor"><span class="k">Supporting · system</span><b>GitHub</b><span>Sends signed events, serves diffs and CI results, shows the check.</span></div>
+    <div class="actor"><span class="k">Supporting · system</span><b>AI Reviewer</b><span>A Bedrock model. Proposes findings only and never decides an outcome.</span></div>
+  </div>
+</section>
+
+<!-- DIAGRAM -->
+<section id="diagram">
+  <span class="eyebrow">UML use case diagram</span>
+  <h2>What each actor can do inside Midflight</h2>
+  <figure>
+    <div class="canvas">
+<svg viewBox="0 0 1120 1000" role="img" aria-label="UML use case diagram. Integration Lead sets up the project, approves plan versions (which includes propagating the change), resolves escalations, and monitors work. Developer connects a coding agent and checks in. Coding Agent checks in, submits and revises claims (both include checking the claim, which uses the AI Reviewer), acknowledges directives, and is gated at push. GitHub triggers verification of pushed commits, which includes publishing a check. Escalate to lead extends check claim and verify commit; mark stale and reconcile extends verify commit.">
+  <defs>
+    <marker id="oa" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path class="arrowhead" d="M0,0 L10,5 L0,10"/></marker>
+  </defs>
+
+  <!-- system boundary -->
+  <rect class="bound" x="200" y="20" width="700" height="960" rx="6"/>
+  <text class="sys" x="884" y="48" text-anchor="end">MIDFLIGHT</text>
+  <line class="band" x1="200" y1="372" x2="900" y2="372"/>
+  <line class="band" x1="200" y1="772" x2="900" y2="772"/>
+  <text class="bandlbl" x="216" y="84">PLAN &amp; OVERSIGHT</text>
+  <text class="bandlbl" x="216" y="392">AGENT WORK</text>
+  <text class="bandlbl" x="216" y="800">VERIFY</text>
+
+  <!-- associations -->
+  <line class="assoc" x1="124" y1="200" x2="295" y2="120"/>
+  <line class="assoc" x1="124" y1="200" x2="295" y2="185"/>
+  <line class="assoc" x1="124" y1="200" x2="295" y2="250"/>
+  <line class="assoc" x1="124" y1="200" x2="295" y2="315"/>
+  <line class="assoc" x1="124" y1="445" x2="295" y2="425"/>
+  <line class="assoc" x1="124" y1="445" x2="295" y2="485"/>
+  <line class="assoc" x1="124" y1="625" x2="295" y2="485"/>
+  <line class="assoc" x1="124" y1="625" x2="295" y2="545"/>
+  <line class="assoc" x1="124" y1="625" x2="295" y2="605"/>
+  <line class="assoc" x1="124" y1="625" x2="295" y2="665"/>
+  <line class="assoc" x1="124" y1="625" x2="295" y2="725"/>
+  <line class="assoc" x1="986" y1="690" x2="805" y2="560"/>
+  <line class="assoc" x1="986" y1="690" x2="805" y2="845"/>
+  <line class="assoc" x1="986" y1="880" x2="805" y2="845"/>
+  <line class="assoc" x1="986" y1="880" x2="805" y2="930"/>
+
+  <!-- include / extend -->
+  <line class="dep" x1="505" y1="185" x2="594" y2="185" marker-end="url(#oa)"/>
+  <text class="deplbl" x="549" y="176" text-anchor="middle">«include»</text>
+  <line class="dep" x1="505" y1="545" x2="594" y2="556" marker-end="url(#oa)"/>
+  <text class="deplbl" x="549" y="539" text-anchor="middle">«include»</text>
+  <line class="dep" x1="505" y1="605" x2="619" y2="578" marker-end="url(#oa)"/>
+  <text class="deplbl" x="572" y="610" text-anchor="middle">«include»</text>
+  <line class="dep" x1="700" y1="654" x2="700" y2="587" marker-end="url(#oa)"/>
+  <text class="deplbl" x="710" y="624">«extend»</text>
+  <line class="dep" x1="700" y1="706" x2="700" y2="818" marker-end="url(#oa)"/>
+  <text class="deplbl" x="710" y="796">«extend»</text>
+  <line class="dep" x1="505" y1="845" x2="594" y2="845" marker-end="url(#oa)"/>
+  <text class="deplbl" x="549" y="836" text-anchor="middle">«extend»</text>
+  <line class="dep" x1="700" y1="871" x2="700" y2="903" marker-end="url(#oa)"/>
+  <text class="deplbl" x="710" y="892">«include»</text>
+
+  <!-- use cases: column A -->
+  <ellipse class="uc" cx="400" cy="120" rx="105" ry="26"/><text class="ucid" x="400" y="113" text-anchor="middle">UC-01</text><text class="ucname" x="400" y="130" text-anchor="middle">Set up project &amp; team</text>
+  <ellipse class="uc" cx="400" cy="185" rx="105" ry="26"/><text class="ucid" x="400" y="178" text-anchor="middle">UC-03</text><text class="ucname" x="400" y="195" text-anchor="middle">Approve plan version</text>
+  <ellipse class="uc" cx="400" cy="250" rx="105" ry="26"/><text class="ucid" x="400" y="243" text-anchor="middle">UC-13</text><text class="ucname" x="400" y="260" text-anchor="middle">Resolve escalation</text>
+  <ellipse class="uc" cx="400" cy="315" rx="105" ry="26"/><text class="ucid" x="400" y="308" text-anchor="middle">UC-14</text><text class="ucname" x="400" y="325" text-anchor="middle">Monitor work &amp; audit</text>
+  <ellipse class="uc" cx="400" cy="425" rx="105" ry="26"/><text class="ucid" x="400" y="418" text-anchor="middle">UC-02</text><text class="ucname" x="400" y="435" text-anchor="middle">Connect coding agent</text>
+  <ellipse class="uc" cx="400" cy="485" rx="105" ry="26"/><text class="ucid" x="400" y="478" text-anchor="middle">UC-07</text><text class="ucname" x="400" y="495" text-anchor="middle">Check in</text>
+  <ellipse class="uc" cx="400" cy="545" rx="105" ry="26"/><text class="ucid" x="400" y="538" text-anchor="middle">UC-04</text><text class="ucname" x="400" y="555" text-anchor="middle">Submit claim</text>
+  <ellipse class="uc" cx="400" cy="605" rx="105" ry="26"/><text class="ucid" x="400" y="598" text-anchor="middle">UC-06</text><text class="ucname" x="400" y="615" text-anchor="middle">Revise or withdraw claim</text>
+  <ellipse class="uc" cx="400" cy="665" rx="105" ry="26"/><text class="ucid" x="400" y="658" text-anchor="middle">UC-09</text><text class="ucname" x="400" y="675" text-anchor="middle">Acknowledge directive</text>
+  <ellipse class="uc" cx="400" cy="725" rx="105" ry="26"/><text class="ucid" x="400" y="718" text-anchor="middle">UC-16</text><text class="ucname" x="400" y="735" text-anchor="middle">Gate push on directives</text>
+  <ellipse class="int" cx="400" cy="845" rx="105" ry="26"/><text class="ucid" x="400" y="838" text-anchor="middle">UC-15</text><text class="ucname" x="400" y="855" text-anchor="middle">Mark stale &amp; reconcile</text>
+
+  <!-- use cases: column B -->
+  <ellipse class="int" cx="700" cy="185" rx="105" ry="26"/><text class="ucid" x="700" y="178" text-anchor="middle">UC-08</text><text class="ucname" x="700" y="195" text-anchor="middle">Propagate plan change</text>
+  <ellipse class="int" cx="700" cy="560" rx="105" ry="26"/><text class="ucid" x="700" y="553" text-anchor="middle">UC-05</text><text class="ucname" x="700" y="570" text-anchor="middle">Check claim</text>
+  <ellipse class="int" cx="700" cy="680" rx="105" ry="26"/><text class="ucid" x="700" y="673" text-anchor="middle">UC-12</text><text class="ucname" x="700" y="690" text-anchor="middle">Escalate to lead</text>
+  <ellipse class="uc" cx="700" cy="845" rx="105" ry="26"/><text class="ucid" x="700" y="838" text-anchor="middle">UC-10</text><text class="ucname" x="700" y="855" text-anchor="middle">Verify pushed commit</text>
+  <ellipse class="int" cx="700" cy="930" rx="105" ry="26"/><text class="ucid" x="700" y="923" text-anchor="middle">UC-11</text><text class="ucname" x="700" y="940" text-anchor="middle">Publish verify check</text>
+
+  <!-- actors -->
+  <g transform="translate(100,175)"><circle class="fig" cx="0" cy="0" r="11"/><path class="fig" d="M0,11 V42 M-18,22 H18 M0,42 L-15,66 M0,42 L15,66"/><text class="alabel" x="0" y="86" text-anchor="middle">Integration Lead</text></g>
+  <g transform="translate(100,420)"><circle class="fig" cx="0" cy="0" r="11"/><path class="fig" d="M0,11 V42 M-18,22 H18 M0,42 L-15,66 M0,42 L15,66"/><text class="alabel" x="0" y="86" text-anchor="middle">Developer</text></g>
+  <g transform="translate(100,600)"><circle class="fig" cx="0" cy="0" r="11"/><path class="fig" d="M0,11 V42 M-18,22 H18 M0,42 L-15,66 M0,42 L15,66"/><text class="alabel" x="0" y="86" text-anchor="middle">Coding Agent</text><text class="stereo" x="0" y="100" text-anchor="middle">via MCP adapter</text></g>
+  <g transform="translate(1010,665)"><circle class="fig" cx="0" cy="0" r="11"/><path class="fig" d="M0,11 V42 M-18,22 H18 M0,42 L-15,66 M0,42 L15,66"/><text class="alabel" x="0" y="86" text-anchor="middle">AI Reviewer</text><text class="stereo" x="0" y="100" text-anchor="middle">«system» Bedrock</text></g>
+  <g transform="translate(1010,855)"><circle class="fig" cx="0" cy="0" r="11"/><path class="fig" d="M0,11 V42 M-18,22 H18 M0,42 L-15,66 M0,42 L15,66"/><text class="alabel" x="0" y="86" text-anchor="middle">GitHub</text><text class="stereo" x="0" y="100" text-anchor="middle">«system» App + Actions</text></g>
+</svg>
+    </div>
+    <div class="legend">
+      <span><i class="sw"></i>Actor goal: someone starts it</span>
+      <span><i class="sw int"></i>Internal step: always runs as part of another use case, or only when something goes wrong</span>
+      <span><i class="dash"></i>«include» always happens · «extend» happens only under a condition</span>
+    </div>
+    <figcaption>Humans and agents are on the left, supporting systems on the right. The AI Reviewer only touches Check claim and Verify pushed commit, which is the whole of the model's role. Not drawn, to keep the diagram readable: UC-12 also extends UC-08 when a change's impact is unclear, and UC-15 also extends UC-08 by holding directives while GitHub data is stale.</figcaption>
+  </figure>
+</section>
+
+<!-- DELIVERY -->
+<section id="delivery">
+  <span class="eyebrow">Reaching coding agents</span>
+  <h2>Midflight answers. It never speaks first.</h2>
+  <p>A coding agent only takes in three things: what its user types, the replies to tool calls it makes, and context its host injects (such as Claude Code hooks). An MCP server can only answer calls. So every message from Midflight has to travel inside a reply to something the agent, or a hook acting for it, called. The design is built around that.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Mechanism</th><th>What it does</th><th>Use cases</th></tr></thead>
+    <tbody>
+      <tr><td><b>Verdict in the same call</b></td><td><code>submit_claim</code> waits for the review (up to about 60 s) and returns the verdict, the agreed contract, and any correction. The agent never polls for its own review.</td><td><a href="#uc04">UC-04</a><a href="#uc06">UC-06</a></td></tr>
+      <tr><td><b>Directives in every reply</b></td><td>Whichever tool the agent calls, the reply includes any unacknowledged directive for its task.</td><td><a href="#uc08">UC-08</a><a href="#uc09">UC-09</a></td></tr>
+      <tr><td><b><code>check_in</code></b></td><td>Replaces <code>get_task_context</code> and <code>get_directives</code>. Returns only what changed since the last check-in.</td><td><a href="#uc07">UC-07</a></td></tr>
+      <tr><td><b>Host hook</b></td><td>In Claude Code, a hook runs <code>check_in</code> after tool calls or on each prompt and adds new directives to the agent's context. This is the closest thing to a push.</td><td><a href="#uc02">UC-02</a><a href="#uc07">UC-07</a></td></tr>
+      <tr><td><b>Agent-planned checkpoints</b></td><td>The adapter's instructions tell the agent to list its assumptions in the claim, check in at the critical points of its task, and submit a revised claim when an assumption or its scope changes (D10). Guidance, not enforcement.</td><td><a href="#uc02">UC-02</a><a href="#uc07">UC-07</a></td></tr>
+      <tr><td><b>git pre-push hook</b></td><td>Refuses the push while a blocking directive is unacknowledged. Works with any agent host.</td><td><a href="#uc16">UC-16</a></td></tr>
+    </tbody>
+  </table></div>
+  <figure>
+  <div class="canvas"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant L as Lead
+  participant M as Midflight
+  participant H as Claude Code hook
+  participant A as Frederik's agent (T2)
+  A->>M: submit_claim(T2, consumes total_cents:int)
+  M-->>A: approved + contract checkout-response v1
+  Note over A: implements - Midflight cannot interrupt
+  L->>M: approve plan v2 (+ currency)
+  M->>M: UC-08 queues directive D-42 for T2
+  A->>H: agent runs any tool
+  H->>M: check_in(T2)
+  M-->>H: D-42 display currency (plan v2)
+  H-->>A: adds D-42 to agent context
+  A->>M: acknowledge_directive(D-42)
+  A->>M: submit_claim(T2 rev 2)
+  M-->>A: approved for v2
+  </pre></div>
+  <figcaption>How long delivery takes depends on when the agent next calls Midflight or the hook runs. It isn't instant. Without the Claude Code hook, D-42 arrives in the reply to the agent's next Midflight call, or the pre-push hook blocks the push until it is acknowledged. If the agent is idle waiting for its developer, nothing reaches it until the developer types.</figcaption>
+  </figure>
+</section>
+
+<!-- SPECS -->
+<section id="specs">
+  <span class="eyebrow">Specifications</span>
+  <h2>Sixteen use cases in detail</h2>
+  <p>Each one lists its main success path plus the alternate and failure paths. Alternates are numbered after the step they branch from (<b>4a</b> branches at step 4). Every alternate is a candidate test. Each card ends with a sequence diagram: stick figures are people, boxes are software, <code>alt</code> blocks are alternate paths (only one branch happens), <code>opt</code> blocks happen only under their condition, and <code>loop</code> blocks repeat.</p>
+  <nav class="rail" aria-label="Use cases" style="position:static;margin:0;padding:0;border:none;flex-wrap:wrap">
+    <a href="#uc01">01</a><a href="#uc02">02</a><a href="#uc03">03</a><a href="#uc04">04</a><a href="#uc05">05</a><a href="#uc06">06</a><a href="#uc07">07</a><a href="#uc08">08</a><a href="#uc09">09</a><a href="#uc10">10</a><a href="#uc11">11</a><a href="#uc12">12</a><a href="#uc13">13</a><a href="#uc14">14</a><a href="#uc15">15</a><a href="#uc16">16</a>
+  </nav>
+
+  <div class="group"><h3>Plan &amp; oversight</h3><span class="cap">Lead-only goals</span></div>
+
+  <article class="spec" id="uc01"><div class="hd"><span class="id">UC-01</span><h3>Set up project &amp; team</h3><span class="refs">FR-01 · NFR-07 · NFR-09</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Integration Lead</dd></div><div><dt>Supporting</dt><dd>GitHub</dd></div><div><dt>Trigger</dt><dd>The team starts the hackathon project.</dd></div><div><dt>Preconditions</dt><dd>The Midflight GitHub App is installed on the demo repo.</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>The lead creates the project and links the repo and its App installation.</li>
+      <li>Midflight confirms it can read the repo through the installation.</li>
+      <li>The lead registers each developer and their agent identity (for example <code>frederik / claude-code</code>) and assigns tasks T1–T3.</li>
+      <li>Midflight issues each participant a revocable token, shows it once, and stores only its hash.</li>
+      <li>Midflight records an audit event for each registration.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>2a</b><span>The repo isn't reachable through the installation. The project stays inactive and the lead sees which permission is missing.</span></li>
+      <li><b>4a</b><span>The lead revokes a token. Later calls with it return 401.</span></li>
+      <li><b>*a</b><span>A non-lead tries any setup action and gets 403.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> Every participant can perform only the operations their role allows.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor L as Lead
+    participant API as Midflight API
+    participant GH as GitHub
+    participant DB as DynamoDB
+    L->>API: create project (repo, App installation id)
+    API->>API: check lead token
+    API->>GH: read repo with installation token
+    alt repo not reachable
+        GH-->>API: 404 or missing permission
+        API-->>L: project inactive, missing permission named
+    else reachable
+        GH-->>API: repo metadata
+        API->>DB: save project
+        L->>API: register frederik / claude-code, assign T2
+        API->>API: generate token, keep only its hash
+        API->>DB: save participant, token hash, audit event
+        API-->>L: token (shown once)
+        L-->>L: hand token to Frederik privately
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec" id="uc03"><div class="hd"><span class="id">UC-03</span><h3>Approve plan version</h3><span class="refs">FR-02 · FR-10</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Integration Lead</dd></div><div><dt>Trigger</dt><dd>The first plan, or a change such as adding <code>currency</code> to <code>checkout-response</code>.</dd></div><div><dt>Preconditions</dt><dd>UC-01 is done.</dd></div><div><dt>Includes</dt><dd>UC-08 when version &gt; 1</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>The lead drafts the plan: requirements, tasks, and contracts with their fields, provider, and consumers.</li>
+      <li>Midflight validates it. IDs must be unique, every contract needs one provider, and every reference must exist.</li>
+      <li>Midflight shows the changes from the current version: requirement and contract IDs added, changed, or removed.</li>
+      <li>The lead approves with a reason.</li>
+      <li>Midflight stores an immutable new version, advances the project's coordination revision, and writes an audit event.</li>
+      <li>For version 2 onward, Midflight runs <b>UC-08 Propagate plan change</b>.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>2a</b><span>Validation fails. Midflight lists each problem and nothing is saved.</span></li>
+      <li><b>4a</b><span>Someone approved another version first. The draft must be rebased on the newer version.</span></li>
+      <li><b>*a</b><span>A developer or agent tries to approve and gets 403. A proposed requirement never replaces the approved plan.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> All older versions stay readable. New claims must reference the current version.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor L as Lead
+    participant API as Midflight API
+    participant DB as DynamoDB
+    participant W as Worker
+    L->>API: submit plan draft v2 (adds currency)
+    API->>API: check lead role, validate IDs and references
+    alt invalid
+        API-->>L: list of problems, nothing saved
+    else valid
+        API->>DB: read current version v1
+        API-->>L: diff, checkout-response changed
+        L->>API: approve with reason
+        API->>DB: write v2 IF current is v1, bump coord_rev, audit, propagate job
+        alt another version was approved first
+            DB-->>API: ConditionalCheckFailed
+            API-->>L: rebase the draft on the newer version
+        else saved
+            DB-->>API: ok
+            API-->>L: plan v2 approved
+            DB-->>W: stream event, propagate job (UC-08)
+        end
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec" id="uc13"><div class="hd"><span class="id">UC-13</span><h3>Resolve escalation</h3><span class="refs">FR-10 · FR-12</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Integration Lead</dd></div><div><dt>Trigger</dt><dd>An open escalation from UC-12.</dd></div><div><dt>Preconditions</dt><dd>The escalation has evidence attached.</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>The lead opens the escalation. Example: T2 wants a tax-inclusive total while T1 excludes tax.</li>
+      <li>Midflight shows the competing requirements, the claims involved, and the evidence.</li>
+      <li>The lead picks one: clarify the plan (goes to UC-03), ask an agent to revise (its claim moves to <i>needs_revision</i> and it gets a directive), or dismiss the finding with a reason.</li>
+      <li>Midflight records who decided and why, and keeps the original finding.</li>
+      <li>Midflight re-checks the affected claims or commits.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>3a</b><span>The lead defers. The escalation stays open and affected approvals stay blocked.</span></li>
+      <li><b>*a</b><span>A non-lead tries to resolve it and gets 403.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> The audit trail links each resolution to the revalidation it caused.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor L as Lead
+    participant API as Midflight API
+    participant DB as DynamoDB
+    participant W as Worker
+    L->>API: open E-7
+    API-->>L: competing requirements and evidence
+    alt clarify plan
+        L->>API: approve plan v3, totals exclude tax
+        Note over API: runs UC-03, then UC-08
+    else request revision
+        L->>API: ask T2 to revise
+        API->>DB: T2 to needs_revision, queue directive for T2
+    else dismiss
+        L->>API: dismiss finding with reason
+    end
+    API->>DB: record decision, who, why, keep original finding
+    DB-->>W: revalidation jobs for T1 and T2
+    Note over L: Deferring leaves E-7 open and affected approvals blocked
+</pre></div></div>
+  </article>
+
+  <article class="spec" id="uc14"><div class="hd"><span class="id">UC-14</span><h3>Monitor work &amp; audit</h3><span class="refs">FR-11 · FR-12 · NFR-06 · NFR-12</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Integration Lead</dd></div><div><dt>Trigger</dt><dd>The lead opens the dashboard.</dd></div><div><dt>Preconditions</dt><dd>The lead is authenticated.</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>The dashboard shows the current plan version and each task: agent, branch, claim state, open findings.</li>
+      <li>It lists directives with their delivery state: queued, delivered, acknowledged, rejected, or needs clarification.</li>
+      <li>It shows verification per commit (passed, failed, needs review, incomplete) with a link to GitHub.</li>
+      <li>It shows sync state, last good sync, and outstanding or failed jobs.</li>
+      <li>The lead opens any item's timeline and sees the chain of reasons that produced it.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>2a</b><span>A directive has stayed queued for a long time because the agent hasn't called. The lead can nudge the developer.</span></li>
+      <li><b>4a</b><span>A job is in the dead-letter queue. It's shown with its error and a retry action.</span></li>
+      <li><b>4b</b><span>State is stale. A banner explains that a GitHub check may still show an old result.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> The lead can tell what needs attention without reading raw logs.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor L as Lead
+    participant UI as Streamlit dashboard
+    participant API as Midflight API
+    participant DB as DynamoDB
+    loop every 5 s
+        UI->>API: GET /projects/{pid}/state
+        API->>DB: read plan, claims, directives, verifications, jobs, sync state
+        API-->>UI: snapshot
+    end
+    UI-->>L: items needing attention first
+    opt state is stale
+        UI-->>L: banner, GitHub may show an old check
+    end
+    opt directive queued for a long time
+        UI-->>L: T2 has not called since D-42, nudge Frederik
+    end
+    opt failed job in dead-letter queue
+        L->>UI: retry job
+        UI->>API: POST /jobs/{jid}/retry
+    end
+    L->>UI: open timeline for D-42
+    UI->>API: GET /projects/{pid}/audit for D-42
+    API-->>UI: v2 approved, D-42 queued, delivered, acknowledged
+</pre></div></div>
+  </article>
+
+  <div class="group"><h3>Agent work</h3><span class="cap">Before and during implementation</span></div>
+
+  <article class="spec" id="uc02"><div class="hd"><span class="id">UC-02</span><h3>Connect coding agent</h3><span class="refs">FR-07</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Developer</dd></div><div><dt>Trigger</dt><dd>The developer receives a token from UC-01.</dd></div><div><dt>Preconditions</dt><dd>The agent host supports MCP over stdio.</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol><li>The developer installs the local MCP adapter.</li><li>They add it to the agent's MCP config, with the API URL and token as environment variables.</li><li>The agent lists three tools: <code>submit_claim</code>, <code>check_in</code>, <code>acknowledge_directive</code>. It also receives the adapter's instructions for planning checkpoints and reporting assumptions (D10).</li><li>The developer installs the git pre-push hook in their clone (UC-16).</li><li>Optionally, for Claude Code, they install the hook that runs <code>check_in</code> automatically.</li><li>A smoke call to <code>check_in</code> returns the developer's assigned task.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts"><li><b>6a</b><span>The token is invalid. The adapter reports 401 and names the setting to fix.</span></li><li><b>6b</b><span>The API is unreachable. The adapter says review is unavailable and never tells the agent to proceed.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> The agent and its git client can both reach Midflight.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as Developer
+    participant A as Coding agent
+    participant AD as MCP adapter
+    participant API as Midflight API
+    D->>AD: install adapter, set MIDFLIGHT_URL and token
+    D->>D: install git pre-push hook (UC-16)
+    opt agent is Claude Code
+        D->>A: install hook that runs check_in
+    end
+    A->>AD: list tools
+    AD-->>A: submit_claim, check_in, acknowledge_directive
+    A->>AD: check_in()
+    AD->>API: POST /projects/{pid}/check-in with bearer token
+    alt token invalid
+        API-->>AD: 401
+        AD-->>A: error, fix MIDFLIGHT_TOKEN
+    else API unreachable
+        AD-->>A: review unavailable, do not proceed as if approved
+    else ok
+        API-->>AD: task T2, plan v1
+        AD-->>A: assigned task T2
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec" id="uc07"><div class="hd"><span class="id">UC-07</span><h3>Check in</h3><span class="refs">FR-07 · FR-06</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actors</dt><dd>Coding Agent, Developer</dd></div><div><dt>Trigger</dt><dd>A checkpoint the agent planned at a critical point of its task (D10: before implementing, before building on a contract or shared interface, when an assumption or its scope changes, before pushing), or a host hook acting for the agent.</dd></div><div><dt>Preconditions</dt><dd>UC-02 is done.</dd></div><div><dt>Replaces</dt><dd><code>get_task_context</code> and <code>get_directives</code></dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol><li>The agent, or its hook, calls <code>check_in(T2)</code>.</li><li>Midflight returns what changed since the last check-in: plan version, claim state, findings, new directives.</li><li>Midflight marks the returned directives as <i>delivered</i>.</li><li>If there are blocking findings or unacknowledged blocking directives, the reply tells the agent to pause or revise.</li><li>Otherwise the agent continues.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts"><li><b>2a</b><span>Nothing changed. The reply is short: the current plan version and "no changes".</span></li><li><b>2b</b><span>A review is still running. The reply says <code>pending</code>, and the agent continues non-conflicting work without resubmitting.</span></li><li><b>2c</b><span>State is stale. The reply flags it and withholds new directives.</span></li><li><b>2d</b><span>The agent asks about another person's task. It gets a read-only view of the contracts it consumes; anything else is 403 (Q3).</span></li><li><b>5a</b><span>The agent has made a new assumption, or its scope has changed, since its last claim. It submits a revised claim with the updated assumptions (UC-06) and waits for the verdict before building on it.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> The agent works from the current plan, not from its own conversation history.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant A as Frederik's agent
+    participant AD as MCP adapter
+    participant API as Midflight API
+    participant DB as DynamoDB
+    A->>AD: check_in(T2)
+    AD->>API: POST /projects/{pid}/check-in for T2 since last cursor
+    API->>DB: read changes since cursor
+    alt state is stale
+        API-->>AD: stale warning, new directives withheld
+    else nothing new
+        API-->>AD: plan v2, no changes
+    else changes
+        API->>DB: mark returned directives delivered
+        API-->>AD: claim state, findings, directive D-42
+    end
+    AD-->>A: reply
+    opt blocking finding or unacknowledged directive
+        A->>A: pause, revise claim (UC-06) or acknowledge (UC-09)
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec" id="uc04"><div class="hd"><span class="id">UC-04</span><h3>Submit claim</h3><span class="refs">FR-03 · FR-04 · NFR-01</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Coding Agent</dd></div><div><dt>Trigger</dt><dd>The agent is about to start implementing a task.</dd></div><div><dt>Preconditions</dt><dd>An approved plan exists, and the task is assigned to this agent.</dd></div><div><dt>Includes</dt><dd>UC-05</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol><li>The agent calls <code>submit_claim</code> with task, branch, base SHA, plan version, requirement IDs, expected files, provided and consumed contracts with field types, assumptions, and acceptance criteria.</li><li>Midflight authenticates the caller and checks every reference.</li><li>It saves the claim as <code>pending</code> together with a review job, in one write.</li><li>It runs <b>UC-05 Check claim</b> in the background while the adapter waits.</li><li><b>The adapter returns the verdict in the same call:</b> <code>approved</code>, <code>needs_revision</code>, or <code>human_review_required</code>, with the agreed contracts, findings, proposed corrections, and any pending directives.</li><li>If approved, the agent builds against the returned contract. Otherwise it revises through UC-06.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts"><li><b>2a</b><span>An unknown requirement or contract ID. The error lists the valid IDs and nothing is saved.</span></li><li><b>2b</b><span>The claim cites an old plan version. The error points to the current one.</span></li><li><b>2c</b><span>The task belongs to another agent: 403.</span></li><li><b>2d</b><span>The claim omits interfaces or criteria. It is saved as a draft and the verdict asks for the missing detail before approval (D5). A task with no interfaces, like T3, declares <code>no_interfaces: true</code> instead (D12).</span></li><li><b>5a</b><span>The review takes longer than the wait limit (~60 s). The call returns <code>pending</code> with a job ID, and the verdict arrives in the agent's next <code>check_in</code>.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> No accepted claim is ever without a review job, and the agent never has to poll for its own review.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant A as Frederik's agent
+    participant AD as MCP adapter
+    participant API as Midflight API
+    participant DB as DynamoDB
+    participant W as Worker
+    A->>AD: submit_claim(T2, consumes checkout-response.total_cents:int)
+    AD->>API: POST /projects/{pid}/claims
+    API->>API: authenticate, validate references
+    alt unknown ID or old plan version
+        API-->>AD: 400 with valid IDs or current version
+        AD-->>A: fix and resubmit
+    else valid
+        API->>DB: one write, claim (pending) plus review job
+        API-->>AD: claim_id, job_id
+        DB-->>W: stream event, review job
+        W->>W: UC-05 Check claim
+        W->>DB: save verdict
+        loop every 2 s, up to about 60 s
+            AD->>API: GET /jobs/{jid}
+        end
+        alt verdict ready
+            API-->>AD: approved, contract, pending directives
+            AD-->>A: approved, build against checkout-response v1
+        else wait limit reached
+            AD-->>A: pending, verdict comes with next check_in
+        end
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec int" id="uc05"><div class="hd"><span class="id">UC-05</span><h3>Check claim</h3><span class="refs">FR-04 · NFR-02 · NFR-03 · NFR-05</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Kind</dt><dd>Included by UC-04 and UC-06</dd></div><div><dt>Supporting</dt><dd>AI Reviewer</dd></div><div><dt>Trigger</dt><dd>A review job</dd></div><div><dt>Extended by</dt><dd>UC-12</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>The worker loads the approved plan and all active claims at coordination revision <i>N</i>.</li>
+      <li>Rules run first: stale version, missing references, contract field or type mismatch (<code>total</code> vs <code>total_cents</code>), and file overlap (recorded as info only).</li>
+      <li>The worker sends the free-text assumptions and related claims to the AI Reviewer.</li>
+      <li>It checks the reviewer's reply against the findings schema and confirms every cited ID exists.</li>
+      <li>It decides <code>approved</code> or <code>needs_revision</code> with evidence and a proposed fix.</li>
+      <li>It saves the decision only if the coordination revision is still <i>N</i>, and writes an audit event.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>5a</b><span>The finding is a requirement conflict or the reviewer is unsure. Goes to <b>UC-12</b>.</span></li>
+      <li><b>4a</b><span>The reply is malformed or times out. No approval. The job retries a bounded number of times, then the result is <i>review incomplete</i>.</span></li>
+      <li><b>6a</b><span>The revision changed because another claim landed. Re-run from step 1, with a bounded number of attempts.</span></li>
+      <li><b>*a</b><span>The same job is delivered twice. Midflight produces one decision and one audit event.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> Two conflicting claims can never both be approved from an outdated snapshot.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant DB as DynamoDB
+    participant W as Worker
+    participant R as AI reviewer
+    DB-->>W: review job for claim T2 rev 1
+    W->>DB: read plan v1 and active claims at coord_rev 7
+    W->>W: rules, version, references, contract fields, file overlap
+    W->>R: assumptions and related claims (no tools)
+    alt malformed reply or timeout
+        R-->>W: invalid
+        W->>W: never approve, retry (bounded), then review incomplete
+    else valid findings
+        R-->>W: findings JSON
+        W->>W: validate schema, check every cited ID exists
+        alt requirement conflict or reviewer unsure
+            W->>W: UC-12 Escalate to lead
+        else decision reached
+            W->>DB: save verdict IF coord_rev is 7, set 8
+            alt another claim landed first
+                DB-->>W: ConditionalCheckFailed
+                W->>W: rerun from the snapshot read (bounded)
+            else saved
+                DB-->>W: ok, audit event written
+            end
+        end
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec" id="uc06"><div class="hd"><span class="id">UC-06</span><h3>Revise or withdraw claim</h3><span class="refs">FR-03</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Coding Agent</dd></div><div><dt>Trigger</dt><dd>A finding, a directive, or the agent learning more.</dd></div><div><dt>Preconditions</dt><dd>The claim exists and belongs to this agent.</dd></div><div><dt>Includes</dt><dd>UC-05 for revisions</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>The agent submits a revision with the same claim ID, for example T2 now consuming <code>total_cents:int</code>.</li>
+      <li>Midflight keeps the previous revision and its findings and stores the new one as <code>pending</code>.</li>
+      <li>Midflight runs <b>UC-05</b> and returns the verdict in the same call, as in UC-04.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>1a</b><span>The agent withdraws the claim, or closes an approved claim when the work is done (D11). It stops reserving work and is excluded from other claims' checks.</span></li>
+      <li><b>1b</b><span>A different agent tries to revise it: 403.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> The claim history shows every revision and why it changed.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant A as Frederik's agent
+    participant AD as MCP adapter
+    participant API as Midflight API
+    participant DB as DynamoDB
+    alt revise
+        A->>AD: submit_claim(T2 rev 2, total_cents:int)
+        AD->>API: POST /projects/{pid}/claims (same claim id, rev 2)
+        API->>API: same owner as rev 1?
+        API->>DB: keep rev 1 and its findings, save rev 2 pending plus job
+        Note over API,DB: UC-05 runs, adapter waits as in UC-04
+        API-->>AD: approved
+        AD-->>A: approved for plan v1
+    else withdraw or close
+        A->>AD: submit_claim(T2, status withdrawn or closed)
+        AD->>API: POST /claims/{cid}/withdraw or /close
+        API->>DB: claim withdrawn or closed, stops reserving work, audit
+        API-->>AD: withdrawn or closed
+    else wrong agent
+        AD->>API: revision from another agent
+        API-->>AD: 403
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec" id="uc09"><div class="hd"><span class="id">UC-09</span><h3>Acknowledge directive</h3><span class="refs">FR-06 · FR-07</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Coding Agent</dd></div><div><dt>Trigger</dt><dd>A directive arrives inside any Midflight reply: <code>submit_claim</code>, <code>check_in</code>, or a hook-run <code>check_in</code>.</dd></div><div><dt>Preconditions</dt><dd>A current (not superseded) directive exists for the task.</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol><li>The agent reads D-42: "display <code>currency</code> next to the total (plan v2)".</li><li>It treats this as information to consider and never runs it as a command.</li><li>It calls <code>acknowledge_directive(D-42, acknowledged, note)</code>.</li><li>The lead sees the acknowledgment on the dashboard.</li><li>The agent revises its claim through <b>UC-06</b>.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts"><li><b>3a</b><span>The agent replies <code>needs_clarification</code>. The question appears for the lead.</span></li><li><b>3b</b><span>The agent replies <code>rejected</code> with a reason, and the lead is alerted.</span></li><li><b>1a</b><span>The directive was superseded by v3. Only the replacement is delivered.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> Acknowledged means received, not implemented. Only UC-10 proves implementation.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant A as Frederik's agent
+    participant AD as MCP adapter
+    participant API as Midflight API
+    participant DB as DynamoDB
+    actor L as Lead
+    AD-->>A: any Midflight reply carrying D-42 (display currency)
+    A->>A: treat as information, never as a command
+    alt agrees
+        A->>AD: acknowledge_directive(D-42, acknowledged)
+    else unclear
+        A->>AD: acknowledge_directive(D-42, needs_clarification, question)
+    else disagrees
+        A->>AD: acknowledge_directive(D-42, rejected, reason)
+    end
+    AD->>API: POST /directives/D-42/ack
+    API->>DB: record response, audit event
+    API-->>AD: recorded
+    L->>API: open dashboard
+    API-->>L: D-42 acknowledged (received, not yet implemented)
+    opt acknowledged
+        A->>AD: submit_claim(T2 rev 3, adds currency) (UC-06)
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec" id="uc16"><div class="hd"><span class="id">UC-16</span><h3>Gate push on directives</h3><span class="refs">FR-07</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Coding Agent (via <code>git push</code>)</dd></div><div><dt>Trigger</dt><dd>A push from a clone with the Midflight pre-push hook installed.</dd></div><div><dt>Preconditions</dt><dd>UC-02 step 4 is done.</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol><li>The agent runs <code>git push</code>.</li><li>The pre-push hook calls <code>check_in</code> for the branch's task.</li><li>The claim is approved for the current plan version and no blocking directive is unacknowledged.</li><li>The push goes through.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts"><li><b>3a</b><span>A blocking directive is unacknowledged. The push is refused and the hook prints the directive, so the agent now has it in context.</span></li><li><b>3b</b><span>The claim is not approved for the current plan version. The push is refused with the reason.</span></li><li><b>2a</b><span>Midflight is unreachable. The hook warns and allows the push, because UC-10 still verifies on GitHub (D8).</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> No agent pushes without having seen the current directives. This is a local convenience, not a security control: <code>--no-verify</code> skips it, and the required GitHub check is still the enforcement point.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant A as Frederik's agent
+    participant PP as pre-push hook
+    participant API as Midflight API
+    participant GH as GitHub
+    A->>PP: git push
+    PP->>API: check_in(T2)
+    alt Midflight unreachable
+        PP-->>A: warning, push allowed, GitHub check still verifies
+        PP->>GH: push
+    else blocking directive unacknowledged
+        API-->>PP: D-42 unacknowledged
+        PP-->>A: push refused, prints D-42
+    else claim not approved for current plan
+        API-->>PP: claim pending for v2
+        PP-->>A: push refused, resubmit claim
+    else all clear
+        API-->>PP: ok
+        PP->>GH: push proceeds
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec int" id="uc08"><div class="hd"><span class="id">UC-08</span><h3>Propagate plan change</h3><span class="refs">FR-05 · FR-06 · NFR-02</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Kind</dt><dd>Included by UC-03</dd></div><div><dt>Trigger</dt><dd>Plan version N &gt; 1 is approved.</dd></div><div><dt>Extended by</dt><dd>UC-12 (unclear impact), UC-15 (stale)</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol><li>Midflight compares version N−1 with N and finds that <code>checkout-response</code> changed.</li><li>It looks up the contract's provider (T1) and consumers (T2), plus any tasks implementing a changed requirement.</li><li>Each affected active approval goes back to <code>pending</code> for revalidation.</li><li>Midflight creates one directive per affected task, with reason, changed IDs, and requested adjustment, in state <i>queued</i>.</li><li>It supersedes that task's older directives that are still <i>queued</i> or <i>delivered</i>.</li><li>T3 has no link to the change, so it gets nothing.</li><li><b>Each directive is delivered inside its recipient's next Midflight reply</b> (UC-07, UC-04, or UC-16). Midflight can't interrupt a running agent.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts"><li><b>2a</b><span>The impact is unclear, such as a requirement text change with no contract link. Goes to <b>UC-12</b> instead of guessing.</span></li><li><b>4a</b><span>State is stale. Directives are held until fresh (<b>UC-15</b>).</span></li><li><b>*a</b><span>The event is processed twice. Each (plan version, task) pair still gets only one directive.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> No affected task keeps an approval based on the old version.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant DB as DynamoDB
+    participant W as Worker
+    participant A as Agents T1 and T2
+    DB-->>W: propagate job for plan v2
+    W->>DB: read v1, v2, active claims
+    W->>W: diff, checkout-response changed
+    W->>W: lookup, provider T1, consumer T2, T3 not linked
+    alt impact unclear
+        W->>W: UC-12 Escalate to lead
+    else impact clear
+        W->>DB: T1 and T2 approvals back to pending
+        W->>DB: directives D-41 and D-42 queued, older ones superseded, audit
+        Note over W,DB: key (plan v2, task) prevents duplicate directives
+        opt state is stale
+            W->>DB: hold directives until fresh (UC-15)
+        end
+    end
+    Note over DB,A: Midflight cannot interrupt the agents. D-41 and D-42 wait.
+    A->>DB: next Midflight call (check_in, submit_claim, or pre-push hook)
+    DB-->>A: reply carries D-41 or D-42
+</pre></div></div>
+  </article>
+
+  <article class="spec int" id="uc12"><div class="hd"><span class="id">UC-12</span><h3>Escalate to lead</h3><span class="refs">FR-04 · FR-05 · FR-09 · FR-10</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Kind</dt><dd>Extends UC-05, UC-08, UC-10</dd></div><div><dt>Extension points</dt><dd>Conflicting human requirements · unclear finding · unclear impact · branch edits its own contract tests</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>Midflight creates an escalation with the competing requirements, the claims or commit involved, and the evidence.</li>
+      <li>Affected claims go to <code>human_review_required</code>, or the commit check goes to <code>action_required</code>.</li>
+      <li>Affected approvals and passes stay blocked while the escalation is open.</li>
+      <li>The escalation appears on the lead's dashboard, waiting for <b>UC-13</b>.</li></ol></div>
+      <div><h4>Rule</h4><p>Midflight never chooses between two people's requirements. Doing so would break FR-10.</p></div>
+      <p class="post"><b>Postcondition:</b> Nothing depending on an open question can show green.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant W as Worker
+    participant DB as DynamoDB
+    participant API as Midflight API
+    participant A as Frederik's agent
+    actor L as Lead
+    W->>W: conflict, T2 wants tax-inclusive, T1 excludes tax
+    W->>DB: create escalation E-7 with requirements, claims, evidence
+    W->>DB: T1 and T2 to human_review_required (or check to action_required)
+    Note over W,DB: Midflight never picks a side
+    A->>API: check_in(T2)
+    API-->>A: human_review_required, pause this part
+    L->>API: open dashboard
+    API-->>L: E-7 waiting for a decision (UC-13)
+</pre></div></div>
+  </article>
+
+  <div class="group"><h3>Verify</h3><span class="cap">After code is pushed</span></div>
+
+  <article class="spec" id="uc10"><div class="hd"><span class="id">UC-10</span><h3>Verify pushed commit</h3><span class="refs">FR-08 · FR-09 · NFR-08 · NFR-10</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>GitHub (signed webhook)</dd></div><div><dt>Supporting</dt><dd>AI Reviewer</dd></div><div><dt>Trigger</dt><dd>The contract-test workflow (<code>contract.yml</code>) finishes for a PR's head commit: <code>workflow_run</code>, action <code>completed</code> (D4).</dd></div><div><dt>Preconditions</dt><dd>The PR's branch is linked to a claim.</dd></div><div><dt>Includes</dt><dd>UC-11</dd></div><div><dt>Extended by</dt><dd>UC-12, UC-15</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>Midflight checks the webhook signature, drops duplicate delivery IDs, saves a job, and replies 202.</li>
+      <li>The worker fetches the PR's current head and confirms it matches the event's SHA.</li>
+      <li>It fetches the diff, the relevant file contents, and the contract-test results for that exact SHA.</li>
+      <li>Rules run: undeclared files, required contract fields present, test result. Edited contract tests or workflows go to UC-12.</li>
+      <li>The AI Reviewer adds semantic findings, which are validated as in UC-05.</li>
+      <li>Right before publishing, the worker re-checks that the head SHA and plan version haven't changed.</li>
+      <li>It runs <b>UC-11 Publish verify check</b>.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>1a</b><span>The signature is invalid: 401 and nothing is stored.</span></li>
+      <li><b>4a</b><span>The agent said "done" but <code>total_cents</code> is missing. Result is <i>failure</i> with evidence, plus a correction directive to the agent.</span></li>
+      <li><b>3a</b><span>The diff is truncated or test results are missing. Result is <i>incomplete</i>, never success.</span></li>
+      <li><b>6a</b><span>A newer commit or plan arrived. The result is discarded and a new job runs.</span></li>
+      <li><b>2a</b><span>GitHub returns an error or rate limit. Goes to <b>UC-15</b>.</span></li>
+      <li><b>5a</b><span>The diff contains instructions aimed at the AI. They're treated as data, may be noted as info, and don't change the outcome.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> The result is tied to one commit, one claim revision, and one plan version.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant A as Somesh's agent (T1)
+    participant GH as GitHub
+    participant CI as GitHub Actions
+    participant API as Midflight API
+    participant DB as DynamoDB
+    participant W as Worker
+    participant R as AI reviewer
+    A->>GH: push 9f3e1 to PR 12, says done per plan
+    GH->>CI: run contract tests on 9f3e1
+    CI-->>GH: completed, failure, junit artifact
+    GH->>API: webhook workflow_run.completed (signed)
+    API->>API: verify signature on raw body
+    alt invalid signature
+        API-->>GH: 401, nothing stored
+    else valid
+        API->>DB: save delivery id and job, drop duplicates
+        API-->>GH: 202
+        DB-->>W: stream event, verify job
+        W->>GH: get PR 12 head
+        alt GitHub error or rate limit
+            W->>W: UC-15 Mark stale and reconcile
+        else head is 9f3e1
+            W->>GH: diff, file contents, test artifact for 9f3e1
+            W->>W: rules, declared files, total_cents present, tests passed, tests untouched
+            W->>R: semantic review of diff against claim
+            R-->>W: findings (repo text treated as data)
+            W->>GH: re-read PR head
+            W->>DB: re-read plan version
+            alt head or plan changed
+                W->>W: discard result, newer job will run
+            else unchanged
+                W->>W: UC-11 publish, failure, total_cents missing
+                W->>DB: queue correction directive for T1
+            end
+        end
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec int" id="uc11"><div class="hd"><span class="id">UC-11</span><h3>Publish verify check</h3><span class="refs">FR-09</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Kind</dt><dd>Included by UC-10</dd></div><div><dt>Supporting</dt><dd>GitHub</dd></div><div><dt>Preconditions</dt><dd>The repo's branch rules require <code>midflight/verify</code>.</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>Midflight maps the outcome to a check: <i>verified</i> becomes success, <i>failed</i> becomes failure, and <i>needs review</i> or <i>incomplete</i> becomes action_required.</li>
+      <li>It writes a summary with findings, evidence links, plan version, and claim revision.</li>
+      <li>It stores the check ID with the verification record.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>1a</b><span>Publishing fails. The record is marked "not yet published", retried later, and shown on the dashboard.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> Merging is blocked unless the current commit's check is success.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant W as Worker
+    participant GH as GitHub
+    participant DB as DynamoDB
+    W->>W: map outcome, verified to success, failed to failure, review or incomplete to action_required
+    W->>GH: create check run midflight/verify on 9f3e1 with summary and evidence
+    alt GitHub accepts
+        GH-->>W: check_run_id
+        W->>DB: store check id with verification record
+        GH->>GH: branch rule blocks merge unless success
+    else publish fails
+        W->>DB: mark unpublished, schedule retry
+    end
+</pre></div></div>
+  </article>
+
+  <article class="spec int" id="uc15"><div class="hd"><span class="id">UC-15</span><h3>Mark stale &amp; reconcile</h3><span class="refs">FR-08 · NFR-04 · NFR-06</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Kind</dt><dd>Extends UC-10 and UC-08</dd></div><div><dt>Extension point</dt><dd>GitHub 5xx, rate limit, or timeout</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>Midflight marks the project's sync state <code>stale</code> with a timestamp.</li>
+      <li>It holds directives and approvals that depend on GitHub data.</li>
+      <li>It retries after the rate-limit reset time, a bounded number of times.</li>
+      <li>On recovery it re-fetches PR heads, re-runs affected verifications, and re-publishes checks.</li>
+      <li>It clears the stale flag and writes an audit event.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>3a</b><span>Retries run out. The job goes to the dead-letter queue and shows on the dashboard (UC-14).</span></li></ul></div>
+      <p class="post"><b>Limitation:</b> During an outage GitHub may still show an old green check. The dashboard says so.</p></div>
+  </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant W as Worker
+    participant GH as GitHub
+    participant DB as DynamoDB
+    W->>GH: get PR head
+    GH-->>W: 403 rate limited, resets in 12 min
+    W->>DB: sync_state stale since 10:42
+    Note over DB: directives and approvals that need GitHub data are held
+    loop bounded retries, after reset time
+        W->>GH: retry
+    end
+    alt recovered
+        GH-->>W: ok
+        W->>GH: refetch heads of open PRs
+        W->>W: rerun affected verifications
+        W->>GH: republish checks
+        W->>DB: sync_state fresh, release held directives, audit
+    else retries exhausted
+        W->>DB: job to dead-letter queue, shown on dashboard
+    end
+</pre></div></div>
+  </article>
+</section>
+
+<!-- TRACE -->
+<section id="trace">
+  <span class="eyebrow">Demo traceability</span>
+  <h2>Every required demo scenario maps to a use case</h2>
+  <p>These are the scenarios from Requirements §11 and the definition of done. If a row has no use case, the model is missing something. Right now every row is covered.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Demo scenario</th><th>Expected result</th><th>Use cases · path</th></tr></thead>
+    <tbody>
+      <tr><td>Compatible backend/frontend claims</td><td>Both approved</td><td><a href="#uc04">UC-04</a><a href="#uc05">UC-05 main</a></td></tr>
+      <tr><td>Frontend expects <code>total</code>, backend gives <code>total_cents</code></td><td>Caught before coding, then fixed</td><td><a href="#uc05">UC-05 step 2</a><a href="#uc06">UC-06</a></td></tr>
+      <tr><td>Two tasks touch the same file</td><td>Visible, not blocked</td><td><a href="#uc05">UC-05 step 2</a></td></tr>
+      <tr><td>Simultaneous conflicting claims</td><td>No approvals from an outdated snapshot</td><td><a href="#uc05">UC-05 · 6a</a></td></tr>
+      <tr><td>Two people's requirements conflict</td><td>Escalated, resolved, audited</td><td><a href="#uc12">UC-12</a><a href="#uc13">UC-13</a></td></tr>
+      <tr><td>Lead adds required <code>currency</code></td><td>Producer and consumer get directives</td><td><a href="#uc03">UC-03</a><a href="#uc08">UC-08</a><a href="#uc07">UC-07</a><a href="#uc09">UC-09</a></td></tr>
+      <tr><td>Agent is mid-work when the plan changes</td><td>Directive arrives at the next call or hook run; push blocked until acknowledged</td><td><a href="#uc08">UC-08 step 7</a><a href="#uc07">UC-07</a><a href="#uc16">UC-16 · 3a</a></td></tr>
+      <tr><td>Unrelated documentation task</td><td>No directive</td><td><a href="#uc08">UC-08 step 6</a></td></tr>
+      <tr><td>Agent says done, pushes the wrong field</td><td>Check fails with evidence</td><td><a href="#uc10">UC-10 · 4a</a><a href="#uc11">UC-11</a></td></tr>
+      <tr><td>GitHub failure or rate limit</td><td>Stale; directives held</td><td><a href="#uc15">UC-15</a><a href="#uc08">UC-08 · 4a</a></td></tr>
+      <tr><td>Duplicate webhook</td><td>One logical outcome</td><td><a href="#uc10">UC-10 step 1</a></td></tr>
+      <tr><td>New commit or plan during review</td><td>Old result can't pass</td><td><a href="#uc10">UC-10 · 6a</a></td></tr>
+      <tr><td>Instruction-like text in repo</td><td>Treated as data</td><td><a href="#uc10">UC-10 · 5a</a></td></tr>
+      <tr><td>Correction and recovery</td><td>Fresh pass; audit explains it</td><td><a href="#uc06">UC-06</a><a href="#uc10">UC-10</a><a href="#uc14">UC-14</a></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- QUESTIONS -->
+<section id="questions">
+  <span class="eyebrow">Review questions</span>
+  <h2>Where the open questions stand</h2>
+  <p>Decided and default answers are logged in <code>docs/design-decisions.md</code>.</p>
+  <ul class="qs">
+    <li><b>New agent tools: D3 (default)</b><span><code>submit_claim</code> (waits for the verdict), <code>check_in</code>, and <code>acknowledge_directive</code> replace <code>get_task_context</code> and <code>get_directives</code>. FR-07 and the architecture doc are updated.</span></li>
+    <li><b>Pre-push hook when Midflight is down: D8 (default)</b><span>Warn and allow. The GitHub check still verifies the commit.</span></li>
+    <li><b>Incomplete claims: D5 (default)</b><span>Saved as <code>draft</code>; no approval until interfaces and criteria are given.</span></li>
+    <li><b>Verification trigger: D4 (default)</b><span>Starts when the contract-test workflow completes, so the evidence already exists.</span></li>
+    <li><b>Canonical plan change: D2 (default)</b><span><code>currency</code>, used throughout.</span></li>
+    <li><b>Developers submitting claims by hand: open (Q1)</b><span>Default: agents only. If developers should also submit claims, UC-04 gets a second actor.</span></li>
+    <li><b>Agents accepting proposed contracts: open (Q2)</b><span>Default: no. Contracts change only through the lead (UC-03) or an escalation (UC-13).</span></li>
+    <li><b>Cross-task visibility (UC-07 · 2d): open (Q3)</b><span>Default: a read-only view of the contracts a task consumes; anything else is 403.</span></li>
+    <li><b>Consistency pass: D11–D15 (default)</b><span>Closing a claim (<code>status: closed</code>), claims with no interfaces (<code>no_interfaces</code>), directive sources and dedupe, escalation transitions, and one REST path table in <code>docs/domain.md</code>.</span></li>
+  </ul>
+</section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:matchMedia("(prefers-color-scheme: dark)").matches?"dark":"default"});</script>
+</body>
+</html>

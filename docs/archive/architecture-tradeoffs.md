@@ -2,6 +2,8 @@
 
 Prepared October 6, 2026. A recommendation for discussion, not an approved change to the requirements or an implementation plan already executed.
 
+> **Archived October 7, 2026.** Background reading on tradeoffs: concurrency, evidence, check-run mapping, and security. The build follows the simplified baseline in [architecture.md](../architecture.md) and [design-decisions.md](../design-decisions.md): no AgentCore Runtime (D1), no relay Lambda or main SQS queue, githubkit instead of HTTPX, and the tools `submit_claim`, `check_in`, `acknowledge_directive` (D3). Where this file disagrees, those files win.
+
 Based on `PROJECT_REQUIREMENTS.md`, the repository README, `docs/design-decisions.md`, and the workflow diagrams. Assumption: prioritize the AWS hackathon demonstration for one repository and 2–4 developers, while keeping components replaceable.
 
 **Recommendation**

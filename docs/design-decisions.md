@@ -1,43 +1,71 @@
-# Open design decisions
+# Design decisions
 
-The [proposed system architecture](../systemarchitecture.md) expands the project
-brief into an AWS service layout, with a technology guide and workflow diagrams.
-The [draft requirements](../PROJECT_REQUIREMENTS.md) describe the intended MVP;
-the [extended reading guide](architecture-reading-guide.md) explains the tradeoffs.
-These documents are proposals for team review. The first local prototype uses
-Python and in-memory state; the cloud design and model reasoning are unimplemented.
+The log of choices that shape the build. If another document disagrees with a
+decision here, this file wins (see the order in [AGENTS.md](../AGENTS.md#when-documents-disagree)).
 
-## Confirmed: lightweight claims
+**Status meanings:** *Decided* was confirmed by the team. *Default* applies unless
+the kickoff call changes it. *To confirm* needs a named person to check a fact.
+When a default is confirmed or changed, update its row and the date.
 
-Start with broad claims and ask targeted questions when tasks may interact.
-Exact changes are not mandatory upfront; claims can be refined during work.
-The local prototype compares exact declared files and shared interface names.
-Overlap requests clarification; missing information remains unknown. It does
-not determine semantic incompatibility or approve tasks.
+## Kickoff decisions (October 7, 2026)
 
-## Open: evaluating semantic compatibility
+| ID | Question | Decision | Status | Affects |
+| --- | --- | --- | --- | --- |
+| D1 | Do the hackathon rules require AgentCore Runtime? | No. The Strands reviewer runs inside the worker Lambda and calls Bedrock directly. It stays behind the `Reviewer` port, so it can move to AgentCore later (stretch task X-1). | Decided Oct 7 | S-5, M-5 |
+| D2 | Canonical plan change for the demo | Add `currency: string` to `checkout-response`. The subtotal/tax example in the archived flowcharts is not used. | Default | F-2, S-6, scenarios |
+| D3 | Tools agents call | `submit_claim` (waits up to 60 s for the verdict; `status: withdrawn` withdraws), `check_in`, `acknowledge_directive`. Replaces `get_task_context` and `get_directives`. | Default | M-3, FR-07 |
+| D4 | What triggers verification | `workflow_run.completed` for the contract-test workflow, so test evidence exists when verification starts | Default | M-6, FR-08 |
+| D5 | Incomplete claims | Saved as `draft`. No approval until interfaces and acceptance criteria are present. | Default | S-3, FR-03 |
+| D6 | The two demo agent hosts | Two Claude Code sessions | Default | M-4, F-3 |
+| D7 | AWS account, region, Bedrock model access | A region with current Claude models, for example `us-east-1` | To confirm: Somesh | S-5, M-5 |
+| D8 | Pre-push hook when Midflight is unreachable | Warn and allow. The GitHub check still verifies. | Default | M-4 |
+| D9 | Video length and submission format | Check the rules page. Plan for 3 minutes. | To confirm: Frederik | F-1, F-5 |
+| D10 | How agents sync while they implement | Agent-planned checkpoints. When an agent connects, the MCP adapter sends instructions (repeated in each tool description) telling it to list its assumptions in the claim, plan checkpoints at the critical points of its task, call `check_in` at each one, and submit a revised claim when an assumption or its scope changes, waiting for the verdict before building on it. No model change: this uses `Claim.assumptions` and claim revisions (UC-06). Checkpoints are guidance, not stored or enforced; the pre-push hook and `midflight/verify` remain the backstop. Tracking them is stretch task X-4. Exact wording: [domain.md](domain.md#interfaces). | Decided Oct 7 (Somesh) | M-3, FR-07, UC-02, UC-07 |
 
-How should Midflight determine that two claims are incompatible, and which
-decisions require the model versus deterministic checks or a human?
+## Consistency pass (October 7, 2026)
 
-Consider the distinction between editing the same file and changing an interface
-in incompatible ways. Separate evidence gathering from permission to proceed.
+Gaps found when checking the specs against each other before S-1. Each one was a
+place where two documents, or two tasks, would have built different things.
 
-## Subsequent decisions
+| ID | Question | Decision | Status | Affects |
+| --- | --- | --- | --- | --- |
+| D11 | How does an agent close finished work? FR-03 requires it, but D3 only had `status: withdrawn`. | `submit_claim` also accepts `status: closed`. REST: `POST /claims/{cid}/close`. Only an `approved` claim can close. | Default | M-2, M-3, S-3, UC-06 |
+| D12 | When is a claim with no interfaces complete? D5 required interfaces, so T3 (contributor guide) could never leave `draft`. | Complete = at least one acceptance criterion, plus at least one `provides`/`consumes` entry **or** `no_interfaces: true`. Otherwise `draft` with an `incomplete_claim` finding. | Default | S-1, S-2, S-3 |
+| D13 | Directive kinds and dedupe. A verification failure on plan v2 creates a correction directive for T1, which collided with INV-05's (plan version, task) key. | `Directive.source` is `plan_change` or `verification`, and `Directive.blocking` is a field. Dedupe key: `plan_change` → (plan version, task); `verification` → (verification id). A newer plan supersedes the task's older directives that are still `queued` or `delivered`. | Default | S-1, S-6, S-10, INV-05 |
+| D14 | Escalation state transitions. UC-12 moves already-approved claims to `human_review_required`, and UC-13 can request a revision, but the state diagram allowed neither. | Add `approved → human_review_required`, `human_review_required → needs_revision` (lead requests revision), and `human_review_required → withdrawn`. | Default | S-1, S-7 |
+| D15 | REST paths. Use cases, step-by-step, and the one-shot prompt used different paths for the same calls. | One table in [domain.md](domain.md#rest-api). Paths are scoped by project id; the adapter reads `MIDFLIGHT_PROJECT`. `check_in` is a `POST` because it marks directives delivered. | Default | M-2, M-3, M-4, S-9 |
 
-- Whether incomplete claims remain drafts until their dependencies and acceptance
-  criteria are sufficient for approval; the current prototype accepts broad claims.
-- One canonical demo change: adding currency or a subtotal/tax breakdown. The
-  requirements and workflow diagrams currently illustrate different changes.
-- The two coding-agent hosts, AWS account/region, model access, and whether the
-  submission requires AgentCore Runtime or a publicly hosted dashboard.
-- Shared plan format, revisioning, and ownership.
-- Claim lifecycle and atomic handling of simultaneous claims.
-- GitHub authentication, webhook verification, event deduplication, and permissions.
-- Evidence needed to verify an interface contract from an actual diff.
-- Stale-state scope and the conditions for safely resuming suggestions.
-- Suggestion delivery to each teammate's agent without treating it as a command.
-- Bounded model tools, audit records, and human escalation.
-- Runtime language, local demo harness, and AWS deployment approach.
+## Architecture baseline (October 7, 2026)
 
-Resolve these through small, reviewable design and implementation steps.
+Simplifications adopted in the [development plan](development-plan.md#architecture-baseline):
+
+| Choice | Instead of | Why |
+| --- | --- | --- |
+| DynamoDB Stream triggers the worker Lambda directly, with an SQS dead-letter queue | A relay Lambda feeding a main SQS queue | Fewer moving parts. The stream is the durable outbox. |
+| Reviewer inside the worker | AgentCore Runtime | D1 |
+| githubkit | Raw HTTPX calls | Typed GitHub client, App auth built in |
+| Typed contract fields (`fields: {name: type}`) | Free-text contracts | The flagship `total` vs `total_cents` conflict is caught by a rule, not a model |
+| Powertools idempotency | Hand-written dedupe | Duplicate webhook and stream deliveries |
+| Every external service behind a port with a fake | Direct SDK calls | The whole system runs and tests on a laptop |
+
+## Earlier decisions still in force
+
+- **Lightweight claims (Oct 6).** Claims can start broad and be refined. Exact
+  changes aren't required upfront. D5 adds the rule that approval needs interfaces
+  and acceptance criteria.
+- **Rules first, model second.** Deterministic checks (references, contract fields
+  and types, versions) run before the AI reviewer. The model proposes findings;
+  application code decides; humans own product decisions.
+- **File overlap is not a conflict.** Shared files produce an `info` finding and
+  never block on their own.
+
+## Open questions
+
+| # | Question | Default until answered | Raised in |
+| --- | --- | --- | --- |
+| Q1 | Can developers submit claims directly, or only their agents? | Agents only | use-cases review question 2 |
+| Q2 | Can agents accept a Midflight-proposed contract without the lead? | No. Contract changes go through the lead (UC-03) or an escalation (UC-13). | use-cases review question 4 |
+| Q3 | Can an agent read a contract it consumes but doesn't own (UC-07 2d)? | Read-only view of contracts it consumes; anything else about another task is 403 | use-cases review question 6 |
+| Q4 | Does the submission need a publicly hosted dashboard? | No. Local Streamlit. Stretch task X-3 if the rules reward it. | requirements §13 |
+| Q5 | Input size limits, retry limits, review timeout | 60 s claim wait; 2 worker retries; limits set in M-5 | requirements §13 |
+| Q6 | Official submission cutoff | Finish Oct 10, submit Oct 11 | requirements §13 |
