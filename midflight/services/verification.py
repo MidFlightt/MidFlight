@@ -121,7 +121,9 @@ class VerificationService:
             project_id=project.id,
             kind=JobKind.VERIFICATION,
             subject_id=f"{run.run_id}/{run.head_sha}/{run.head_branch}",
-            idempotency_key=f"verify:{project.id}:{run.run_id}:{run.attempt}",
+            # One verification per commit and attempt: a workflow that runs on both push
+            # and pull_request finishes twice for the same commit, and needs one check.
+            idempotency_key=f"verify:{project.id}:{run.head_sha}:{run.attempt}",
             correlation_id=new_correlation_id(),
             created_at=now,
             updated_at=now,
@@ -184,6 +186,10 @@ class VerificationService:
         usable = claim if claim is not None and verifiable(claim) else None
 
         pull = github.pull_for_branch(repo, branch)
+        if pull is None and claim is None:
+            # Nothing under review: for example a push to main. No check is published.
+            self._close(job, project, JobState.SUCCEEDED, f"no pull request or claim for {branch}")
+            return
         if pull is not None and pull.head_sha != head_sha:
             self._close(
                 job, project, JobState.SUCCEEDED, f"{branch} moved on to {pull.head_sha[:7]}"
