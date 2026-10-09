@@ -75,6 +75,7 @@ def create_server(
     auth = AuthSettings(
         issuer_url=settings.public_url,
         resource_server_url=f"{settings.public_url}/mcp",
+        validate_token_resource=True,  # refuse tokens issued for any other server
         client_registration_options=ClientRegistrationOptions(enabled=True),
         revocation_options=RevocationOptions(enabled=True),
     )
