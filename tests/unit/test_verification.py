@@ -169,7 +169,42 @@ def test_a_newer_failure_supersedes_the_older_correction() -> None:
     assert states == [DirectiveState.SUPERSEDED, DirectiveState.QUEUED]
 
 
+def test_the_demo_shops_summary_artifact_counts() -> None:
+    team = Team()
+    run = team.push()
+    team.github.artifacts[run.run_id] = {"head_sha": run.head_sha, "passed": True, "failures": []}
+    assert team.verify(run).outcome is VerificationOutcome.VERIFIED
+
+    failing = team.push(sha="bad0001", files={"app/api.py": WRONG_API})
+    team.github.artifacts[failing.run_id] = {
+        "head_sha": failing.head_sha,
+        "passed": False,
+        "failures": ["Provider: Expected {'total_cents': 'integer'}, got {'total': 'number'}"],
+    }
+    v = team.verify(failing)
+    assert v.outcome is VerificationOutcome.FAILED
+    assert [t.name for t in v.test_results] == ["Provider"]
+
+
 # Dropping stale and duplicate work (UC-10 1, 6a) ---------------------------------------
+
+
+def test_a_push_run_and_a_pull_request_run_for_one_commit_verify_once() -> None:
+    team = Team()
+    push_run = team.push()
+    pr_run = WorkflowRun(REPO, INSTALLATION, 99, 1, push_run.head_sha, BRANCH, "d-pr")
+    team.github.artifacts[99] = team.github.artifacts[push_run.run_id]
+    team.services.verifications.enqueue(push_run)
+    assert team.services.verifications.enqueue(pr_run) is None
+    assert len(team.github.checks) == 1
+
+
+def test_a_push_to_main_with_no_pull_request_or_claim_gets_no_check() -> None:
+    team = Team()
+    run = WorkflowRun(REPO, INSTALLATION, 7, 1, "aaa0000", "main", "d-main")
+    team.github.artifacts[7] = {"sha": "aaa0000", "results": [{"name": "t", "passed": True}]}
+    team.services.verifications.enqueue(run)
+    assert team.store.list_verifications(PROJECT) == [] and team.github.checks == []
 
 
 def test_a_duplicate_delivery_saves_one_job_and_one_check() -> None:

@@ -304,8 +304,9 @@ own task):
 | App authentication | Repo checks and verification as the App (App ID + private key, then an installation token). Sign in with GitHub through the App's user authorization (client id + client secret). |
 | Check run name | `midflight/verify` |
 | Verification trigger (D4) | `workflow_run` event, action `completed`, for the contract-test workflow `contract.yml` |
-| Test results artifact | `contract-results`: a zip with one JSON file, `{"sha": "<head sha>", "results": [{"name": "...", "passed": true, "message": ""}]}`. Results for another SHA don't count. |
-| Protected paths | `tests/contract/` and `.github/`: a branch that changes them is escalated, never passed (INV-15) |
+| Test results artifact | `contract-results`: a zip with one JSON file, either `{"sha": "<head sha>", "results": [{"name": "...", "passed": true, "message": ""}]}` or the demo shop's summary `{"head_sha": "<head sha>", "passed": true, "failures": ["Provider: ..."]}`. Results for another SHA don't count. |
+| Protected paths | `tests/contract/`, `contracts/`, and `.github/`: a branch that changes them is escalated, never passed (INV-15) |
+| What gets a check | A finished `contract.yml` run whose branch has an open pull request or a claim. One verification per commit and run attempt, even if the workflow runs on both push and pull_request. |
 | Webhook path | `/github/webhook` |
 
 **Environment variables** (names only; values never go in git)
