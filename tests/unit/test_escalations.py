@@ -159,3 +159,61 @@ def test_only_the_lead_resolves_and_only_once(team) -> None:
     services.escalations.resolve(people["p-lead"], eid, Resolution.DISMISS, "fine")
     with pytest.raises(StateConflict):
         services.escalations.resolve(people["p-lead"], eid, Resolution.DISMISS, "again")
+
+
+# Found by the HireBot experiment (docs/experiment.md) -------------------------------
+
+
+class RecordingReviewer:
+    """Finds nothing; remembers which other claims it was shown."""
+
+    def __init__(self) -> None:
+        self.seen: list[list[str]] = []
+
+    def review_claim(self, request: ClaimReviewRequest) -> Any:
+        self.seen.append([c.id for c in request.other_claims])
+        return []
+
+    def review_commit(self, request: object) -> Any:
+        return []
+
+
+def test_the_reviewer_is_never_shown_a_withdrawn_claim() -> None:
+    store = MemoryStore()
+    people = seed(store)
+    reviewer = RecordingReviewer()
+    services = build_services(store, FixedClock(NOW), reviewer)
+    old = services.claims.submit(people["p-t1"], submission("T1"))
+    services.claims.withdraw(people["p-t1"], old.claim_id)
+    services.claims.submit(people["p-t2"], submission("T2"))
+    assert reviewer.seen[-1] == []
+
+
+class OneSidedReviewer:
+    """Calls it a conflict between people, but cites only the claim under review."""
+
+    def review_claim(self, request: ClaimReviewRequest) -> Any:
+        return [
+            {
+                "id": "x",
+                "kind": "requirement_conflict",
+                "severity": "blocking",
+                "source": "reviewer",
+                "affected_ids": [request.claim.id],
+                "explanation": "This claim contradicts itself.",
+            }
+        ]
+
+    def review_commit(self, request: object) -> Any:
+        return []
+
+
+def test_a_conflict_citing_one_tasks_claims_is_a_note_not_an_escalation() -> None:
+    store = MemoryStore()
+    people = seed(store)
+    services = build_services(store, FixedClock(NOW), OneSidedReviewer())
+    result = services.claims.submit(people["p-t2"], submission("T2"))
+    assert result.state is ClaimState.APPROVED
+    assert services.store.list_escalations("demo") == []
+    [finding] = services.store.get_claim(result.claim_id).findings
+    assert finding.severity is FindingSeverity.INFO and "Not escalated" in finding.explanation
