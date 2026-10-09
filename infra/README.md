@@ -101,6 +101,49 @@ sam deploy ... --parameter-overrides PublicUrl=<FunctionUrl without the slash> R
 As of October 9, Bedrock answers "Operation not allowed" for every model on this
 account; see the [human steps](../docs/development-plan.md#human-steps).
 
+### Bedrock through another account
+
+If this account can't call Bedrock but another one can, the reviewer can borrow a role
+there. Everything else stays here. In the other account, open **CloudShell** (us-east-1)
+and paste:
+
+```bash
+cat > trust.json <<'EOF'
+{"Version": "2012-10-17", "Statement": [{
+  "Effect": "Allow",
+  "Principal": {"AWS": "arn:aws:iam::376564125271:root"},
+  "Action": "sts:AssumeRole",
+  "Condition": {"ArnLike": {"aws:PrincipalArn": [
+    "arn:aws:iam::376564125271:role/midflight-WorkerFunctionRole-*",
+    "arn:aws:iam::376564125271:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_AdministratorAccess_*"
+  ]}}
+}]}
+EOF
+cat > claude-only.json <<'EOF'
+{"Version": "2012-10-17", "Statement": [{
+  "Effect": "Allow",
+  "Action": "bedrock:InvokeModel",
+  "Resource": [
+    "arn:aws:bedrock:*:*:inference-profile/*.anthropic.*",
+    "arn:aws:bedrock:*::foundation-model/anthropic.*"
+  ]
+}]}
+EOF
+aws iam create-role --role-name midflight-bedrock-reviewer --assume-role-policy-document file://trust.json --query Role.Arn --output text
+aws iam put-role-policy --role-name midflight-bedrock-reviewer --policy-name claude-only --policy-document file://claude-only.json
+```
+
+The role can only call Claude models, and only Midflight's worker Lambda and this
+account's administrators can use it. The first command prints the role's ARN; deploy
+with it:
+
+```bash
+sam deploy ... --parameter-overrides PublicUrl=<FunctionUrl without the slash> ReviewerModel=us.anthropic.claude-sonnet-5-5 ReviewerRoleArn=<that ARN>
+```
+
+Bedrock usage is billed to the other account (cents for a demo). To stop, delete the
+role there and deploy again without `ReviewerRoleArn`.
+
 ## The live deployment
 
 Deployed October 9, 2026: stack `midflight`, `us-east-1`.

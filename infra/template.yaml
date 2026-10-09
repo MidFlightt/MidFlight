@@ -28,6 +28,13 @@ Parameters:
       Bedrock model id for the AI reviewer, e.g. us.anthropic.claude-sonnet-5-5. Empty
       means rules only. Set it only once Bedrock answers for this account: while Bedrock
       refuses calls, every complete claim would wait in pending.
+  ReviewerRoleArn:
+    Type: String
+    Default: ""
+    Description: >
+      Optional. A role named midflight-bedrock-reviewer in another AWS account that may
+      only call Claude on Bedrock; the reviewer calls Bedrock through it. Empty means
+      Bedrock in this account.
   WebConcurrencyLimit:
     Type: Number
     Default: 0
@@ -53,6 +60,7 @@ Globals:
         MIDFLIGHT_GITHUB_CLIENT_ID: !Ref GitHubClientId
         MIDFLIGHT_GITHUB_APP_ID: !Ref GitHubAppId
         MIDFLIGHT_REVIEWER_MODEL: !Ref ReviewerModel
+        MIDFLIGHT_REVIEWER_ROLE_ARN: !Ref ReviewerRoleArn
 
 Resources:
   # Everything Midflight knows: projects, plans, claims, jobs, audit, sign-in records.
@@ -137,6 +145,9 @@ Resources:
               Resource:
                 - arn:aws:bedrock:*:*:inference-profile/*.anthropic.*
                 - arn:aws:bedrock:*::foundation-model/anthropic.*
+            - Effect: Allow  # or through another account's reviewer role (ReviewerRoleArn)
+              Action: sts:AssumeRole
+              Resource: arn:aws:iam::*:role/midflight-bedrock-reviewer
 
   # Jobs that failed every retry wait here for inspection (NFR-06).
   DeadLetters:

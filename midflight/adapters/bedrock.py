@@ -15,11 +15,16 @@ How a review works:
    is never treated as a pass.
 
 Uses Bedrock's Converse API through boto3, so there's nothing extra to install.
+
+Bedrock can live in another AWS account: with `role_arn` set, the reviewer assumes that
+role (which may only call Claude) and renews it before its credentials expire.
+Everything else stays in Midflight's own account.
 """
 
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 import boto3
@@ -115,9 +120,13 @@ FINDINGS_SCHEMA: dict[str, Any] = {
 
 
 class BedrockReviewer:
-    def __init__(self, model_id: str = DEFAULT_MODEL, client: Any = None) -> None:
+    def __init__(
+        self, model_id: str = DEFAULT_MODEL, client: Any = None, role_arn: str | None = None
+    ) -> None:
         self.model_id = model_id
+        self._role_arn = role_arn
         self._client = client  # created on first use, so building a reviewer needs no AWS
+        self._renew_at = float("inf")  # when the borrowed role's credentials need renewing
 
     def review_claim(self, request: ClaimReviewRequest) -> Any:
         return self._ask(
@@ -147,13 +156,8 @@ class BedrockReviewer:
 
     def _ask(self, task: str, data: dict[str, Any]) -> Any:
         message = f"{task}\n\n<data>\n{json.dumps(data, indent=1)}\n</data>"
-        if self._client is None:
-            self._client = boto3.client(
-                "bedrock-runtime",
-                config=Config(read_timeout=40, connect_timeout=5, retries={"max_attempts": 2}),
-            )
         try:
-            response = self._client.converse(
+            response = self._bedrock().converse(
                 modelId=self.model_id,
                 system=[{"text": SYSTEM}],
                 messages=[{"role": "user", "content": [{"text": message}]}],
@@ -178,3 +182,24 @@ class BedrockReviewer:
             if "toolUse" in block:
                 return block["toolUse"]["input"]
         raise ReviewerUnavailable("the model answered without reporting findings")
+
+    def _bedrock(self) -> Any:
+        """The Bedrock client: in this account, or through `role_arn` in another one."""
+        if self._client is not None and time.time() < self._renew_at:
+            return self._client
+        config = Config(read_timeout=40, connect_timeout=5, retries={"max_attempts": 2})
+        if self._role_arn is None:
+            self._client = boto3.client("bedrock-runtime", config=config)
+            return self._client
+        credentials = boto3.client("sts").assume_role(
+            RoleArn=self._role_arn, RoleSessionName="midflight-reviewer"
+        )["Credentials"]
+        self._client = boto3.client(
+            "bedrock-runtime",
+            config=config,
+            aws_access_key_id=credentials["AccessKeyId"],
+            aws_secret_access_key=credentials["SecretAccessKey"],
+            aws_session_token=credentials["SessionToken"],
+        )
+        self._renew_at = credentials["Expiration"].timestamp() - 300  # five minutes early
+        return self._client
