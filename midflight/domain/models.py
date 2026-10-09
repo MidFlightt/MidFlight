@@ -181,10 +181,23 @@ class JobState(StrEnum):
 # Project and people --------------------------------------------------------------------
 
 
+class User(Model):
+    """A person, identified by their GitHub account (D17). Not tied to one project."""
+
+    id: Id
+    github_id: int
+    github_login: Text
+    name: str | None = None
+    created_at: AwareDatetime
+
+
 class Project(Model):
     id: Id
+    name: str = ""
     repository: Repository
     github_installation_id: int | None = None
+    join_code: str | None = None
+    created_by: Id | None = None
     lead_id: Id
     participant_ids: list[Id] = []
     current_plan_version: Version | None = None
@@ -201,20 +214,27 @@ class Project(Model):
 
 
 class Participant(Model):
+    """One person's membership in one project, with their role there.
+
+    Connector users sign in with GitHub (`user_id`). A `token_hash` is for scripts and
+    the pre-push hook, which can't sign in through a browser (D20).
+    """
+
     id: Id
     project_id: Id
     role: Role
     developer_name: Text
+    user_id: Id | None = None
     agent_name: str | None = None
-    token_hash: TokenHash
+    token_hash: TokenHash | None = None
     revoked_at: AwareDatetime | None = None
     last_check_in_at: AwareDatetime | None = None
     last_check_in_rev: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def _agents_are_named(self) -> Self:
-        if self.role is Role.AGENT and not self.agent_name:
-            raise ValueError("an agent participant needs an agent_name, e.g. claude-code")
+    def _can_authenticate(self) -> Self:
+        if self.user_id is None and self.token_hash is None:
+            raise ValueError("a participant needs a user_id (GitHub sign-in) or a token_hash")
         return self
 
     @property

@@ -425,11 +425,12 @@ def test_project_repository_is_owner_slash_name() -> None:
         Project(id=PROJECT, repository="midflight-demo-shop", lead_id="p-lead")
 
 
-def test_agent_participant_needs_an_agent_name() -> None:
-    with pytest.raises(ValidationError, match="agent_name"):
-        Participant(
-            id="p", project_id=PROJECT, role=Role.AGENT, developer_name="d", token_hash=TOKEN_HASH
-        )
+def test_participant_needs_a_way_to_sign_in() -> None:
+    with pytest.raises(ValidationError, match="user_id"):
+        Participant(id="p", project_id=PROJECT, role=Role.AGENT, developer_name="d")
+    assert Participant(
+        id="p", project_id=PROJECT, role=Role.AGENT, developer_name="d", user_id="u-1"
+    )
 
 
 def test_inv_12_participant_stores_a_hash_not_a_token() -> None:

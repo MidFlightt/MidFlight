@@ -382,9 +382,7 @@ def test_dashboard_state_lists_everything(client: TestClient) -> None:
 
 
 def test_local_tokens_stay_the_same_across_restarts(tmp_path: Path) -> None:
-    from midflight.api.local import local_tokens
-
     path = tmp_path / "tokens.json"
-    first = local_tokens(path)
+    first = demo.local_tokens(path)
     assert set(first) == {pid for pid, *_ in demo.PEOPLE}
-    assert local_tokens(path) == first
+    assert demo.local_tokens(path) == first

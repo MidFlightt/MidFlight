@@ -7,7 +7,9 @@ Contributor guide has no interfaces. Plan v2 adds `currency: string`.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
+from pathlib import Path
 
 from midflight.domain.models import (
     Contract,
@@ -21,7 +23,7 @@ from midflight.domain.models import (
     Task,
 )
 from midflight.ports import Commit, Store
-from midflight.services.participants import hash_token
+from midflight.services.participants import hash_token, new_token
 
 PROJECT_ID = "demo"
 REPOSITORY = "MidFlightt/midflight-demo-shop"
@@ -132,3 +134,14 @@ def seed(store: Store, tokens: dict[str, str], now: datetime) -> None:
             puts=[project, *participants, demo_plan(1, approved_at=now)],
         )
     )
+
+
+def local_tokens(path: Path = Path(".midflight/local-tokens.json")) -> dict[str, str]:
+    """Tokens for the demo participants, kept in a git-ignored file so they survive
+    restarts. Only the local stdio adapter (a development tool) uses them."""
+    tokens: dict[str, str] = json.loads(path.read_text()) if path.exists() else {}
+    for participant_id, *_ in PEOPLE:
+        tokens.setdefault(participant_id, new_token())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(tokens, indent=2))
+    return tokens

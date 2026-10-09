@@ -1,7 +1,7 @@
 """The Midflight REST API (task M-2). Paths are the table in docs/domain.md (D15).
 
-`create_app(services)` builds the app around any set of services, so tests, the local
-server (`midflight.api.local`), and the Lambda handler (M-5) share every route.
+`create_app(services)` builds the app around any set of services. `midflight.main`
+adds the hosted MCP connector and sign-in on top, for local runs and for AWS.
 Errors are JSON `{error, detail, hint}`; refusals with findings include them too.
 """
 
@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from midflight.adapters.runners import InlineRunner
+from midflight.api.views import check_in_json, dump, participant_json, verdict_json
 from midflight.domain.models import (
     DirectiveResponse,
     JobKind,
@@ -24,13 +25,8 @@ from midflight.domain.models import (
     Text,
 )
 from midflight.ports import Clock, Reviewer, Store
-from midflight.services.check_in import CheckIn, CheckInService
-from midflight.services.claims import (
-    ClaimService,
-    ClaimSubmission,
-    Verdict,
-    parse_review_subject,
-)
+from midflight.services.check_in import CheckInService
+from midflight.services.claims import ClaimService, ClaimSubmission, parse_review_subject
 from midflight.services.directives import ACK_NOTE, DirectiveService
 from midflight.services.errors import NotFound, PermissionDenied, ServiceError
 from midflight.services.participants import ParticipantService
@@ -91,55 +87,14 @@ class AckRequest(Model):
     note: str | None = None
 
 
-# JSON shapes ---------------------------------------------------------------------------
-
-
-def dump(model: Any) -> Any:
-    return model.model_dump(mode="json")
-
-
-def participant_json(p: Participant) -> dict[str, Any]:
-    # Never return the token hash (INV-12).
-    return p.model_dump(mode="json", exclude={"token_hash"})
-
-
-def verdict_json(v: Verdict) -> dict[str, Any]:
-    return {
-        "claim_id": v.claim_id,
-        "revision": v.revision,
-        "state": v.state.value,
-        "review_complete": v.review_complete,
-        "findings": [dump(f) for f in v.findings],
-        "contracts": [dump(c) for c in v.contracts],
-        "directives": [dump(d) for d in v.directives],
-        "note": v.note,
-    }
-
-
-def check_in_json(c: CheckIn) -> dict[str, Any]:
-    return {
-        "plan_version": c.plan_version,
-        "changed": c.changed,
-        "task": dump(c.task),
-        "requirements": [dump(r) for r in c.requirements],
-        "contracts": [dump(k) for k in c.contracts],
-        "claim": verdict_json(c.claim) if c.claim else None,
-        "directives": [dump(d) for d in c.directives],
-        "delivered_now": list(c.delivered_now),
-        "stale": c.stale,
-        "stale_reason": c.stale_reason,
-        "ready_to_push": c.ready_to_push,
-        "push_blockers": list(c.push_blockers),
-    }
-
-
 # App -----------------------------------------------------------------------------------
 
 _bearer = HTTPBearer(auto_error=False)
 
 
-def create_app(services: Services) -> FastAPI:
+def create_app(services: Services, lifespan: Any = None) -> FastAPI:
     app = FastAPI(
+        lifespan=lifespan,
         title="Midflight",
         version="0.1.0",
         description="Keeps a small team's coding agents aligned while they work.",

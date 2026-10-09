@@ -1,4 +1,4 @@
-"""M-3: the MCP adapter, driven by an MCP client against the real API (UC-02, 04, 07, 09)."""
+"""M-3: the local (stdio) MCP adapter, driven by an MCP client against the real API."""
 
 from __future__ import annotations
 
@@ -17,8 +17,9 @@ from midflight.adapters.clock import FixedClock
 from midflight.adapters.memory_store import MemoryStore
 from midflight.api.app import Services, build_services, create_app
 from midflight.domain.models import Directive, DirectiveSource
-from midflight.mcp.api import MidflightApi
-from midflight.mcp.server import INSTRUCTIONS, build_server
+from midflight.mcp.instructions import INSTRUCTIONS
+from midflight.mcp.local.adapter import build_server
+from midflight.mcp.local.client import MidflightApi
 from midflight.ports import Commit
 
 pytestmark = pytest.mark.anyio
@@ -272,7 +273,7 @@ async def test_every_reply_carries_open_directives() -> None:
 async def test_stdio_server_starts_and_answers() -> None:
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "midflight.mcp.server"],
+        args=["-m", "midflight.mcp.local.adapter"],
         env={"MIDFLIGHT_URL": "http://127.0.0.1:9", "MIDFLIGHT_TOKEN": "t"},
     )
     async with Client(params) as client:
