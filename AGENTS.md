@@ -23,13 +23,14 @@ is buffer and submission.
 **Product model (D16):** Midflight is one hosted service. Teams install the public
 GitHub App and add one connector URL to their AI client; they sign in with GitHub and
 join projects with a code. The local API and stdio adapter in this repo are development
-tools. New work is tasks H-1 to H-5 in the development plan.
+tools.
 
 **Current state (October 9):** every code task is built, tested, and deployed on AWS:
 the domain, claims and reviews, the hosted connector with Sign in with GitHub, projects
 with join codes, plan-change directives (S-6), escalations (S-7), the Bedrock reviewer
-(S-5, off until Bedrock is enabled for the account), GitHub verification (M-6, S-10),
-stale handling with a demo fault switch (M-7), the pre-push hook (M-4), and CI (M-1).
+(S-5, on Amazon Nova Pro through a teammate's AWS account, D7), GitHub verification
+(M-6, S-10), stale handling with a demo fault switch (M-7), the pre-push hook (M-4), and
+CI (M-1).
 Open: the eval (S-8) and people's tasks. The [code guide](docs/code-guide.md) explains
 every file. Don't assume a module exists; check first.
 
@@ -43,7 +44,7 @@ every file. Don't assume a module exists; check first.
 | Names, states, invariants | [docs/domain.md](docs/domain.md) | Exact enum values, MCP tools, REST paths, GitHub names, INV-01 to INV-15 |
 | Requirements and acceptance | [docs/requirements.md](docs/requirements.md) | FR/NFR IDs, demo scenarios (§11), definition of done (§12), traceability (§14) |
 | Where code runs | [docs/architecture.md](docs/architecture.md) | AWS layout, sequence diagrams, technology links |
-| Decisions | [docs/design-decisions.md](docs/design-decisions.md) | D1 to D20 and open questions |
+| Decisions | [docs/design-decisions.md](docs/design-decisions.md) | D1 to D26 and open questions |
 | Human, step by step | [docs/step-by-step.md](docs/step-by-step.md) | Each person's steps with prompts to paste into an agent |
 | Visual overviews | [docs/pages/development-plan.html](docs/pages/development-plan.html), [docs/pages/use-cases.html](docs/pages/use-cases.html) | Open in a browser after cloning |
 | Team process | [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, PRs, reviews |
