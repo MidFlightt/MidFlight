@@ -225,7 +225,7 @@ class PlanService:
                 recipient_id=task.owner,
                 plan_version=plan.version,
                 changed_ids=ids,
-                requested_adjustment=_adjustment(plan, task_id, ids),
+                requested_adjustment=_adjustment(previous, plan, task_id, ids),
                 reason=plan.change_reason or "plan changed",
                 created_at=now,
             )
@@ -268,16 +268,18 @@ class PlanService:
             self._runner.submit(job)
 
 
-def _adjustment(plan: Plan, task_id: str, ids: list[str]) -> str:
+def _adjustment(previous: Plan, plan: Plan, task_id: str, ids: list[str]) -> str:
     """What changed for this task, in words an agent can act on."""
     parts = []
     for i in ids:
         contract = plan.contract(i)
+        requirement = plan.requirement(i)
         if contract is not None:
             fields = ", ".join(f"{name}: {kind}" for name, kind in contract.fields.items())
             parts.append(f"contract {i} is now {{{fields}}}")
-        elif plan.requirement(i) is not None:
-            parts.append(f"requirement {i} changed")
+        elif requirement is not None:
+            label = "requirement" if previous.requirement(i) else "new requirement"
+            parts.append(f"{label} {i}: {requirement.description}")
         elif i == task_id:
             parts.append(f"your task {i} changed")
         else:
