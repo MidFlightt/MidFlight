@@ -12,13 +12,16 @@ Locally, put them in a `.env` file in the repository root (git-ignored); see
 | `MIDFLIGHT_GITHUB_CLIENT_SECRET` | The GitHub App's client secret (sign-in). Secret. |
 | `MIDFLIGHT_GITHUB_APP_ID` | The GitHub App's id (repo checks). |
 | `MIDFLIGHT_GITHUB_PRIVATE_KEY_PATH` | Path to the App's `.pem` private key. Secret. |
-| `MIDFLIGHT_GITHUB_PRIVATE_KEY` | The key itself, instead of a path (used on AWS). Secret. |
+| `MIDFLIGHT_GITHUB_PRIVATE_KEY` | The key itself, instead of a path. Secret. |
+| `MIDFLIGHT_TABLE` | DynamoDB table name. Unset means an in-memory store. |
+| `MIDFLIGHT_SECRET_ID` | Secrets Manager secret holding the secrets above, as JSON (AWS). |
 """
 
 from __future__ import annotations
 
+import json
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,10 +35,21 @@ class Settings:
     github_client_secret: str | None = None
     github_app_id: str | None = None
     github_private_key: str | None = None
+    table_name: str | None = None
 
     @classmethod
-    def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
-        env = os.environ if env is None else env
+    def from_env(
+        cls,
+        env: Mapping[str, str] | None = None,
+        read_secret: Callable[[str], dict[str, str]] | None = None,
+    ) -> Settings:
+        env = dict(os.environ if env is None else env)
+        if env.get("MIDFLIGHT_SECRET_ID"):
+            # On AWS the secrets live in Secrets Manager, not in environment variables.
+            secret = (read_secret or _read_secret)(env["MIDFLIGHT_SECRET_ID"])
+            for name, value in secret.items():
+                if value and value != "REPLACE_ME":
+                    env.setdefault(f"MIDFLIGHT_{name.upper()}", value)
         key = env.get("MIDFLIGHT_GITHUB_PRIVATE_KEY")
         key_path = env.get("MIDFLIGHT_GITHUB_PRIVATE_KEY_PATH")
         if not key and key_path:
@@ -48,6 +62,7 @@ class Settings:
             github_client_secret=env.get("MIDFLIGHT_GITHUB_CLIENT_SECRET") or None,
             github_app_id=env.get("MIDFLIGHT_GITHUB_APP_ID") or None,
             github_private_key=key or None,
+            table_name=env.get("MIDFLIGHT_TABLE") or None,
         )
 
     @property
@@ -69,3 +84,10 @@ def load_dotenv(path: Path = Path(".env")) -> None:
             continue
         key, value = line.split("=", 1)
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _read_secret(secret_id: str) -> dict[str, str]:
+    import boto3
+
+    value = boto3.client("secretsmanager").get_secret_value(SecretId=secret_id)["SecretString"]
+    return json.loads(value)

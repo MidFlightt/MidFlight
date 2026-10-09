@@ -24,7 +24,7 @@ from midflight.domain.models import (
     Role,
     Text,
 )
-from midflight.ports import Clock, Reviewer, Store
+from midflight.ports import Clock, JobRunner, Reviewer, Store
 from midflight.services.check_in import CheckInService
 from midflight.services.claims import ClaimService, ClaimSubmission, parse_review_subject
 from midflight.services.directives import ACK_NOTE, DirectiveService
@@ -45,11 +45,20 @@ class Services:
     directives: DirectiveService
 
 
-def build_services(store: Store, clock: Clock, reviewer: Reviewer | None = None) -> Services:
-    """Wire every service to one store, running review jobs inline."""
-    runner = InlineRunner()
-    claims = ClaimService(store, runner, clock, reviewer)
-    runner.register(JobKind.CLAIM_REVIEW, claims.run_review)
+def build_services(
+    store: Store,
+    clock: Clock,
+    reviewer: Reviewer | None = None,
+    runner: JobRunner | None = None,
+) -> Services:
+    """Wire every service to one store. Review jobs run inline unless a runner is given
+    (on AWS, `StreamRunner`: the worker Lambda runs them)."""
+    if runner is None:
+        inline = InlineRunner()
+        claims = ClaimService(store, inline, clock, reviewer)
+        inline.register(JobKind.CLAIM_REVIEW, claims.run_review)
+    else:
+        claims = ClaimService(store, runner, clock, reviewer)
     return Services(
         store=store,
         claims=claims,
