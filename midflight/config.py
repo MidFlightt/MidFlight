@@ -13,6 +13,8 @@ Locally, put them in a `.env` file in the repository root (git-ignored); see
 | `MIDFLIGHT_GITHUB_APP_ID` | The GitHub App's id (repo checks). |
 | `MIDFLIGHT_GITHUB_PRIVATE_KEY_PATH` | Path to the App's `.pem` private key. Secret. |
 | `MIDFLIGHT_GITHUB_PRIVATE_KEY` | The key itself, instead of a path. Secret. |
+| `MIDFLIGHT_GITHUB_WEBHOOK_SECRET` | The App's webhook secret (verification). Secret. |
+| `MIDFLIGHT_REVIEWER_MODEL` | Bedrock model for the AI reviewer. Unset means rules only. |
 | `MIDFLIGHT_TABLE` | DynamoDB table name. Unset means an in-memory store. |
 | `MIDFLIGHT_SECRET_ID` | Secrets Manager secret holding the secrets above, as JSON (AWS). |
 """
@@ -35,6 +37,8 @@ class Settings:
     github_client_secret: str | None = None
     github_app_id: str | None = None
     github_private_key: str | None = None
+    github_webhook_secret: str | None = None
+    reviewer_model: str | None = None
     table_name: str | None = None
 
     @classmethod
@@ -62,6 +66,8 @@ class Settings:
             github_client_secret=env.get("MIDFLIGHT_GITHUB_CLIENT_SECRET") or None,
             github_app_id=env.get("MIDFLIGHT_GITHUB_APP_ID") or None,
             github_private_key=key or None,
+            github_webhook_secret=env.get("MIDFLIGHT_GITHUB_WEBHOOK_SECRET") or None,
+            reviewer_model=env.get("MIDFLIGHT_REVIEWER_MODEL") or None,
             table_name=env.get("MIDFLIGHT_TABLE") or None,
         )
 

@@ -14,11 +14,11 @@ from functools import cache
 from typing import Any
 
 from midflight.adapters.clock import SystemClock
-from midflight.adapters.dynamo_store import DynamoStore
 from midflight.adapters.runners import StreamRunner
 from midflight.api.app import Services, build_services
 from midflight.config import Settings
 from midflight.domain.models import Job, JobKind
+from midflight.wiring import reviewer_for, store_for
 
 
 @cache
@@ -26,8 +26,9 @@ def _services() -> Services:
     settings = Settings.from_env()
     if not settings.table_name:
         raise RuntimeError("MIDFLIGHT_TABLE isn't set")
-    store = DynamoStore(settings.table_name)
-    return build_services(store, SystemClock(), runner=StreamRunner())
+    return build_services(
+        store_for(settings), SystemClock(), reviewer_for(settings), runner=StreamRunner()
+    )
 
 
 def run_job(job: Job, services: Services) -> None:
