@@ -86,7 +86,9 @@ def create_server(
         client_registration_options=ClientRegistrationOptions(enabled=True),
         revocation_options=RevocationOptions(enabled=True),
     )
-    mcp = build_hosted_server(services, projects, auth=auth, oauth=oauth)
+    mcp = build_hosted_server(
+        services, projects, auth=auth, oauth=oauth, public_url=settings.public_url
+    )
     add_sign_in_routes(mcp, oauth, github_sign_in)
     # Stateless JSON responses: any server instance (or Lambda) can answer any request.
     mcp_app = mcp.streamable_http_app(

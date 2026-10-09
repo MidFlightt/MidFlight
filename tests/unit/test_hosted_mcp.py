@@ -111,6 +111,7 @@ async def test_connector_offers_the_tools_and_getting_started_instructions() -> 
         "submit_claim",
         "acknowledge_directive",
         "project_status",
+        "hook_setup",
         "propose_plan",
         "approve_plan",
         "assign_task",

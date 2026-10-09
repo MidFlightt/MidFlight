@@ -1,7 +1,8 @@
 """Participants and their bearer tokens (UC-01, INV-08, INV-12).
 
 A token is shown once, when it's issued. Only its SHA-256 hash is stored, so a leaked
-database doesn't leak working tokens.
+database doesn't leak working tokens. Connector users sign in with GitHub instead;
+they get a token only for the pre-push hook (`issue_hook_token`, D20).
 """
 
 from __future__ import annotations
@@ -114,6 +115,32 @@ class ParticipantService:
             Commit(project_id=lead.project_id, idempotency_key=key, puts=[revoked], audit=[event])
         )
         return revoked
+
+    def issue_hook_token(self, actor: Participant) -> str:
+        """A personal token for the pre-push hook (UC-16, D20). Replaces any earlier one."""
+        participant = self._store.get_participant(actor.id)
+        if participant is None or not participant.active:
+            raise PermissionDenied("you were removed from this project")
+        token = new_token()
+        updated = Participant.model_validate(
+            participant.model_dump() | {"token_hash": hash_token(token)}
+        )
+        key = f"hook-token:{actor.id}:{new_correlation_id()}"
+        event = audit_event(
+            self._store,
+            self._clock,
+            project_id=actor.project_id,
+            actor=actor.id,
+            action="participant.hook_token",
+            entity_ids=[actor.id],
+            reason="issued a pre-push hook token (any earlier one stops working)",
+            correlation_id=new_correlation_id(),
+            idempotency_key=key,
+        )
+        self._store.commit(
+            Commit(project_id=actor.project_id, idempotency_key=key, puts=[updated], audit=[event])
+        )
+        return token
 
 
 def _require_lead(actor: Participant) -> None:

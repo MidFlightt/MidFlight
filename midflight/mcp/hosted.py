@@ -9,7 +9,8 @@ tool call:
 4. replies in plain text from `midflight.mcp.replies`.
 
 Tools for everyone signed in: `my_projects`, `create_project`, `join_project`.
-Tools for members: `check_in`, `submit_claim`, `acknowledge_directive`, `project_status`.
+Tools for members: `check_in`, `submit_claim`, `acknowledge_directive`, `project_status`,
+`hook_setup`.
 Tools for the lead: `propose_plan`, `approve_plan`, `assign_task`, `resolve_escalation`,
 `rotate_join_code`, `remove_member`, and the demo fault switch `simulate_github_outage`.
 """
@@ -96,6 +97,7 @@ def build_hosted_server(
     current_user_id: Callable[[], str | None] = _signed_in_user_id,
     wait_seconds: float = WAIT_SECONDS,
     sleep: Callable[[float], None] = time.sleep,
+    public_url: str = "http://127.0.0.1:8000",
 ) -> MCPServer:
     """The hosted MCP server. Tests pass `current_user_id` instead of real sign-in."""
     server = MCPServer(
@@ -294,6 +296,35 @@ def build_hosted_server(
             )
             text = f"Directive {answered.id}: {answered.state.value}. {ACK_NOTE}"
             return with_directives(text, member, answered.task_id)
+
+        return answer(act)
+
+    @server.tool(
+        description="Set up the git pre-push hook in this repository. It blocks a push while "
+        "your claim isn't approved or a directive is unanswered. Returns a personal hook "
+        "token (shown once) and the commands to run in the repository root; show them to "
+        "your developer or run them. Calling it again replaces the token."
+    )
+    def hook_setup(task_id: str | None = None, project_id: str | None = None) -> str:
+        def act() -> str:
+            member = membership(project_id).participant
+            token = services.participants.issue_hook_token(member)
+            commands = [
+                f"curl -fsSL {public_url}/hook/pre-push -o .git/hooks/pre-push",
+                "chmod +x .git/hooks/pre-push",
+                f"git config midflight.url {public_url}",
+                f"git config midflight.project {member.project_id}",
+                f"git config midflight.token {token}",
+            ]
+            if task_id:
+                commands.append(f"git config midflight.task {task_id}")
+            return (
+                "Run these in the repository root. They stay in .git and are never "
+                "committed:\n```\n" + "\n".join(commands) + "\n```\n"
+                "The token is shown once and only works for your membership in this "
+                "project. If Midflight can't be reached, the hook warns and lets the push "
+                "through; midflight/verify still checks the code on GitHub."
+            )
 
         return answer(act)
 
