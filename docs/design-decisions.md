@@ -76,7 +76,7 @@ Simplifications adopted in the [development plan](development-plan.md#architectu
 
 | # | Question | Default until answered | Raised in |
 | --- | --- | --- | --- |
-| Q1 | Can developers submit claims directly, or only their agents? | Agents only | use-cases review question 2 |
+| Q1 | Can developers submit claims directly, or only their agents? | Agents only, through the connector. Any member's agent may claim a task that member owns, the lead's included (in a hosted project the lead is usually a developer too). | use-cases review question 2, D18 |
 | Q2 | Can agents accept a Midflight-proposed contract without the lead? | No. Contract changes go through the lead (UC-03) or an escalation (UC-13). | use-cases review question 4 |
 | Q3 | Can an agent read a contract it consumes but doesn't own (UC-07 2d)? | Read-only view of contracts it consumes; anything else about another task is 403 | use-cases review question 6 |
 | Q4 | Does the submission need a publicly hosted dashboard? | No. The lead works through their AI client with the lead tools (`project_status`, plan and escalation tools, D16). A read-only status page served by the backend is stretch task X-3. | requirements §13, D16 |
