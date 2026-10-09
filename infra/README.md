@@ -119,27 +119,21 @@ cat > trust.json <<'EOF'
   ]}}
 }]}
 EOF
-cat > claude-only.json <<'EOF'
-{"Version": "2012-10-17", "Statement": [{
-  "Effect": "Allow",
-  "Action": "bedrock:InvokeModel",
-  "Resource": [
-    "arn:aws:bedrock:*:*:inference-profile/*.anthropic.*",
-    "arn:aws:bedrock:*::foundation-model/anthropic.*"
-  ]
-}]}
-EOF
 aws iam create-role --role-name midflight-bedrock-reviewer --assume-role-policy-document file://trust.json --query Role.Arn --output text
-aws iam put-role-policy --role-name midflight-bedrock-reviewer --policy-name claude-only --policy-document file://claude-only.json
+aws iam put-role-policy --role-name midflight-bedrock-reviewer --policy-name invoke-models-only --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"bedrock:InvokeModel","Resource":["arn:aws:bedrock:*::foundation-model/*","arn:aws:bedrock:*:*:inference-profile/*"]}]}'
 ```
 
-The role can only call Claude models, and only Midflight's worker Lambda and this
+The role can only call Bedrock models, and only Midflight's worker Lambda and this
 account's administrators can use it. The first command prints the role's ARN; deploy
 with it:
 
 ```bash
-sam deploy ... --parameter-overrides PublicUrl=<FunctionUrl without the slash> ReviewerModel=us.anthropic.claude-sonnet-5-5 ReviewerRoleArn=<that ARN>
+sam deploy ... --parameter-overrides PublicUrl=<FunctionUrl without the slash> ReviewerModel=us.amazon.nova-pro-v1:0 ReviewerRoleArn=<that ARN>
 ```
+
+The live deploy uses `us.amazon.nova-pro-v1:0` through the role
+`arn:aws:iam::825125930394:role/midflight-bedrock-reviewer` (October 9): that account
+hasn't submitted Anthropic's use-case form, so Claude isn't available there yet.
 
 Bedrock usage is billed to the other account (cents for a demo). To stop, delete the
 role there and deploy again without `ReviewerRoleArn`.

@@ -57,6 +57,11 @@ things must happen in. Blocking if building on it would break another task; info
 otherwise.
 
 Rules:
+- Report a conflict only when two statements in the data explicitly contradict each \
+other, and quote both in the explanation. If one side says nothing about a topic, that \
+is not a conflict: don't guess what a claim means beyond what it says.
+- Formatting for display is not a mismatch: a page showing 4999 cents as "$49.99" uses \
+the contract correctly.
 - Don't repeat problems already listed in rule_findings.
 - Cite only ids that appear in the data (claims, requirements, tasks, contracts).
 - Use source "reviewer" on every finding.
