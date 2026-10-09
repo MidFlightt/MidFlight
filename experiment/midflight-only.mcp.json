@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "midflight-live": {
+      "type": "http",
+      "url": "https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/mcp"
+    }
+  }
+}
