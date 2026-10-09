@@ -10,8 +10,8 @@ tool call:
 
 Tools for everyone signed in: `my_projects`, `create_project`, `join_project`.
 Tools for members: `check_in`, `submit_claim`, `acknowledge_directive`, `project_status`.
-Tools for the lead: `propose_plan`, `approve_plan`, `assign_task`, `rotate_join_code`,
-`remove_member`.
+Tools for the lead: `propose_plan`, `approve_plan`, `assign_task`, `resolve_escalation`,
+`rotate_join_code`, `remove_member`.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from midflight.api.views import check_in_json, verdict_json
 from midflight.domain.models import Contract as PlanContract
 from midflight.domain.models import (
     DirectiveResponse,
+    EscalationState,
     FieldType,
     Id,
     InterfaceUse,
@@ -37,6 +38,7 @@ from midflight.domain.models import (
     Model,
     Participant,
     Requirement,
+    Resolution,
     Role,
     Text,
     User,
@@ -338,8 +340,17 @@ def build_hosted_server(
                 f"- {d.id} for {d.task_id} ({d.state.value}): {d.requested_adjustment}"
                 for d in open_directives
             ]
-            escalations = [e for e in store.list_escalations(project.id) if e.state.value == "open"]
-            lines.append(f"Open escalations: {len(escalations)}")
+            escalations = [
+                e for e in store.list_escalations(project.id) if e.state is EscalationState.OPEN
+            ]
+            lines.append(f"\nOpen escalations: {len(escalations)}")
+            for e in escalations:
+                lines.append(f"- {e.id} (claims {', '.join(e.claim_ids)}): {e.explanation}")
+                lines += [f"    {ev.ref}: {ev.excerpt}" for ev in e.evidence if ev.excerpt]
+            if escalations and m.participant.role is Role.LEAD:
+                lines.append(
+                    "Decide each one with resolve_escalation. Midflight won't pick a side."
+                )
             return "\n".join(lines)
 
         return answer(act)
@@ -398,6 +409,31 @@ def build_hosted_server(
         def act() -> str:
             plan = projects.assign_task(lead(project_id), task_id, member)
             return f"{task_id} now belongs to {member} (plan v{plan.version})."
+
+        return answer(act)
+
+    @server.tool(
+        description="Lead only. Decide an open escalation (a conflict between people's "
+        "requirements). clarify_plan: you already approved a plan version that settles it; "
+        "the claims are reviewed again. request_revision: the involved agents revise their "
+        "claims to match your reason. dismiss: not a real conflict; the claims are reviewed "
+        "again without it. Always give the reason the team will see."
+    )
+    def resolve_escalation(
+        escalation_id: str,
+        resolution: Literal["clarify_plan", "request_revision", "dismiss"],
+        reason: str,
+        project_id: str | None = None,
+    ) -> str:
+        def act() -> str:
+            resolved = services.escalations.resolve(
+                lead(project_id), escalation_id, Resolution(resolution), reason
+            )
+            return (
+                f"Escalation {resolved.id} resolved ({resolution}). Claims "
+                f"{', '.join(resolved.claim_ids)} were updated; their agents see it at their "
+                "next check_in."
+            )
 
         return answer(act)
 
