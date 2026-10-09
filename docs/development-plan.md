@@ -124,8 +124,11 @@ midflight/
     adapters/github_app.py              M  App auth, user sign-in, checks
     api/app.py                          S  REST routes
     api/oauth.py                        S  OAuth server, Sign in with GitHub (H-3)
-    mcp/remote.py                       S  hosted MCP endpoint and its tools (H-2)
-    mcp/server.py, api.py, replies.py   S  local stdio adapter (dev tool) and reply text
+    mcp/hosted.py, instructions.py      S  hosted MCP connector and its tools (H-2)
+    mcp/replies.py                      S  the text agents read
+    mcp/local/                          S  local stdio adapter (development tool)
+    main.py, config.py                  S  wires the server together; settings
+    aws/worker.py                       M  the worker Lambda (H-5)
     worker/handler.py                   M
     hooks/pre_push.py                   M
     demo.py                             S  demo plan for tests and local runs
@@ -172,6 +175,11 @@ Task IDs: **S-** Somesh, **M-** Mithilesh, **F-** Frederik, **H-** hosted produc
 | M-2 | REST API: token auth, plans, claims, jobs, check-in, directive answers | ✅ PR #4 |
 | M-3 | Local stdio MCP adapter (now a development tool, D20) | ✅ PR #5 |
 | M-1 | Scaffold | Partial: uv project done; **CI workflow missing** |
+| H-1 | Projects, join codes, members | ✅ built and tested (branch `H-hosted-connector`) |
+| H-2 | Hosted MCP connector (`/mcp`, 12 tools) | ✅ built and tested |
+| H-3 | Sign in with GitHub (OAuth), local dev login | ✅ built; tested end to end over HTTP with the dev login and against a fake GitHub |
+| H-4 | Repo checks (App installed, caller is admin) | ✅ built; tested against a fake GitHub |
+| H-5 | AWS: DynamoDB store, worker Lambda, SAM template, packaging | ✅ built and tested on moto; **not deployed yet** (waiting on the AWS account) |
 
 ### Friday, October 9: hosted product (G1, G2)
 
@@ -252,7 +260,8 @@ Steps only a person with the accounts can do. Somesh does them unless noted.
 6. In the Bedrock playground (`us-east-1`), send one message each to the current Claude
    Sonnet and Haiku (fill in the use-case form if asked) and note both inference
    profile ids.
-7. After the first deploy, put the secret values in with the commands H-5 prints.
+7. Deploy, store the secrets, and deploy again with the public URL: follow
+   [infra/README.md](../infra/README.md). About 15 minutes.
 
 **GitHub App settings:**
 

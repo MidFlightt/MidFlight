@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Midflight, hosted once for every team (decisions D16-D19). One web Lambda behind a
+  Function URL serves the REST API, the MCP connector at /mcp, and Sign in with GitHub.
+  A worker Lambda runs review jobs from the DynamoDB stream. See infra/README.md.
+
+Parameters:
+  PublicUrl:
+    Type: String
+    Default: ""
+    Description: >
+      The Function URL without a trailing slash, e.g. https://abc.lambda-url.us-east-1.on.aws.
+      Empty on the first deploy; deploy again with it once the stack prints it.
+  GitHubClientId:
+    Type: String
+    Default: Iv23li5CstbOq7OMWVjO
+    Description: The Midflight GitHub App's client id (public).
+  GitHubAppId:
+    Type: String
+    Default: "5233457"
+    Description: The Midflight GitHub App's id (public).
+  WebConcurrencyLimit:
+    Type: Number
+    Default: 0
+    Description: >
+      Cap on simultaneous web requests, to limit cost and abuse. 0 means no cap. New AWS
+      accounts often allow only 10 in total, and a cap needs headroom, so start with 0.
+
+Conditions:
+  HasConcurrencyLimit: !Not [!Equals [!Ref WebConcurrencyLimit, 0]]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    MemorySize: 1024
+    Timeout: 120
+    CodeUri: ../build/lambda.zip  # built by infra/package.py
+    Environment:
+      Variables:
+        MIDFLIGHT_TABLE: !Ref Table
+        MIDFLIGHT_SECRET_ID: !Ref Secrets
+        MIDFLIGHT_PUBLIC_URL: !Ref PublicUrl
+        MIDFLIGHT_GITHUB_CLIENT_ID: !Ref GitHubClientId
+        MIDFLIGHT_GITHUB_APP_ID: !Ref GitHubAppId
+
+Resources:
+  # Everything Midflight knows: projects, plans, claims, jobs, audit, sign-in records.
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }
+        - { AttributeName: SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  # The GitHub App's secrets. Filled in by infra/put_secrets.py after the first deploy.
+  Secrets:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Midflight GitHub App secrets (client secret, private key, webhook secret)
+      SecretString: '{"github_client_secret":"REPLACE_ME","github_private_key":"REPLACE_ME","github_webhook_secret":"REPLACE_ME"}'
+
+  # Web: REST API, /mcp, and sign-in. Lambda Web Adapter runs uvicorn (run.sh).
+  WebFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Midflight web (REST, MCP connector, Sign in with GitHub)
+      Handler: run.sh
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerArm64:30
+      ReservedConcurrentExecutions: !If
+        - HasConcurrencyLimit
+        - !Ref WebConcurrencyLimit
+        - !Ref AWS::NoValue
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_PORT: "8080"
+          AWS_LWA_READINESS_CHECK_PATH: /healthz
+      FunctionUrlConfig:
+        AuthType: NONE  # public; Midflight checks sign-in itself (OAuth and tokens)
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref Table }
+        - AWSSecretsManagerGetSecretValuePolicy: { SecretArn: !Ref Secrets }
+
+  # Worker: runs each new job item from the table's stream (claim reviews).
+  WorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Midflight worker (review jobs from the DynamoDB stream)
+      Handler: midflight.aws.worker.handler
+      Events:
+        NewJobs:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt Table.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 1
+            MaximumRetryAttempts: 2
+            BisectBatchOnFunctionError: true
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName": ["INSERT"], "dynamodb": {"NewImage": {"type": {"S": ["job"]}}}}'
+            DestinationConfig:
+              OnFailure:
+                Destination: !GetAtt DeadLetters.Arn
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref Table }
+        - AWSSecretsManagerGetSecretValuePolicy: { SecretArn: !Ref Secrets }
+        - SQSSendMessagePolicy: { QueueName: !GetAtt DeadLetters.QueueName }
+
+  # Jobs that failed every retry wait here for inspection (NFR-06).
+  DeadLetters:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600  # 14 days
+      SqsManagedSseEnabled: true
+
+  WebLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${WebFunction}
+      RetentionInDays: 14
+
+  WorkerLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${WorkerFunction}
+      RetentionInDays: 14
+
+Outputs:
+  FunctionUrl:
+    Description: Pass this (without the trailing slash) as PublicUrl on the next deploy
+    Value: !GetAtt WebFunctionUrl.FunctionUrl
+  ConnectorUrl:
+    Description: What teams add to their AI client
+    Value: !Sub "${WebFunctionUrl.FunctionUrl}mcp"
+  GitHubCallbackUrl:
+    Description: Add to the GitHub App's callback URLs
+    Value: !Sub "${WebFunctionUrl.FunctionUrl}oauth/github/callback"
+  SecretArn:
+    Description: Fill with infra/put_secrets.py
+    Value: !Ref Secrets
+  TableName:
+    Value: !Ref Table
+  DeadLetterQueue:
+    Value: !Ref DeadLetters

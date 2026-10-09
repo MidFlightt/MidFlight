@@ -58,8 +58,9 @@ note under [Invariants](#invariants)).
 
 | Entity | Key fields |
 | --- | --- |
-| `Project` | id, repository (`owner/name`), GitHub installation id, lead, participants, current plan version, `sync_state`, sync reason (required when stale), last synced at, coordination revision (`coord_rev`) |
-| `Participant` | id, project, role (`lead` or `agent`), developer name, agent name (required for agents), token hash (SHA-256 hex), revoked at, last check-in at, last check-in revision (the check-in cursor) |
+| `User` | id (`u-<github id>`), GitHub id, GitHub login, name, created at. One per GitHub account; not tied to a project. |
+| `Project` | id, name, repository (`owner/name`, one project per repository), GitHub installation id, join code, created by (user id), lead, participants, current plan version, `sync_state`, sync reason (required when stale), last synced at, coordination revision (`coord_rev`) |
+| `Participant` | One person's membership in one project: id (`<project id>.<github login>`), project, role (`lead` or `agent`), developer name, user id (GitHub sign-in), agent name, token hash (SHA-256 hex, for scripts and hooks), revoked at, last check-in at, last check-in revision. Needs a user id or a token hash. |
 | `Plan` | project, version, status (`proposed` or `approved`), requirements, tasks, contracts, approved by, approved at, change reason, changed ids |
 | `Requirement` | id, description, acceptance criteria |
 | `Task` | id, title, owner, branch, requirement ids, provides (contract ids), consumes (contract ids) |
@@ -195,21 +196,21 @@ caller's only project.
 | `resolve_escalation` | lead | UC-13 | S-7 |
 | `hook_setup` | members | Issues a personal hook token, shown once, and the pre-push hook install command | M-4 |
 
-Planned entities for H-1 and H-3 (added to `models.py` with both programmers'
-approval): `User` (id, GitHub user id, GitHub login), `Project` gains `name`,
-`join_code`, and `created_by`, and `Participant` gains `user_id`. OAuth clients, codes,
-and tokens are stored hashed by the OAuth server.
+Built in `midflight/mcp/hosted.py`, `midflight/api/oauth.py`, and
+`midflight/services/projects.py`; `hook_setup` comes with M-4 and `resolve_escalation`
+with S-7. Ids such as `C-1` or `J-4` are numbered across all projects, so two teams
+never share one. A member's participant id is `<project id>.<github login>`.
 
-The local stdio adapter (`midflight.mcp.server`) and the seeded local API remain as
-development tools (D20). A local dev login replaces GitHub only when
-`MIDFLIGHT_DEV_LOGIN=1`.
+The local stdio adapter (`midflight/mcp/local/`) and the demo seed
+(`MIDFLIGHT_SEED_DEMO=1`) remain as development tools (D20). A local dev login replaces
+GitHub only when `MIDFLIGHT_DEV_LOGIN=1`.
 
 
-**MCP tools** (decision D3, served by `midflight/mcp/server.py` on the MCP Python
-SDK 2's `MCPServer`). Every reply ends with the task's open directives, fenced and
-labeled as data. `submit_claim` fills `branch` and `base_sha` from the agent's git
-checkout when they're left out. The adapter reads `MIDFLIGHT_URL` (default
-`http://127.0.0.1:8000`), `MIDFLIGHT_TOKEN`, and `MIDFLIGHT_PROJECT` (default `demo`).
+**Agent tools** (decision D3; the hosted connector serves them, and so does the local
+adapter in `midflight/mcp/local/`). Every reply ends with the task's open directives, fenced and
+labeled as data. On the hosted connector the agent passes `branch` and `base_sha`;
+the local adapter fills them from git and reads `MIDFLIGHT_URL`, `MIDFLIGHT_TOKEN`, and
+`MIDFLIGHT_PROJECT`.
 
 | Tool | Input | Returns |
 | --- | --- | --- |
@@ -270,10 +271,9 @@ Decision D15. FastAPI serves OpenAPI at `/docs`. Every call except `/healthz` an
 | `POST /github/webhook` | GitHub (signature) | Verification trigger | UC-10 |
 | `POST /admin/fault`, `POST /admin/reconcile` | lead | Labeled demo fault switch, manual reconcile | UC-15 |
 
-The project and the lead's token are created by seeding, so there is no public
-create-project call. Locally, `midflight.api.local` seeds the demo project at startup and
-keeps the tokens in `.midflight/local-tokens.json`; the cloud bootstrap command comes
-with M-5.
+The REST API is for scripts and the pre-push hook, which authenticate with a
+participant token. Projects are created and joined through the connector
+(`create_project`, `join_project`), not through REST.
 
 M-2 built every row except `/escalations/{eid}/resolve` (S-7), `/github/webhook` (M-6),
 and `/admin/*` (M-7). Refusals return 400 with `findings` when rules caused them; a body

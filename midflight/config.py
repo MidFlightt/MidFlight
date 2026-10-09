@@ -55,7 +55,7 @@ class Settings:
         if not key and key_path:
             key = Path(key_path).expanduser().read_text()
         return cls(
-            public_url=env.get("MIDFLIGHT_PUBLIC_URL", cls.public_url).rstrip("/"),
+            public_url=(env.get("MIDFLIGHT_PUBLIC_URL") or cls.public_url).rstrip("/"),
             dev_login=env.get("MIDFLIGHT_DEV_LOGIN", "") == "1",
             seed_demo=env.get("MIDFLIGHT_SEED_DEMO", "") == "1",
             github_client_id=env.get("MIDFLIGHT_GITHUB_CLIENT_ID") or None,
