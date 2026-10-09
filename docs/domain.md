@@ -193,12 +193,13 @@ caller's only project.
 | `propose_plan`, `approve_plan` | lead | UC-03 | H-2 |
 | `assign_task` | lead | Sets a plan task's owner to a member (in the next plan version) | H-1, H-2 |
 | `rotate_join_code`, `remove_member` | lead | D18 | H-1 |
-| `resolve_escalation` | lead | UC-13 | S-7 |
-| `hook_setup` | members | Issues a personal hook token, shown once, and the pre-push hook install command | M-4 |
+| `resolve_escalation` | lead | UC-13: `clarify_plan` (after approving the clarifying plan), `request_revision`, or `dismiss`, with a reason | S-7 |
+| `hook_setup` | members | Issues a personal hook token, shown once, and the pre-push hook install commands | M-4 |
+| `simulate_github_outage` | lead | Labeled demo fault switch: `on` marks the project stale and makes verification behave as if GitHub were down; `off` recovers (UC-15) | M-7 |
 
 Built in `midflight/mcp/hosted.py`, `midflight/api/oauth.py`, and
-`midflight/services/projects.py`; `hook_setup` comes with M-4 and `resolve_escalation`
-with S-7. Ids such as `C-1` or `J-4` are numbered across all projects, so two teams
+`midflight/services/projects.py`; the services behind the other tools are in
+`midflight/services/`. Ids such as `C-1` or `J-4` are numbered across all projects, so two teams
 never share one. A member's participant id is `<project id>.<github login>`.
 
 The local stdio adapter (`midflight/mcp/local/`) and the demo seed
@@ -246,8 +247,8 @@ or a tool.
 
 ### REST API
 
-Decision D15. FastAPI serves OpenAPI at `/docs`. Every call except `/healthz` and
-`/github/webhook` sends `Authorization: Bearer <token>`. Errors are JSON
+Decision D15. FastAPI serves OpenAPI at `/docs`. Every call except `/healthz`,
+`/hook/pre-push`, and `/github/webhook` sends `Authorization: Bearer <token>`. Errors are JSON
 `{error, detail, hint}`.
 
 | Method and path | Who | Purpose | Use case |
@@ -268,16 +269,18 @@ Decision D15. FastAPI serves OpenAPI at `/docs`. Every call except `/healthz` an
 | `POST /directives/{did}/ack` | recipient agent | `{response, note}` | UC-09 |
 | `POST /escalations/{eid}/resolve` | lead | `{resolution, reason}`; `clarify_plan` points at a plan version | UC-13 |
 | `GET /projects/{pid}/audit` | any participant | Timeline, filterable by entity id | UC-14 |
-| `POST /github/webhook` | GitHub (signature) | Verification trigger | UC-10 |
-| `POST /admin/fault`, `POST /admin/reconcile` | lead | Labeled demo fault switch, manual reconcile | UC-15 |
+| `POST /projects/{pid}/push-check` | agent (hook token) | `{task_id}`; plain text, 200 if ready to push, 409 with the reasons. Delivers directives like check-in | UC-16 |
+| `GET /hook/pre-push` | anyone | The pre-push hook script | UC-16 |
+| `POST /github/webhook` | GitHub (signature) | Verification trigger: 401 on a bad signature, 202 otherwise | UC-10 |
 
 The REST API is for scripts and the pre-push hook, which authenticate with a
 participant token. Projects are created and joined through the connector
 (`create_project`, `join_project`), not through REST.
 
-M-2 built every row except `/escalations/{eid}/resolve` (S-7), `/github/webhook` (M-6),
-and `/admin/*` (M-7). Refusals return 400 with `findings` when rules caused them; a body
-that doesn't fit the schema returns 422.
+Every row is built. The demo fault switch is the lead's `simulate_github_outage` tool,
+and reconciling is automatic: the next successful GitHub read marks the project fresh
+and reviews held claims again. Refusals return 400 with `findings` when rules caused
+them; a body that doesn't fit the schema returns 422.
 
 **`check_in` reply** (`POST /projects/{pid}/check-in`; `task_id` defaults to the agent's
 own task):
@@ -289,7 +292,7 @@ own task):
 | `claim` | The agent's current claim verdict for the task, or `null` before the first claim |
 | `directives`, `delivered_now` | Open directives; ids that became `delivered` with this reply. Held while stale. |
 | `stale`, `stale_reason` | GitHub data can't be trusted right now (INV-09) |
-| `ready_to_push`, `push_blockers` | What the pre-push hook checks: an approved claim for the current plan and no open blocking directive (UC-16) |
+| `ready_to_push`, `push_blockers` | What the pre-push hook checks: an approved claim and no open blocking directive (UC-16). A plan change sends affected approvals back for review (UC-08), so an approval on an older version stays valid for an unaffected task. |
 
 **GitHub**
 
@@ -298,10 +301,11 @@ own task):
 | GitHub App | `MidFlight Team Yoga`, App ID `5233457`, owned by the `MidFlightt` organization, installed only on `midflight-demo-shop` (installation id `169380149`) |
 | App permissions | Checks: read and write. Actions, Contents, Pull requests, Metadata: read. Nothing else. |
 | App events | `workflow_run` only |
-| App authentication | As the App (App ID + private key + installation id). No user sign-in, no client secret. |
+| App authentication | Repo checks and verification as the App (App ID + private key, then an installation token). Sign in with GitHub through the App's user authorization (client id + client secret). |
 | Check run name | `midflight/verify` |
 | Verification trigger (D4) | `workflow_run` event, action `completed`, for the contract-test workflow `contract.yml` |
-| Test results artifact | `contract-results` |
+| Test results artifact | `contract-results`: a zip with one JSON file, `{"sha": "<head sha>", "results": [{"name": "...", "passed": true, "message": ""}]}`. Results for another SHA don't count. |
+| Protected paths | `tests/contract/` and `.github/`: a branch that changes them is escalated, never passed (INV-15) |
 | Webhook path | `/github/webhook` |
 
 **Environment variables** (names only; values never go in git)
@@ -311,7 +315,10 @@ own task):
 | `MIDFLIGHT_URL` | MCP adapter, hooks, dashboard |
 | `MIDFLIGHT_TOKEN` | MCP adapter, hooks, dashboard |
 | `MIDFLIGHT_PROJECT` | MCP adapter, hooks, dashboard |
-| `MIDFLIGHT_BEDROCK_MODEL_ID` | Worker (`BedrockReviewer`); chosen by S-8 |
+| `MIDFLIGHT_REVIEWER_MODEL` | Server and worker (`BedrockReviewer`). Unset means rules only. |
+
+The pre-push hook reads `midflight.url`, `midflight.project`, `midflight.token`, and
+optionally `midflight.task` from the repository's `.git/config`, set by `hook_setup`.
 
 ## Invariants
 

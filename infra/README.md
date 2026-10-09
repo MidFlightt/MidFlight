@@ -13,8 +13,8 @@ Team Yoga deploys Midflight **once**; every team then uses the same connector UR
 
 | Resource | Why |
 | --- | --- |
-| **Web Lambda + Function URL** | Serves the REST API, the MCP connector at `/mcp`, and Sign in with GitHub. Runs the same server as `uv run midflight-server`, through Lambda Web Adapter. A Function URL instead of API Gateway because `submit_claim` waits up to 60 s (API Gateway stops at 30 s). |
-| **Worker Lambda** | Reviews claims. DynamoDB's stream hands it each new job; it retries twice, then gives up to the dead-letter queue. |
+| **Web Lambda + Function URL** | Serves the REST API, the MCP connector at `/mcp`, Sign in with GitHub, and the GitHub webhook. Runs the same server as `uv run midflight-server`, through Lambda Web Adapter. A Function URL instead of API Gateway because `submit_claim` waits up to 60 s (API Gateway stops at 30 s). |
+| **Worker Lambda** | Reviews claims and verifies pushes. DynamoDB's stream hands it each new job; it retries twice, then gives up to the dead-letter queue. It may call Anthropic models on Bedrock, for the AI reviewer. |
 | **DynamoDB table** | Everything Midflight stores. Encrypted, point-in-time recovery on, expired sign-in records deleted automatically. |
 | **Secrets Manager secret** | The GitHub App's client secret, private key, and webhook secret. Never in code or environment variables. |
 | **SQS dead-letter queue** | Jobs that failed every retry, kept 14 days for inspection. |
@@ -66,7 +66,10 @@ Apply that change set the same way (only the two functions change; wait with
 Finally, in the GitHub App's settings:
 
 - **Callback URL:** add the `GitHubCallbackUrl` output.
-- **Webhook URL:** `<FunctionUrl>github/webhook` (used once verification lands, M-6).
+- **Webhook:** Active, URL = the `GitHubWebhookUrl` output, secret = the webhook secret
+  from your `.env`.
+- **Permissions:** Checks read and write; Actions, Contents, Pull requests, Metadata
+  read. **Events:** Workflow run.
 
 ## Check it works
 
@@ -85,12 +88,26 @@ Run `uv run python infra/package.py` and the `sam deploy ... --no-execute-change
 command again, keeping `--parameter-overrides PublicUrl=...`; then apply the change set.
 Data in DynamoDB is kept.
 
+## Turning on the AI reviewer
+
+The deploy runs **rules only** until you set `ReviewerModel`. Turn it on only once a
+message in the Bedrock playground (`us-east-1`) gets an answer: while Bedrock refuses
+calls, every complete claim would wait in `pending`. Then add it to the redeploy:
+
+```bash
+sam deploy ... --parameter-overrides PublicUrl=<FunctionUrl without the slash> ReviewerModel=us.anthropic.claude-sonnet-5-5
+```
+
+As of October 9, Bedrock answers "Operation not allowed" for every model on this
+account; see the [human steps](../docs/development-plan.md#human-steps).
+
 ## The live deployment
 
 Deployed October 9, 2026: stack `midflight`, `us-east-1`.
 
 - Connector URL: `https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/mcp`
 - GitHub callback URL: `https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/oauth/github/callback`
+- GitHub webhook URL: `https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/github/webhook`
 
 ## If something goes wrong
 
@@ -99,4 +116,6 @@ Deployed October 9, 2026: stack `midflight`, `us-east-1`.
 | The Function URL answers 403 Forbidden | The function's public-access policy is missing. Re-run `sam deploy`; an older SAM CLI may only add `lambda:InvokeFunctionUrl`, and Function URLs created since October 2025 also need `lambda:InvokeFunction` (update SAM CLI). |
 | `/healthz` answers 502, logs say "configure Sign in with GitHub" | The secrets are still placeholders: run `put_secrets.py`. |
 | Sign-in redirects to `127.0.0.1` | `PublicUrl` isn't set yet: run the second deploy. |
-| A claim stays `pending` | Look at the worker's logs and the dead-letter queue. |
+| A claim stays `pending` | Look at the worker's logs and the dead-letter queue. With `ReviewerModel` set, check that Bedrock answers for this account. |
+| No `midflight/verify` on a pull request | The App's Recent Deliveries: is the webhook active, and did a `workflow_run` arrive with a 202? Does the repo's workflow file end in `contract.yml`, and does the pull request's branch belong to an approved claim? |
+| Project shows as stale | GitHub errored or the lead turned the fault switch on (`simulate_github_outage` with `on: false` turns it off). |

@@ -2,8 +2,9 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Midflight, hosted once for every team (decisions D16-D19). One web Lambda behind a
-  Function URL serves the REST API, the MCP connector at /mcp, and Sign in with GitHub.
-  A worker Lambda runs review jobs from the DynamoDB stream. See infra/README.md.
+  Function URL serves the REST API, the MCP connector at /mcp, Sign in with GitHub, and
+  the GitHub webhook. A worker Lambda runs claim reviews and verifications from the
+  DynamoDB stream. See infra/README.md.
 
 Parameters:
   PublicUrl:
@@ -20,6 +21,13 @@ Parameters:
     Type: String
     Default: "5233457"
     Description: The Midflight GitHub App's id (public).
+  ReviewerModel:
+    Type: String
+    Default: ""
+    Description: >
+      Bedrock model id for the AI reviewer, e.g. us.anthropic.claude-sonnet-5-5. Empty
+      means rules only. Set it only once Bedrock answers for this account: while Bedrock
+      refuses calls, every complete claim would wait in pending.
   WebConcurrencyLimit:
     Type: Number
     Default: 0
@@ -44,6 +52,7 @@ Globals:
         MIDFLIGHT_PUBLIC_URL: !Ref PublicUrl
         MIDFLIGHT_GITHUB_CLIENT_ID: !Ref GitHubClientId
         MIDFLIGHT_GITHUB_APP_ID: !Ref GitHubAppId
+        MIDFLIGHT_REVIEWER_MODEL: !Ref ReviewerModel
 
 Resources:
   # Everything Midflight knows: projects, plans, claims, jobs, audit, sign-in records.
@@ -97,11 +106,11 @@ Resources:
         - DynamoDBCrudPolicy: { TableName: !Ref Table }
         - AWSSecretsManagerGetSecretValuePolicy: { SecretArn: !Ref Secrets }
 
-  # Worker: runs each new job item from the table's stream (claim reviews).
+  # Worker: runs each new job item from the table's stream (reviews, verifications).
   WorkerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: Midflight worker (review jobs from the DynamoDB stream)
+      Description: Midflight worker (claim reviews and verifications from the stream)
       Handler: midflight.aws.worker.handler
       Events:
         NewJobs:
@@ -122,6 +131,12 @@ Resources:
         - DynamoDBCrudPolicy: { TableName: !Ref Table }
         - AWSSecretsManagerGetSecretValuePolicy: { SecretArn: !Ref Secrets }
         - SQSSendMessagePolicy: { QueueName: !GetAtt DeadLetters.QueueName }
+        - Statement:  # the AI reviewer: Anthropic models on Bedrock only
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource:
+                - arn:aws:bedrock:*:*:inference-profile/*.anthropic.*
+                - arn:aws:bedrock:*::foundation-model/anthropic.*
 
   # Jobs that failed every retry wait here for inspection (NFR-06).
   DeadLetters:
@@ -152,6 +167,9 @@ Outputs:
   GitHubCallbackUrl:
     Description: Add to the GitHub App's callback URLs
     Value: !Sub "${WebFunctionUrl.FunctionUrl}oauth/github/callback"
+  GitHubWebhookUrl:
+    Description: The GitHub App's webhook URL
+    Value: !Sub "${WebFunctionUrl.FunctionUrl}github/webhook"
   SecretArn:
     Description: Fill with infra/put_secrets.py
     Value: !Ref Secrets

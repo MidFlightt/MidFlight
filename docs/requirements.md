@@ -292,12 +292,12 @@ These choices come from the [development plan](development-plan.md#architecture-
 | Area | Initial choice |
 | --- | --- |
 | Language and validation | Python 3.12, Pydantic, uv |
-| Coordinating agent | Strands Agents SDK with a configurable Bedrock model (`MIDFLIGHT_BEDROCK_MODEL_ID`); candidates are the current Claude Sonnet and Haiku models, chosen from S-8 eval results |
+| Coordinating agent | A Bedrock model through the Converse API (D21), configured with `MIDFLIGHT_REVIEWER_MODEL`; default Claude Sonnet 5.5, to be confirmed by the S-8 eval |
 | Agent hosting | Runs inside the worker Lambda (AgentCore Runtime not required; D1) |
 | API | FastAPI on a Lambda behind a Lambda Function URL (D19), serving REST, `/mcp`, OAuth, and the GitHub webhook |
 | Persistent state | DynamoDB through Boto3 |
-| Background processing | DynamoDB Streams trigger the worker Lambda; SQS dead-letter queue; Powertools idempotency |
-| GitHub | GitHub App through githubkit |
+| Background processing | DynamoDB Streams trigger the worker Lambda; SQS dead-letter queue; idempotency keys on every write |
+| GitHub | GitHub App, REST calls with httpx (D23) |
 | Agent connection | Hosted remote MCP endpoint on the official MCP Python SDK 2.x (`MCPServer`), with its OAuth server and Sign in with GitHub (D16, D17); a git pre-push hook; the local stdio adapter is a development tool (D20) |
 | Lead interface | Lead tools in the same connector (`project_status`, plan and escalation tools); a read-only status page is stretch |
 | Tests and CI | pytest, GitHub Actions |

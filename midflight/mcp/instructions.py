@@ -68,6 +68,7 @@ HOSTED_INSTRUCTIONS = (
     + """
 Getting started: call my_projects. If you aren't in a project yet, ask your developer
 for the project's join code and call join_project. A lead creates a project with
-create_project and shares the join code it returns.
+create_project and shares the join code it returns. Once you have a task, offer your
+developer the pre-push hook (hook_setup), which stops a push Midflight isn't ready for.
 """
 )
