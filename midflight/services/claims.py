@@ -178,7 +178,7 @@ class ClaimService:
             id=self._store.next_id(project.id, "J"),
             project_id=project.id,
             kind=JobKind.CLAIM_REVIEW,
-            subject_id=_subject(claim_id, revision),
+            subject_id=review_subject(claim_id, revision),
             idempotency_key=f"claim:{claim_id}:{revision}",
             correlation_id=correlation_id,
             created_at=now,
@@ -507,7 +507,8 @@ class ClaimService:
         return plan
 
 
-def _subject(claim_id: str, revision: int) -> str:
+def review_subject(claim_id: str, revision: int) -> str:
+    """A claim review job's subject: which claim revision it reviews."""
     return f"{claim_id}/{revision}"
 
 

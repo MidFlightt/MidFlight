@@ -120,7 +120,7 @@ class CheckInService:
 
         claim = self._current_claim(actor, task.id)
         verdict = self._claims.verdict(claim.id, claim.revision) if claim else None
-        blockers = _push_blockers(claim, plan, directives)
+        blockers = _push_blockers(claim, directives)
         return CheckIn(
             plan_version=plan.version,
             task=task,
@@ -172,16 +172,14 @@ def _queued(directive: Directive) -> bool:
     return directive.state is DirectiveState.QUEUED
 
 
-def _push_blockers(claim: Claim | None, plan: Plan, directives: Sequence[Directive]) -> list[str]:
+def _push_blockers(claim: Claim | None, directives: Sequence[Directive]) -> list[str]:
     blockers = []
     if claim is None:
         blockers.append("no claim for this task; submit one before pushing")
     elif claim.state is not ClaimState.APPROVED:
+        # A plan change sends affected approvals back for review (UC-08 step 3), so an
+        # approval on an older plan version is still valid for an unaffected task.
         blockers.append(f"claim {claim.id} is {claim.state}, not approved")
-    elif claim.plan_version != plan.version:
-        blockers.append(
-            f"claim {claim.id} is for plan v{claim.plan_version}; v{plan.version} is current"
-        )
     for directive in directives:
         if directive.blocking:
             blockers.append(f"directive {directive.id} is {directive.state}; answer it first")
