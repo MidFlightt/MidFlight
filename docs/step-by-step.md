@@ -8,9 +8,11 @@ Claude Code (or your agent) inside the `midflight` folder; your agent reads
 Finish line: **Saturday, October 10.** Sunday, October 11 is spare time for fixes and
 submission.
 
-**Where we are (October 8):** the hosted connector is built and tested on a laptop:
-projects with join codes, Sign in with GitHub, the connector's tools, the claim checks,
-and the AWS code. It isn't deployed yet. How the code fits together:
+**Where we are (October 9):** the hosted connector is built, tested, and **deployed on
+AWS**: projects with join codes, Sign in with GitHub, the connector's tools, and the
+claim checks. The live connector URL is
+`https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/mcp`
+([deploy details](../infra/README.md#the-live-deployment)). How the code fits together:
 [code-guide.md](code-guide.md).
 
 ---
@@ -50,11 +52,13 @@ and the AWS code. It isn't deployed yet. How the code fits together:
    and the webhook secret in your `.env`, and remove `MIDFLIGHT_DEV_LOGIN=1`.
    ✅ `uv run midflight-server`, then connecting Claude Code sends you to GitHub to sign
    in.
-2. **AWS** once the account is verified: root MFA, budget, deploy identity, AWS CLI and
-   SAM CLI, Bedrock playground check ([details](development-plan.md#human-steps)).
-3. **Deploy:** follow [infra/README.md](../infra/README.md).
-   ✅ `curl <FunctionUrl>healthz` prints `{"status":"ok"}`, and Claude Code connects to
-   the Function URL.
+2. ~~**AWS**: account, deploy identity, AWS CLI and SAM CLI.~~ Done October 9.
+3. ~~**Deploy**~~ Done October 9 ([infra/README.md](../infra/README.md)). Left to do:
+   add the GitHub callback URL
+   `https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/oauth/github/callback`
+   to the App's **Callback URLs** (keep the `127.0.0.1` one for local work).
+   ✅ `claude mcp add --transport http --scope user midflight-live <connector URL>`, then
+   `/mcp` signs you in with GitHub.
 4. **Next code tasks** (paste into your agent one at a time):
    > Task S-6 in docs/development-plan.md: plan-change directives. When the lead
    > approves a new plan version, find the tasks it affects, send each one directive
