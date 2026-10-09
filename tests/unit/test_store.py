@@ -15,11 +15,16 @@ import pytest
 from moto import mock_aws
 from pydantic import ValidationError
 
-from demo_fixture import NOW, PROJECT, make_claim, make_plan, seed
+from demo_fixture import NOW, PROJECT, make_claim, make_plan, seed, submission
+from midflight.adapters.clock import FixedClock
 from midflight.adapters.dynamo_store import DynamoStore
+from midflight.adapters.fake_github import FakeGitHub
 from midflight.adapters.memory_store import MemoryStore
+from midflight.api.app import build_services
 from midflight.domain.models import ClaimState, Participant, PlanStatus, Role, SyncState, User
-from midflight.ports import Commit, RevisionConflict, Store
+from midflight.ports import ChangedFiles, Commit, PullRequestInfo, RevisionConflict, Store
+from midflight.services.plans import PlanDraft
+from midflight.services.verification import WorkflowRun
 
 
 @pytest.fixture(params=["memory", "dynamo"])
@@ -206,3 +211,35 @@ def test_sign_in_records_expire(store: Store) -> None:
 
 def test_ids_never_repeat_across_projects(store: Store) -> None:
     assert store.next_id("one", "C") != store.next_id("two", "C")
+
+
+def test_plan_change_verification_and_fault_switch_work_on_this_store(store: Store) -> None:
+    """S-6, M-6, and M-7 write new kinds of items together; each store must take them."""
+    github = FakeGitHub()
+    services = build_services(store, FixedClock(NOW), github=github)
+    t1, lead = store.get_participant("p-t1"), store.get_participant("p-lead")
+    claim = services.claims.submit(t1, submission("T1"))
+
+    # A failed push: a verification, a check, and a correction directive.
+    github.pulls["t1-work"] = PullRequestInfo(12, "t1-work", "abc1234", "9f3e1a2")
+    github.diffs["abc1234"] = ChangedFiles(paths=["app/api.py"], patch="")
+    github.files[("app/api.py", "abc1234")] = "return {'total': 49.99}"
+    github.artifacts[1] = {"sha": "abc1234", "results": [{"name": "t", "passed": False}]}
+    repo = "MidFlightt/midflight-demo-shop"
+    services.verifications.enqueue(WorkflowRun(repo, 169380149, 1, 1, "abc1234", "t1-work", "d"))
+    [verification] = store.list_verifications(PROJECT)
+    assert verification.outcome.value == "failed" and verification.check_run_id == 1
+
+    # A plan change supersedes the correction and sends T1 back for review.
+    plan = make_plan(2)
+    draft = PlanDraft(requirements=plan.requirements, tasks=plan.tasks, contracts=plan.contracts)
+    services.plans.approve(lead, services.plans.propose(lead, draft).version, "add currency")
+    states = sorted((d.source.value, d.state.value) for d in store.list_directives(PROJECT, "T1"))
+    assert states == [("plan_change", "queued"), ("verification", "superseded")]
+    assert store.get_claim(claim.claim_id).state is ClaimState.NEEDS_REVISION
+
+    # The fault switch round trip.
+    services.sync.set_fault(lead, True)
+    assert store.get_project(PROJECT).sync_state is SyncState.STALE
+    services.sync.set_fault(lead, False)
+    assert store.get_project(PROJECT).sync_state is SyncState.FRESH

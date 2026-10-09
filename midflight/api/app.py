@@ -15,6 +15,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from midflight.adapters.runners import InlineRunner
 from midflight.api.views import check_in_json, dump, participant_json, verdict_json
+from midflight.api.webhook import add_webhook_route
 from midflight.domain.models import (
     DirectiveResponse,
     JobKind,
@@ -25,7 +26,7 @@ from midflight.domain.models import (
     Role,
     Text,
 )
-from midflight.ports import Clock, JobRunner, Reviewer, Store
+from midflight.ports import Clock, GitHub, JobRunner, Reviewer, Store
 from midflight.services.check_in import CheckInService
 from midflight.services.claims import ClaimService, ClaimSubmission, parse_review_subject
 from midflight.services.directives import ACK_NOTE, DirectiveService
@@ -33,6 +34,8 @@ from midflight.services.errors import NotFound, PermissionDenied, ServiceError
 from midflight.services.escalations import EscalationService
 from midflight.services.participants import ParticipantService
 from midflight.services.plans import PlanDraft, PlanService
+from midflight.services.sync import SyncService
+from midflight.services.verification import VerificationService
 
 # Services ------------------------------------------------------------------------------
 
@@ -46,6 +49,8 @@ class Services:
     check_ins: CheckInService
     directives: DirectiveService
     escalations: EscalationService
+    sync: SyncService
+    verifications: VerificationService
 
 
 def build_services(
@@ -53,16 +58,19 @@ def build_services(
     clock: Clock,
     reviewer: Reviewer | None = None,
     runner: JobRunner | None = None,
+    github: GitHub | None = None,
 ) -> Services:
-    """Wire every service to one store. Review jobs run inline unless a runner is given
-    (on AWS, `StreamRunner`: the worker Lambda runs them)."""
-    if runner is None:
-        inline = InlineRunner()
-        claims = ClaimService(store, inline, clock, reviewer)
+    """Wire every service to one store. Jobs run inline unless a runner is given (on
+    AWS, `StreamRunner`: the worker Lambda runs them)."""
+    inline = InlineRunner() if runner is None else None
+    runner = runner or inline
+    assert runner is not None
+    claims = ClaimService(store, runner, clock, reviewer)
+    sync = SyncService(store, clock, runner)
+    verifications = VerificationService(store, clock, runner, sync, github, reviewer)
+    if inline is not None:
         inline.register(JobKind.CLAIM_REVIEW, claims.run_review)
-        runner = inline
-    else:
-        claims = ClaimService(store, runner, clock, reviewer)
+        inline.register(JobKind.VERIFICATION, verifications.run)
     return Services(
         store=store,
         claims=claims,
@@ -71,6 +79,8 @@ def build_services(
         check_ins=CheckInService(store, clock, claims),
         directives=DirectiveService(store, clock),
         escalations=EscalationService(store, clock, runner),
+        sync=sync,
+        verifications=verifications,
     )
 
 
@@ -111,7 +121,9 @@ class ResolveRequest(Model):
 _bearer = HTTPBearer(auto_error=False)
 
 
-def create_app(services: Services, lifespan: Any = None) -> FastAPI:
+def create_app(
+    services: Services, lifespan: Any = None, webhook_secret: str | None = None
+) -> FastAPI:
     app = FastAPI(
         lifespan=lifespan,
         title="Midflight",
@@ -297,6 +309,9 @@ def create_app(services: Services, lifespan: Any = None) -> FastAPI:
     def audit(pid: str, actor: Caller, entity_id: str | None = None) -> list[Any]:
         in_project(pid, actor)
         return [dump(e) for e in services.store.list_audit(pid, entity_id)]
+
+    # GitHub (UC-10)
+    add_webhook_route(app, services.verifications, webhook_secret)
 
     return app
 

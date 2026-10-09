@@ -18,7 +18,7 @@ from midflight.adapters.runners import StreamRunner
 from midflight.api.app import Services, build_services
 from midflight.config import Settings
 from midflight.domain.models import Job, JobKind
-from midflight.wiring import reviewer_for, store_for
+from midflight.wiring import github_for, reviewer_for, store_for
 
 
 @cache
@@ -27,7 +27,11 @@ def _services() -> Services:
     if not settings.table_name:
         raise RuntimeError("MIDFLIGHT_TABLE isn't set")
     return build_services(
-        store_for(settings), SystemClock(), reviewer_for(settings), runner=StreamRunner()
+        store_for(settings),
+        SystemClock(),
+        reviewer_for(settings),
+        StreamRunner(),
+        github_for(settings),
     )
 
 
@@ -35,9 +39,10 @@ def run_job(job: Job, services: Services) -> None:
     """Run one job with its handler. Each handler is safe to run twice (INV-13)."""
     if job.kind is JobKind.CLAIM_REVIEW:
         services.claims.run_review(job)
+    elif job.kind is JobKind.VERIFICATION:
+        services.verifications.run(job)
     else:
-        # Plan propagation (S-6), verification (M-6), and reconcile (M-7) plug in here.
-        raise NotImplementedError(f"no handler for {job.kind} jobs yet")
+        raise NotImplementedError(f"no handler for {job.kind} jobs")
 
 
 def handler(event: dict[str, Any], context: Any = None, services: Services | None = None) -> None:

@@ -11,7 +11,7 @@ tool call:
 Tools for everyone signed in: `my_projects`, `create_project`, `join_project`.
 Tools for members: `check_in`, `submit_claim`, `acknowledge_directive`, `project_status`.
 Tools for the lead: `propose_plan`, `approve_plan`, `assign_task`, `resolve_escalation`,
-`rotate_join_code`, `remove_member`.
+`rotate_join_code`, `remove_member`, and the demo fault switch `simulate_github_outage`.
 """
 
 from __future__ import annotations
@@ -340,6 +340,18 @@ def build_hosted_server(
                 f"- {d.id} for {d.task_id} ({d.state.value}): {d.requested_adjustment}"
                 for d in open_directives
             ]
+            if project.sync_state.value == "stale":
+                lines.append(f"\nGitHub data is STALE: {project.sync_reason}")
+            verifications = sorted(
+                store.list_verifications(project.id), key=lambda v: v.created_at
+            )[-5:]
+            if verifications:
+                lines.append("\nLatest midflight/verify results:")
+                lines += [
+                    f"- {v.id} {v.outcome.value} for {v.head_sha[:7]}"
+                    + (f" (claim {v.claim_id})" if v.claim_id else "")
+                    for v in verifications
+                ]
             escalations = [
                 e for e in store.list_escalations(project.id) if e.state is EscalationState.OPEN
             ]
@@ -434,6 +446,23 @@ def build_hosted_server(
                 f"{', '.join(resolved.claim_ids)} were updated; their agents see it at their "
                 "next check_in."
             )
+
+        return answer(act)
+
+    @server.tool(
+        description="Lead only, for demos: a labeled fault switch. on=true makes Midflight "
+        "behave as if GitHub were down for this project (data marked stale, new directives "
+        "held, no approvals); on=false recovers and reviews held claims again."
+    )
+    def simulate_github_outage(on: bool, project_id: str | None = None) -> str:
+        def act() -> str:
+            services.sync.set_fault(lead(project_id), on)
+            if on:
+                return (
+                    "Fault switch ON: Midflight now treats GitHub as unavailable for this "
+                    "project. Directives are held and nothing is approved until you turn it off."
+                )
+            return "Fault switch OFF: GitHub data is fresh again; held claims were reviewed again."
 
         return answer(act)
 
