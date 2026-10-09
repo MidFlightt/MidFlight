@@ -87,71 +87,18 @@ Working on Midflight's own code? `git clone https://github.com/MidFlightt/MidFli
 
 1. **Connect** (the "Everyone" steps above), and tell Somesh anything that feels
    confusing. You're the first user.
-2. **The demo-shop repo** (F-2). In `midflight-demo-shop`, paste into your agent:
-   > Create a tiny shop for a demo. api/checkout.py: a FastAPI endpoint GET /checkout
-   > returning JSON {"total_cents": 4999}. web/checkout.html: a page that shows "$49.99".
-   > tests/contract/test_checkout.py: pytest tests that the response has total_cents as
-   > an integer. A CODEOWNERS file making Somesh the owner of tests/ and .github/.
-
-   Then add this workflow as `.github/workflows/contract.yml`. Midflight reacts to this
-   file name, and reads the `contract-results` artifact it uploads:
-
-   ```yaml
-   name: contract
-   on: pull_request
-   permissions:
-     contents: read
-   jobs:
-     contract:
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v4
-           with:
-             ref: ${{ github.event.pull_request.head.sha }}
-         - name: Use the contract tests from main, not the branch's own copy
-           run: |
-             git fetch --depth=1 origin main
-             git checkout FETCH_HEAD -- tests/contract
-         - uses: actions/setup-python@v5
-           with:
-             python-version: "3.12"
-         - run: pip install fastapi httpx pytest
-         - name: Run the contract tests
-           id: tests
-           continue-on-error: true
-           run: pytest tests/contract --junitxml=report.xml
-         - name: Write contract-results.json for Midflight
-           if: always()
-           env:
-             HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-           run: |
-             python - <<'EOF'
-             import json, os, xml.etree.ElementTree as ET
-             results = []
-             for case in ET.parse("report.xml").iter("testcase"):
-                 problem = case.find("failure")
-                 if problem is None:
-                     problem = case.find("error")
-                 message = "" if problem is None else (problem.get("message") or "")[:300]
-                 results.append({"name": case.get("name"), "passed": problem is None,
-                                 "message": message})
-             with open("contract-results.json", "w") as f:
-                 json.dump({"sha": os.environ["HEAD_SHA"], "results": results}, f)
-             EOF
-         - uses: actions/upload-artifact@v4
-           if: always()
-           with:
-             name: contract-results
-             path: contract-results.json
-         - name: Fail if a contract test failed
-           if: steps.tests.outcome == 'failure'
-           run: exit 1
+2. ~~**The demo-shop repo** (F-2)~~ Done October 8 (`MidFlightt/MidFlight-demo-shop`):
+   the checkout API and page, the trusted contract runner, and `contract.yml`, which
+   restores `tests/contract/` and `contracts/` from main and uploads `contract-results`.
+   Midflight reads that artifact as it is. One fix left: `.mcp.json.example` still points
+   at the old local adapter; replace it with the hosted connector:
+   ```json
+   {"mcpServers": {"midflight": {"type": "http", "url": "https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/mcp"}}}
    ```
-
-   ✅ A pull request shows a green `contract` run; changing `total_cents` to `total`
-   turns it red, and `midflight/verify` turns red too.
+   Saved as `.mcp.json`, Claude Code offers the connector to anyone who opens the repo.
 3. **The storyboard** in [demo.md](demo.md), using the scene list at the end of the
-   [development plan](development-plan.md#demo-storyboard). For the outage scene, the
+   [development plan](development-plan.md#demo-storyboard), and the animated version from
+   [video-prompt.md](video-prompt.md). For the outage scene, the
    lead asks their agent to "simulate a GitHub outage" (the labeled fault switch) and
    later to turn it off.
 
