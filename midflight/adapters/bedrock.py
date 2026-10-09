@@ -179,7 +179,8 @@ class BedrockReviewer:
                     ],
                     "toolChoice": {"tool": {"name": "report_findings"}},
                 },
-                inferenceConfig={"maxTokens": 2000},
+                # Temperature 0: the same claims should get the same findings.
+                inferenceConfig={"maxTokens": 2000, "temperature": 0},
             )
         except (BotoCoreError, ClientError) as error:
             raise ReviewerUnavailable(f"Bedrock: {error}") from error

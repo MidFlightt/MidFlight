@@ -17,6 +17,7 @@ from midflight.domain.models import (
     FieldType,
     FindingKind,
     Participant,
+    Requirement,
     SyncState,
 )
 from midflight.ports import Commit
@@ -193,3 +194,24 @@ def test_the_change_is_audited_with_the_plan_version(team) -> None:
     [event] = [e for e in services.store.list_audit("demo") if e.action == "plan.propagated"]
     assert event.versions == {"plan": 2}
     assert "T1" in event.reason and "T2" in event.reason and "T3" not in event.reason
+
+
+def test_a_directive_spells_out_a_new_requirement(team) -> None:
+    services, people = team
+    approve_all_three(services, people)
+    plan = make_plan(1)
+    promo = Requirement(id="R-9", description="Promo code BEEPBOOP takes 10% off")
+    tasks = [
+        t.model_copy(update={"requirement_ids": [*t.requirement_ids, "R-9"]}) if t.id == "T2" else t
+        for t in plan.tasks
+    ]
+    draft = PlanDraft(
+        requirements=[*plan.requirements, promo], tasks=tasks, contracts=plan.contracts
+    )
+    lead = people["p-lead"]
+    services.plans.approve(lead, services.plans.propose(lead, draft).version, "Prime Day")
+    [directive] = services.store.list_directives("demo")
+    assert directive.task_id == "T2"
+    assert (
+        "new requirement R-9: Promo code BEEPBOOP takes 10% off" in directive.requested_adjustment
+    )
