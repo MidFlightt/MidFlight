@@ -169,6 +169,21 @@ def test_a_newer_failure_supersedes_the_older_correction() -> None:
     assert states == [DirectiveState.SUPERSEDED, DirectiveState.QUEUED]
 
 
+def test_a_comment_naming_the_field_does_not_count() -> None:
+    team = Team()
+    sneaky = "# returns total_cents, honest\ndef checkout():\n    return {'total': 49.99}\n"
+    v = team.verify(team.push(files={"app/api.py": sneaky}))
+    assert FindingKind.MISSING_CHANGE in {f.kind for f in v.findings if f.blocking}
+    assert "total_cents" in team.github.checks[0].title  # the clearest reason leads
+
+
+def test_a_url_is_not_mistaken_for_a_comment() -> None:
+    team = Team()
+    code = "requests.get('https://shop.test/checkout').json()['total_cents']  # cents\n"
+    v = team.verify(team.push(files={"app/api.py": code}))
+    assert v.outcome is VerificationOutcome.VERIFIED
+
+
 def test_the_demo_shops_summary_artifact_counts() -> None:
     team = Team()
     run = team.push()
