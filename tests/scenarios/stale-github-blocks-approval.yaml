@@ -1,0 +1,8 @@
+name: While GitHub data is stale, no claim is approved
+requirement: "requirements §11: GitHub failure or simulated rate limit (approvals)"
+use_cases: [UC-15, UC-05]
+steps:
+  - go_stale: "GitHub rate limit (SIMULATED)"
+  - say: A claim that would normally pass is held
+    submit: {as: T2, name: page}
+    expect: {state: pending, findings: []}

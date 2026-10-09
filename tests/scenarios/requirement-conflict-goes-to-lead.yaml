@@ -1,0 +1,23 @@
+name: Two people's requirements conflict; the claim waits for the lead
+requirement: "definition of done: human requirement conflicts are escalated"
+use_cases: [UC-05, UC-12]
+reviewer:
+  - []
+  - - id: x
+      kind: requirement_conflict
+      severity: blocking
+      source: reviewer
+      affected_ids: [C-1, C-2, R-1]
+      explanation: T2 assumes a tax-inclusive total; T1 returns it tax-exclusive
+      proposed_correction: The lead decides whether totals include tax
+steps:
+  - submit:
+      as: T1
+      name: api
+      claim: {assumptions: ["total_cents excludes tax"]}
+    expect: {state: approved}
+  - submit:
+      as: T2
+      name: page
+      claim: {assumptions: ["total_cents already includes tax"]}
+    expect: {state: human_review_required, blocking: [requirement_conflict]}

@@ -181,10 +181,23 @@ class JobState(StrEnum):
 # Project and people --------------------------------------------------------------------
 
 
+class User(Model):
+    """A person, identified by their GitHub account (D17). Not tied to one project."""
+
+    id: Id
+    github_id: int
+    github_login: Text
+    name: str | None = None
+    created_at: AwareDatetime
+
+
 class Project(Model):
     id: Id
+    name: str = ""
     repository: Repository
     github_installation_id: int | None = None
+    join_code: str | None = None
+    created_by: Id | None = None
     lead_id: Id
     participant_ids: list[Id] = []
     current_plan_version: Version | None = None
@@ -201,20 +214,27 @@ class Project(Model):
 
 
 class Participant(Model):
+    """One person's membership in one project, with their role there.
+
+    Connector users sign in with GitHub (`user_id`). A `token_hash` is for scripts and
+    the pre-push hook, which can't sign in through a browser (D20).
+    """
+
     id: Id
     project_id: Id
     role: Role
     developer_name: Text
+    user_id: Id | None = None
     agent_name: str | None = None
-    token_hash: TokenHash
+    token_hash: TokenHash | None = None
     revoked_at: AwareDatetime | None = None
     last_check_in_at: AwareDatetime | None = None
     last_check_in_rev: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def _agents_are_named(self) -> Self:
-        if self.role is Role.AGENT and not self.agent_name:
-            raise ValueError("an agent participant needs an agent_name, e.g. claude-code")
+    def _can_authenticate(self) -> Self:
+        if self.user_id is None and self.token_hash is None:
+            raise ValueError("a participant needs a user_id (GitHub sign-in) or a token_hash")
         return self
 
     @property
@@ -283,59 +303,6 @@ class Plan(Model):
 # Claims and findings -------------------------------------------------------------------
 
 
-class InterfaceUse(Model):
-    """One contract a claim provides or consumes, with the fields and types it expects."""
-
-    contract_id: Id
-    fields: dict[Text, FieldType] = Field(min_length=1)
-
-
-class Claim(Model):
-    """One revision of an agent's declaration of intent. Revised, never edited in place."""
-
-    id: Id
-    revision: Version
-    project_id: Id
-    task_id: Id
-    agent_id: Id
-    branch: Text
-    base_sha: Sha
-    plan_version: Version
-    state: ClaimState
-    requirement_ids: list[Id] = []
-    files: list[Text] = []
-    provides: list[InterfaceUse] = []
-    consumes: list[InterfaceUse] = []
-    no_interfaces: bool = False
-    assumptions: list[Text] = []
-    acceptance_criteria: list[Text] = []
-    reason: str | None = None
-    created_at: AwareDatetime
-
-    @model_validator(mode="after")
-    def _interfaces_are_consistent(self) -> Self:
-        if self.no_interfaces and (self.provides or self.consumes):
-            raise ValueError("no_interfaces is true, but the claim lists provides or consumes")
-        for side, uses in (("provides", self.provides), ("consumes", self.consumes)):
-            ids = [use.contract_id for use in uses]
-            if len(ids) != len(set(ids)):
-                raise ValueError(f"{side} lists the same contract twice")
-        return self
-
-    def missing_details(self) -> list[str]:
-        """What keeps this claim in `draft` (D5, D12). Empty means complete."""
-        missing = []
-        if not (self.provides or self.consumes or self.no_interfaces):
-            missing.append("interfaces: list provides/consumes, or set no_interfaces: true")
-        if not self.acceptance_criteria:
-            missing.append("acceptance_criteria: at least one")
-        return missing
-
-    @property
-    def is_complete(self) -> bool:
-        return not self.missing_details()
-
-
 class Evidence(Model):
     kind: EvidenceKind
     ref: Text
@@ -363,6 +330,64 @@ class Finding(Model):
     @property
     def blocking(self) -> bool:
         return self.severity is FindingSeverity.BLOCKING
+
+
+class InterfaceUse(Model):
+    """One contract a claim provides or consumes, with the fields and types it expects."""
+
+    contract_id: Id
+    fields: dict[Text, FieldType] = Field(min_length=1)
+
+
+class Claim(Model):
+    """One revision of an agent's declaration of intent. Revised, never edited in place.
+
+    `state` and `findings` together are the revision's verdict. Only they change after
+    the revision is saved; everything the agent declared stays as submitted.
+    """
+
+    id: Id
+    revision: Version
+    project_id: Id
+    task_id: Id
+    agent_id: Id
+    branch: Text
+    base_sha: Sha
+    plan_version: Version
+    state: ClaimState
+    requirement_ids: list[Id] = []
+    files: list[Text] = []
+    provides: list[InterfaceUse] = []
+    consumes: list[InterfaceUse] = []
+    no_interfaces: bool = False
+    assumptions: list[Text] = []
+    acceptance_criteria: list[Text] = []
+    reason: str | None = None
+    findings: list[Finding] = []
+    created_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def _interfaces_are_consistent(self) -> Self:
+        if self.no_interfaces and (self.provides or self.consumes):
+            raise ValueError("no_interfaces is true, but the claim lists provides or consumes")
+        for side, uses in (("provides", self.provides), ("consumes", self.consumes)):
+            ids = [use.contract_id for use in uses]
+            if len(ids) != len(set(ids)):
+                raise ValueError(f"{side} lists the same contract twice")
+        return self
+
+    def missing_details(self) -> list[str]:
+        """What keeps this claim in `draft` (D5, D12). Empty means complete."""
+        missing = []
+        if not (self.provides or self.consumes or self.no_interfaces):
+            missing.append("interfaces: list provides/consumes, or set no_interfaces: true")
+        if not self.acceptance_criteria:
+            missing.append("acceptance_criteria: at least one")
+        return missing
+
+    @property
+    def is_complete(self) -> bool:
+        return not self.missing_details()
 
 
 # Directives and escalations ------------------------------------------------------------

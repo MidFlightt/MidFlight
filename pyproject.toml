@@ -5,12 +5,24 @@ description = "Keeps a small team's coding agents aligned while they work."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "boto3>=1.43.110",
+    "fastapi>=0.143.0",
+    "httpx>=0.28",
+    "mcp>=2.3.0",
     "pydantic>=2.9",
+    "pyjwt[crypto]>=2.10",
+    "uvicorn>=0.54.0",
 ]
+
+[project.scripts]
+midflight-server = "midflight.main:run"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
+    "moto[dynamodb]>=5.2.3",
     "pytest>=8",
+    "pyyaml>=6.0.3",
     "ruff>=0.8",
 ]
 
@@ -25,12 +37,14 @@ packages = ["midflight"]
 testpaths = ["tests"]
 pythonpath = ["tests"]
 addopts = "-q"
+filterwarnings = [
+    # Starlette suggests httpx2 for its TestClient; httpx works and is what we pin.
+    "ignore:Using `httpx` with `starlette.testclient`",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# The standard-library prototype; deleted once S-3 lands.
-extend-exclude = ["midflight/__main__.py", "midflight/claims.py", "tests/test_claims.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]

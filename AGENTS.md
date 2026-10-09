@@ -20,22 +20,30 @@ while they work:
 Team Yoga, AWS Agentic AI hackathon. Planned finish **Sat Oct 10, 2026**; Sun Oct 11
 is buffer and submission.
 
-**Current state:** the specs, the shared models and ports from S-1
-(`midflight/domain/models.py`, `states.py`, `midflight/ports.py`), and the old local
-prototype (`midflight/claims.py`, deleted once S-3 lands). The other planned packages
-(`services/`, `api/`, ...) appear as tasks land. Don't assume a module exists. Check
-first.
+**Product model (D16):** Midflight is one hosted service. Teams install the public
+GitHub App and add one connector URL to their AI client; they sign in with GitHub and
+join projects with a code. The local API and stdio adapter in this repo are development
+tools. New work is tasks H-1 to H-5 in the development plan.
+
+**Current state (October 9):** every code task is built, tested, and deployed on AWS:
+the domain, claims and reviews, the hosted connector with Sign in with GitHub, projects
+with join codes, plan-change directives (S-6), escalations (S-7), the Bedrock reviewer
+(S-5, off until Bedrock is enabled for the account), GitHub verification (M-6, S-10),
+stale handling with a demo fault switch (M-7), the pre-push hook (M-4), and CI (M-1).
+Open: the eval (S-8) and people's tasks. The [code guide](docs/code-guide.md) explains
+every file. Don't assume a module exists; check first.
 
 ## Where things are
 
 | Need | Read | Notes |
 | --- | --- | --- |
+| How the code fits together | [docs/code-guide.md](docs/code-guide.md) | Every file, and what happens when people use it |
 | Your task | [docs/development-plan.md](docs/development-plan.md) | Task tables by day: owner, depends on, use cases, done when |
 | What the system must do | [docs/use-cases.md](docs/use-cases.md) | UC-01 to UC-16, main and alternate paths. Every alternate path is a test case. |
 | Names, states, invariants | [docs/domain.md](docs/domain.md) | Exact enum values, MCP tools, REST paths, GitHub names, INV-01 to INV-15 |
 | Requirements and acceptance | [docs/requirements.md](docs/requirements.md) | FR/NFR IDs, demo scenarios (§11), definition of done (§12), traceability (§14) |
 | Where code runs | [docs/architecture.md](docs/architecture.md) | AWS layout, sequence diagrams, technology links |
-| Decisions | [docs/design-decisions.md](docs/design-decisions.md) | D1 to D15 and open questions |
+| Decisions | [docs/design-decisions.md](docs/design-decisions.md) | D1 to D20 and open questions |
 | Human, step by step | [docs/step-by-step.md](docs/step-by-step.md) | Each person's steps with prompts to paste into an agent |
 | Visual overviews | [docs/pages/development-plan.html](docs/pages/development-plan.html), [docs/pages/use-cases.html](docs/pages/use-cases.html) | Open in a browser after cloning |
 | Team process | [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, PRs, reviews |
@@ -46,7 +54,7 @@ first.
 
 Use the first source in this list that answers the question:
 
-1. `midflight/domain/models.py` and `midflight/ports.py`, once they exist
+1. `midflight/domain/models.py` and `midflight/ports.py`
 2. [docs/design-decisions.md](docs/design-decisions.md)
 3. [docs/domain.md](docs/domain.md)
 4. [docs/development-plan.md](docs/development-plan.md)
@@ -82,16 +90,7 @@ true.
 
 ## Commands
 
-Today (prototype, standard library only, Python 3.10+):
-
-```sh
-python -m midflight demo
-python -m midflight check examples/claims.json
-python -m unittest discover -s tests -v
-```
-
-uv project on Python 3.12 (a minimal `pyproject.toml` landed with S-1; M-1 adds the
-remaining dependencies and CI):
+Python 3.12 with uv:
 
 ```sh
 uv sync                                    # install
@@ -99,14 +98,19 @@ uv run pytest                              # all tests
 uv run pytest tests/unit/test_rules.py -k total_cents   # one test
 uv run ruff check .                        # lint
 uv run ruff format .                       # format
+uv run python tests/scenario_report.py     # trace every scenario into docs/pages/scenarios.html
 ```
 
-After M-2 and M-3 (local stack):
+Run the server locally (copy `.env.example` to `.env` first; `MIDFLIGHT_DEV_LOGIN=1`
+signs in with a form instead of GitHub):
 
 ```sh
-uv run uvicorn midflight.api.app:app --reload   # API at http://127.0.0.1:8000/docs
-uv run python -m midflight.mcp.server           # MCP adapter (stdio)
+uv run midflight-server                    # http://127.0.0.1:8000, REST docs at /docs, connector at /mcp
+claude mcp add --transport http midflight http://127.0.0.1:8000/mcp
 ```
+
+Deploy to AWS: [infra/README.md](infra/README.md) (`uv run python infra/package.py`,
+then `sam deploy`).
 
 If a command fails because its task hasn't landed, say so. Don't invent a substitute.
 
@@ -119,16 +123,15 @@ elsewhere, stop and ask your developer.
 | --- | --- |
 | `pyproject.toml`, `uv.lock`, `.github/workflows/` | Mithilesh |
 | `midflight/domain/models.py`, `midflight/ports.py` | **Both programmers approve every change** |
-| `midflight/domain/` (rules, impact, states) | Somesh |
+| `midflight/domain/` (rules, decide, impact, states) | Somesh |
 | `midflight/services/` | Somesh |
-| `midflight/adapters/memory_store.py`, `fake_reviewer.py`, `bedrock_reviewer.py`, `runners.py`, `clock.py` | Somesh |
-| `midflight/adapters/dynamo_store.py`, `github_app.py`, `fake_github.py` | Mithilesh |
-| `midflight/api/`, `worker/`, `mcp/`, `hooks/` | Mithilesh |
-| `midflight/dashboard/` | Somesh |
-| `tests/unit/` | Owner of the code under test |
+| `midflight/mcp/`, `midflight/api/`, `midflight/main.py`, `midflight/config.py` | Somesh |
+| `midflight/adapters/memory_store.py`, `runners.py`, `clock.py`, `fake_github.py`, `github.py` | Somesh |
+| `midflight/adapters/dynamo_store.py`, `midflight/aws/`, `infra/` | Mithilesh (Somesh until he's back) |
+| `midflight/hooks/` (M-4), `midflight/api/webhook.py`, `midflight/services/verification.py`, `midflight/services/sync.py` (M-6, M-7) | Mithilesh |
+| `tests/unit/`, `tests/integration/` | Owner of the code under test |
 | `tests/scenarios/*.yaml` | Somesh writes, Frederik checks against use cases |
 | `evals/` | Somesh |
-| `infra/` | Mithilesh |
 | `docs/` | Frederik edits wording, Somesh approves content |
 | `midflight-demo-shop` (separate repo) | Frederik |
 

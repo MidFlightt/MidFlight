@@ -1,0 +1,341 @@
+"""M-6, S-10, M-7: verifying pushes, the webhook, and GitHub outages (UC-10, 11, 15)."""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+from typing import Any
+
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+
+from demo_fixture import NOW, PROJECT, seed, submission
+from midflight.adapters.clock import FixedClock
+from midflight.adapters.fake_github import FakeGitHub
+from midflight.adapters.github import API, GitHubAppClient
+from midflight.adapters.memory_store import MemoryStore
+from midflight.api.app import Services, build_services, create_app
+from midflight.domain.models import (
+    ClaimState,
+    DirectiveSource,
+    DirectiveState,
+    EscalationState,
+    FindingKind,
+    Participant,
+    SyncState,
+    Verification,
+    VerificationOutcome,
+)
+from midflight.ports import ChangedFiles, CheckRunRequest, GitHubUnavailable, PullRequestInfo
+from midflight.services.errors import PermissionDenied
+from midflight.services.sync import FAULT_REASON
+from midflight.services.verification import WorkflowRun
+
+REPO = "MidFlightt/midflight-demo-shop"
+INSTALLATION = 169380149
+BRANCH = "t1-work"  # the demo T1 claim's branch
+GOOD_API = "def checkout():\n    return {'total_cents': 4999}\n"
+WRONG_API = "def checkout():\n    return {'total': 49.99}\n"
+
+
+class Team:
+    def __init__(self) -> None:
+        self.store = MemoryStore()
+        self.people: dict[str, Participant] = seed(self.store)
+        self.github = FakeGitHub()
+        self.services: Services = build_services(self.store, FixedClock(NOW), github=self.github)
+        self.t1_claim = self.services.claims.submit(self.people["p-t1"], submission("T1"))
+        assert self.t1_claim.state is ClaimState.APPROVED
+        self.runs = 0
+
+    def push(
+        self,
+        sha: str = "abc1234",
+        files: dict[str, str] | None = None,
+        tests: list[tuple[str, bool]] | None = None,
+        branch: str = BRANCH,
+        artifact_sha: str | None = None,
+        head_now: str | None = None,
+    ) -> WorkflowRun:
+        """Pretend the agent pushed `files` and the contract tests reported `tests`."""
+        files = {"app/api.py": GOOD_API} if files is None else files
+        tests = [("test_total_cents_is_an_integer", True)] if tests is None else tests
+        self.runs += 1
+        self.github.pulls[branch] = PullRequestInfo(12, branch, head_now or sha, "9f3e1a2")
+        self.github.diffs[sha] = ChangedFiles(paths=list(files), patch="(diff)")
+        for path, text in files.items():
+            self.github.files[(path, sha)] = text
+        self.github.artifacts[self.runs] = {
+            "sha": artifact_sha or sha,
+            "results": [
+                {"name": n, "passed": ok, "message": "" if ok else "KeyError"} for n, ok in tests
+            ],
+        }
+        return WorkflowRun(REPO, INSTALLATION, self.runs, 1, sha, branch, f"delivery-{self.runs}")
+
+    def verify(self, run: WorkflowRun) -> Verification | None:
+        self.services.verifications.enqueue(run)
+        found = [v for v in self.store.list_verifications(PROJECT) if v.head_sha == run.head_sha]
+        return found[-1] if found else None
+
+
+# Verification outcomes (UC-10, UC-11) --------------------------------------------------
+
+
+def test_a_correct_push_is_verified_and_published_as_success() -> None:
+    team = Team()
+    v = team.verify(team.push())
+    assert v.outcome is VerificationOutcome.VERIFIED
+    assert (v.claim_id, v.claim_revision, v.plan_version) == (team.t1_claim.claim_id, 1, 1)
+    [check] = team.github.checks
+    assert check.conclusion == "success" and check.head_sha == "abc1234"
+    assert v.check_run_id == 1
+
+
+def test_wrong_field_fails_with_evidence_and_a_correction_directive() -> None:
+    team = Team()
+    run = team.push(
+        files={"app/api.py": WRONG_API}, tests=[("test_total_cents_is_an_integer", False)]
+    )
+    v = team.verify(run)
+
+    assert v.outcome is VerificationOutcome.FAILED
+    kinds = {f.kind for f in v.findings if f.blocking}
+    assert kinds == {FindingKind.MISSING_CHANGE, FindingKind.TEST_FAILURE}
+    missing = next(f for f in v.findings if f.kind is FindingKind.MISSING_CHANGE)
+    assert "total_cents" in missing.explanation
+    assert team.github.checks[0].conclusion == "failure"
+    assert "total_cents" in team.github.checks[0].summary
+
+    [directive] = team.store.list_directives(PROJECT, "T1")
+    assert directive.source is DirectiveSource.VERIFICATION
+    assert directive.verification_id == v.id and directive.recipient_id == "p-t1"
+    assert "total_cents" in directive.requested_adjustment
+
+
+def test_a_field_already_in_a_declared_file_counts() -> None:
+    team = Team()
+    team.github.files[("app/api.py", "abc1234")] = GOOD_API
+    v = team.verify(team.push(files={"README.md": "Docs only."}))
+    assert v.outcome is VerificationOutcome.VERIFIED
+
+
+def test_missing_test_results_are_incomplete_never_success() -> None:
+    team = Team()
+    run = team.push()
+    team.github.artifacts.clear()
+    v = team.verify(run)
+    assert v.outcome is VerificationOutcome.INCOMPLETE
+    assert not v.evidence_coverage.test_results_present
+    assert team.github.checks[0].conclusion == "action_required"
+
+
+def test_test_results_for_another_commit_do_not_count() -> None:
+    team = Team()
+    v = team.verify(team.push(artifact_sha="fff0000"))
+    assert v.outcome is VerificationOutcome.INCOMPLETE
+
+
+def test_editing_the_contract_tests_goes_to_the_lead() -> None:
+    team = Team()
+    files = {"app/api.py": GOOD_API, "tests/contract/test_checkout.py": "assert True"}
+    v = team.verify(team.push(files=files))
+    assert v.outcome is VerificationOutcome.NEEDS_REVIEW
+    [escalation] = team.store.list_escalations(PROJECT)
+    assert escalation.verification_id == v.id and escalation.state is EscalationState.OPEN
+
+
+def test_undeclared_files_are_shown_but_do_not_block() -> None:
+    team = Team()
+    v = team.verify(team.push(files={"app/api.py": GOOD_API, "app/util.py": "x = 1"}))
+    assert v.outcome is VerificationOutcome.VERIFIED
+    assert FindingKind.UNDECLARED_CHANGE in {f.kind for f in v.findings}
+
+
+def test_a_push_without_an_approved_claim_is_incomplete() -> None:
+    team = Team()
+    v = team.verify(team.push(branch="someone-elses-branch"))
+    assert v.outcome is VerificationOutcome.INCOMPLETE and v.claim_id is None
+
+
+def test_a_newer_failure_supersedes_the_older_correction() -> None:
+    team = Team()
+    failing = {"app/api.py": WRONG_API}
+    team.verify(team.push(sha="aaa1111", files=failing))
+    team.verify(team.push(sha="bbb2222", files=failing))
+    states = [d.state for d in team.store.list_directives(PROJECT, "T1")]
+    assert states == [DirectiveState.SUPERSEDED, DirectiveState.QUEUED]
+
+
+# Dropping stale and duplicate work (UC-10 1, 6a) ---------------------------------------
+
+
+def test_a_duplicate_delivery_saves_one_job_and_one_check() -> None:
+    team = Team()
+    run = team.push()
+    assert team.services.verifications.enqueue(run) is not None
+    assert team.services.verifications.enqueue(run) is None
+    assert len(team.store.list_verifications(PROJECT)) == 1
+    assert len(team.github.checks) == 1
+
+
+def test_a_newer_head_drops_the_result() -> None:
+    team = Team()
+    assert team.verify(team.push(head_now="def5678")) is None
+    assert team.github.checks == []
+
+
+def test_other_repositories_and_installations_are_ignored() -> None:
+    team = Team()
+    run = team.push()
+    other_repo = WorkflowRun("someone/else", INSTALLATION, 1, 1, "abc1234", BRANCH, "d")
+    other_install = WorkflowRun(REPO, 999, 1, 1, "abc1234", BRANCH, "d")
+    assert team.services.verifications.enqueue(other_repo) is None
+    assert team.services.verifications.enqueue(other_install) is None
+    assert run  # the real run is untouched
+
+
+# GitHub outages and the demo fault switch (UC-15, M-7) ---------------------------------
+
+
+def test_an_outage_marks_the_project_stale_and_holds_approvals_until_it_recovers() -> None:
+    team = Team()
+    run = team.push()
+    team.github.down = "GitHub answered 503"
+    with pytest.raises(GitHubUnavailable):
+        team.services.verifications.enqueue(run)
+    project = team.store.get_project(PROJECT)
+    assert project.sync_state is SyncState.STALE and "503" in project.sync_reason
+
+    held = team.services.claims.submit(team.people["p-t2"], submission("T2"))
+    assert held.state is ClaimState.PENDING  # no approvals while stale (INV-09)
+
+    team.github.down = None
+    team.verify(team.push(sha="abc9999"))
+    assert team.store.get_project(PROJECT).sync_state is SyncState.FRESH
+    assert team.store.get_claim(held.claim_id).state is ClaimState.APPROVED
+
+
+def test_the_fault_switch_behaves_like_an_outage() -> None:
+    team = Team()
+    lead = team.people["p-lead"]
+    team.services.sync.set_fault(lead, True)
+    project = team.store.get_project(PROJECT)
+    assert project.sync_state is SyncState.STALE and project.sync_reason == FAULT_REASON
+    with pytest.raises(GitHubUnavailable):
+        team.services.verifications.enqueue(team.push())
+    assert team.services.check_ins.check_in(team.people["p-t1"], "T1").stale
+
+    team.services.sync.set_fault(lead, False)
+    assert team.store.get_project(PROJECT).sync_state is SyncState.FRESH
+
+
+def test_only_the_lead_flips_the_fault_switch() -> None:
+    team = Team()
+    with pytest.raises(PermissionDenied):
+        team.services.sync.set_fault(team.people["p-t2"], True)
+
+
+# The webhook endpoint (UC-10 step 1) ---------------------------------------------------
+
+SECRET = "webhook-secret"
+
+
+def signed(body: bytes, secret: str = SECRET) -> str:
+    return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+
+def run_event(sha: str = "abc1234", path: str = ".github/workflows/contract.yml") -> bytes:
+    return json.dumps(
+        {
+            "action": "completed",
+            "repository": {"full_name": REPO},
+            "installation": {"id": INSTALLATION},
+            "workflow_run": {
+                "id": 1,
+                "run_attempt": 1,
+                "path": path,
+                "head_sha": sha,
+                "head_branch": BRANCH,
+            },
+        }
+    ).encode()
+
+
+def post(client: TestClient, body: bytes, event: str = "workflow_run", sig: str | None = None):
+    headers = {
+        "X-GitHub-Event": event,
+        "X-GitHub-Delivery": "d-1",
+        "X-Hub-Signature-256": sig if sig is not None else signed(body),
+        "Content-Type": "application/json",
+    }
+    return client.post("/github/webhook", content=body, headers=headers)
+
+
+def test_webhook_with_a_bad_signature_is_401_and_stores_nothing() -> None:
+    team = Team()
+    client = TestClient(create_app(team.services, webhook_secret=SECRET))
+    body = run_event()
+    assert post(client, body, sig=signed(body, "wrong")).status_code == 401
+    assert post(client, body, sig="").status_code == 401
+    assert team.store.list_verifications(PROJECT) == []
+
+
+def test_webhook_queues_a_verification_for_a_finished_contract_run() -> None:
+    team = Team()
+    team.push()  # GitHub's state for run 1
+    client = TestClient(create_app(team.services, webhook_secret=SECRET))
+    response = post(client, run_event())
+    assert response.status_code == 202 and "queued" in response.json()
+    [v] = team.store.list_verifications(PROJECT)
+    assert v.outcome is VerificationOutcome.VERIFIED
+
+
+def test_webhook_ignores_other_events_and_answers_ping() -> None:
+    team = Team()
+    client = TestClient(create_app(team.services, webhook_secret=SECRET))
+    assert post(client, b"{}", event="ping").status_code == 200
+    assert post(client, b'{"action": "opened"}', event="pull_request").status_code == 202
+    other = run_event(path=".github/workflows/ci.yml")
+    assert post(client, other).json() == {"ignored": "not a finished contract-test run"}
+    assert team.store.list_verifications(PROJECT) == []
+
+
+def test_webhook_without_a_secret_refuses() -> None:
+    team = Team()
+    client = TestClient(create_app(team.services))
+    assert post(client, run_event()).status_code == 503
+
+
+# The real GitHub client, against a fake GitHub (no network) ----------------------------
+
+
+def test_github_client_publishes_the_check_and_maps_outages() -> None:
+    from test_github import PEM
+
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        path = request.url.path
+        if path == f"/repos/{REPO}/installation":
+            return httpx.Response(200, json={"id": INSTALLATION})
+        if path == f"/app/installations/{INSTALLATION}/access_tokens":
+            return httpx.Response(201, json={"token": "ghs_x"})
+        if path == f"/repos/{REPO}/check-runs":
+            return httpx.Response(201, json={"id": 77})
+        if path == f"/repos/{REPO}/pulls":
+            return httpx.Response(503, json={})
+        return httpx.Response(404, json={})
+
+    http = httpx.Client(base_url=API, transport=httpx.MockTransport(handle))
+    client = GitHubAppClient("5233457", PEM, http=http)
+    request = CheckRunRequest(head_sha="abc1234", conclusion="failure", title="t", summary="s")
+    assert client.create_check_run(REPO, request) == 77
+    body: dict[str, Any] = json.loads(seen[-1].content)
+    assert body["name"] == "midflight/verify" and body["conclusion"] == "failure"
+    assert seen[-1].headers["authorization"] == "Bearer ghs_x"
+    with pytest.raises(GitHubUnavailable):
+        client.pull_for_branch(REPO, BRANCH)

@@ -58,14 +58,15 @@ note under [Invariants](#invariants)).
 
 | Entity | Key fields |
 | --- | --- |
-| `Project` | id, repository (`owner/name`), GitHub installation id, lead, participants, current plan version, `sync_state`, sync reason (required when stale), last synced at, coordination revision (`coord_rev`) |
-| `Participant` | id, project, role (`lead` or `agent`), developer name, agent name (required for agents), token hash (SHA-256 hex), revoked at, last check-in at, last check-in revision (the check-in cursor) |
+| `User` | id (`u-<github id>`), GitHub id, GitHub login, name, created at. One per GitHub account; not tied to a project. |
+| `Project` | id, name, repository (`owner/name`, one project per repository), GitHub installation id, join code, created by (user id), lead, participants, current plan version, `sync_state`, sync reason (required when stale), last synced at, coordination revision (`coord_rev`) |
+| `Participant` | One person's membership in one project: id (`<project id>.<github login>`), project, role (`lead` or `agent`), developer name, user id (GitHub sign-in), agent name, token hash (SHA-256 hex, for scripts and hooks), revoked at, last check-in at, last check-in revision. Needs a user id or a token hash. |
 | `Plan` | project, version, status (`proposed` or `approved`), requirements, tasks, contracts, approved by, approved at, change reason, changed ids |
 | `Requirement` | id, description, acceptance criteria |
 | `Task` | id, title, owner, branch, requirement ids, provides (contract ids), consumes (contract ids) |
 | `Contract` | id, version, provider task, consumer tasks, `fields: {name: FieldType}` (at least one) |
 | `InterfaceUse` | contract id, `fields: {name: FieldType}`: one contract a claim provides or consumes, with the types it expects |
-| `Claim` | id, revision, project, task, agent, branch, base SHA, plan version, state, requirement ids, files, provides, consumes (lists of `InterfaceUse`), `no_interfaces` (bool, D12), assumptions (free text), acceptance criteria, reason for the revision, created at |
+| `Claim` | id, revision, project, task, agent, branch, base SHA, plan version, state, requirement ids, files, provides, consumes (lists of `InterfaceUse`), `no_interfaces` (bool, D12), assumptions (free text), acceptance criteria, reason for the revision, findings, created at. `state` plus `findings` is the revision's verdict; only those two change after it is saved. |
 | `Finding` | id, kind, severity, source (`rule` or `reviewer`), affected ids (at least one), evidence, explanation, proposed correction |
 | `Evidence` | kind (`EvidenceKind`), ref, excerpt (at most 500 characters) |
 | `Directive` | id, project, source (`plan_change` or `verification`, D13), task, recipient, plan version, verification id (set exactly when source is `verification`), changed ids, requested adjustment, reason, blocking (default true), state, response, response note, created at. `dedupe_key` is the INV-05 key. |
@@ -148,6 +149,19 @@ stateDiagram-v2
 `queued`, `delivered`, and `needs_clarification` are open: a blocking open directive
 refuses a push (UC-16). A superseded directive keeps any earlier answer as history.
 
+How a review decides (`midflight/domain/decide.py`, UC-05 step 5), in order:
+
+1. Missing details: stays `draft` (D5, D12).
+2. A blocking `requirement_conflict`: `human_review_required` (INV-11).
+3. Any other blocking finding: `needs_revision`.
+4. No usable AI review (`reviewer_unavailable`), or the project is stale: stays
+   `pending` (INV-01, INV-09). The review job is marked failed so the lead can retry it.
+5. Otherwise: `approved`.
+
+Rules run first, and the AI reviewer runs only when no rule already blocks.
+`duplicate_provider` counts only approved rivals: the first approval wins, and the
+coord_rev check stops a second one (INV-02).
+
 Verification outcome to GitHub check conclusion (UC-11, `check_conclusion()`):
 
 | Outcome | Check conclusion | Merge |
@@ -161,8 +175,43 @@ Never map an outcome to `neutral` or `skipped`.
 
 ## Interfaces
 
-**MCP tools** (decision D3, served by `midflight/mcp/server.py`). Every reply also
-carries the task's unacknowledged directives.
+**Hosted connector** (D16–D19, tasks H-1 to H-3). One remote MCP endpoint serves every
+team at `<Function URL>/mcp` (streamable HTTP, stateless, JSON responses). Clients
+discover its OAuth server from the 401 it returns without a token, register themselves
+(dynamic client registration), and send the person to **Sign in with GitHub**. A
+Midflight user is a GitHub account; each project membership is a `Participant` with a
+role. Tools that act on a project take an optional `project_id` and default to the
+caller's only project.
+
+| Tool | Who | Does | Task |
+| --- | --- | --- | --- |
+| `my_projects` | anyone signed in | Lists the caller's projects and role in each | H-2 |
+| `create_project` | anyone signed in | `repository` (`owner/name`): checks the App is installed and the caller is a repo admin, creates the project with the caller as lead, returns the join code | H-1, H-4 |
+| `join_project` | anyone signed in | `join_code`: joins as a member (`agent` role) | H-1 |
+| `submit_claim`, `check_in`, `acknowledge_directive` | members | As in the table below | M-3, H-2 |
+| `project_status` | lead | Plan version, members and their tasks, claims, open directives, escalations, verifications | H-2 |
+| `propose_plan`, `approve_plan` | lead | UC-03 | H-2 |
+| `assign_task` | lead | Sets a plan task's owner to a member (in the next plan version) | H-1, H-2 |
+| `rotate_join_code`, `remove_member` | lead | D18 | H-1 |
+| `resolve_escalation` | lead | UC-13: `clarify_plan` (after approving the clarifying plan), `request_revision`, or `dismiss`, with a reason | S-7 |
+| `hook_setup` | members | Issues a personal hook token, shown once, and the pre-push hook install commands | M-4 |
+| `simulate_github_outage` | lead | Labeled demo fault switch: `on` marks the project stale and makes verification behave as if GitHub were down; `off` recovers (UC-15) | M-7 |
+
+Built in `midflight/mcp/hosted.py`, `midflight/api/oauth.py`, and
+`midflight/services/projects.py`; the services behind the other tools are in
+`midflight/services/`. Ids such as `C-1` or `J-4` are numbered across all projects, so two teams
+never share one. A member's participant id is `<project id>.<github login>`.
+
+The local stdio adapter (`midflight/mcp/local/`) and the demo seed
+(`MIDFLIGHT_SEED_DEMO=1`) remain as development tools (D20). A local dev login replaces
+GitHub only when `MIDFLIGHT_DEV_LOGIN=1`.
+
+
+**Agent tools** (decision D3; the hosted connector serves them, and so does the local
+adapter in `midflight/mcp/local/`). Every reply ends with the task's open directives, fenced and
+labeled as data. On the hosted connector the agent passes `branch` and `base_sha`;
+the local adapter fills them from git and reads `MIDFLIGHT_URL`, `MIDFLIGHT_TOKEN`, and
+`MIDFLIGHT_PROJECT`.
 
 | Tool | Input | Returns |
 | --- | --- | --- |
@@ -198,8 +247,8 @@ or a tool.
 
 ### REST API
 
-Decision D15. FastAPI serves OpenAPI at `/docs`. Every call except `/healthz` and
-`/github/webhook` sends `Authorization: Bearer <token>`. Errors are JSON
+Decision D15. FastAPI serves OpenAPI at `/docs`. Every call except `/healthz`,
+`/hook/pre-push`, and `/github/webhook` sends `Authorization: Bearer <token>`. Errors are JSON
 `{error, detail, hint}`.
 
 | Method and path | Who | Purpose | Use case |
@@ -220,11 +269,30 @@ Decision D15. FastAPI serves OpenAPI at `/docs`. Every call except `/healthz` an
 | `POST /directives/{did}/ack` | recipient agent | `{response, note}` | UC-09 |
 | `POST /escalations/{eid}/resolve` | lead | `{resolution, reason}`; `clarify_plan` points at a plan version | UC-13 |
 | `GET /projects/{pid}/audit` | any participant | Timeline, filterable by entity id | UC-14 |
-| `POST /github/webhook` | GitHub (signature) | Verification trigger | UC-10 |
-| `POST /admin/fault`, `POST /admin/reconcile` | lead | Labeled demo fault switch, manual reconcile | UC-15 |
+| `POST /projects/{pid}/push-check` | agent (hook token) | `{task_id}`; plain text, 200 if ready to push, 409 with the reasons. Delivers directives like check-in | UC-16 |
+| `GET /hook/pre-push` | anyone | The pre-push hook script | UC-16 |
+| `POST /github/webhook` | GitHub (signature) | Verification trigger: 401 on a bad signature, 202 otherwise | UC-10 |
 
-The project and the lead's token are created by a bootstrap command
-(`midflight admin bootstrap --seed demo`), so there is no public create-project call.
+The REST API is for scripts and the pre-push hook, which authenticate with a
+participant token. Projects are created and joined through the connector
+(`create_project`, `join_project`), not through REST.
+
+Every row is built. The demo fault switch is the lead's `simulate_github_outage` tool,
+and reconciling is automatic: the next successful GitHub read marks the project fresh
+and reviews held claims again. Refusals return 400 with `findings` when rules caused
+them; a body that doesn't fit the schema returns 422.
+
+**`check_in` reply** (`POST /projects/{pid}/check-in`; `task_id` defaults to the agent's
+own task):
+
+| Field | Meaning |
+| --- | --- |
+| `plan_version`, `changed` | The current plan, and whether anything changed since the agent's last check-in |
+| `task`, `requirements`, `contracts` | The task's plan context: its requirements and every contract it provides or consumes, with fields (FR-07) |
+| `claim` | The agent's current claim verdict for the task, or `null` before the first claim |
+| `directives`, `delivered_now` | Open directives; ids that became `delivered` with this reply. Held while stale. |
+| `stale`, `stale_reason` | GitHub data can't be trusted right now (INV-09) |
+| `ready_to_push`, `push_blockers` | What the pre-push hook checks: an approved claim and no open blocking directive (UC-16). A plan change sends affected approvals back for review (UC-08), so an approval on an older version stays valid for an unaffected task. |
 
 **GitHub**
 
@@ -233,10 +301,11 @@ The project and the lead's token are created by a bootstrap command
 | GitHub App | `MidFlight Team Yoga`, App ID `5233457`, owned by the `MidFlightt` organization, installed only on `midflight-demo-shop` (installation id `169380149`) |
 | App permissions | Checks: read and write. Actions, Contents, Pull requests, Metadata: read. Nothing else. |
 | App events | `workflow_run` only |
-| App authentication | As the App (App ID + private key + installation id). No user sign-in, no client secret. |
+| App authentication | Repo checks and verification as the App (App ID + private key, then an installation token). Sign in with GitHub through the App's user authorization (client id + client secret). |
 | Check run name | `midflight/verify` |
 | Verification trigger (D4) | `workflow_run` event, action `completed`, for the contract-test workflow `contract.yml` |
-| Test results artifact | `contract-results` |
+| Test results artifact | `contract-results`: a zip with one JSON file, `{"sha": "<head sha>", "results": [{"name": "...", "passed": true, "message": ""}]}`. Results for another SHA don't count. |
+| Protected paths | `tests/contract/` and `.github/`: a branch that changes them is escalated, never passed (INV-15) |
 | Webhook path | `/github/webhook` |
 
 **Environment variables** (names only; values never go in git)
@@ -246,7 +315,10 @@ The project and the lead's token are created by a bootstrap command
 | `MIDFLIGHT_URL` | MCP adapter, hooks, dashboard |
 | `MIDFLIGHT_TOKEN` | MCP adapter, hooks, dashboard |
 | `MIDFLIGHT_PROJECT` | MCP adapter, hooks, dashboard |
-| `MIDFLIGHT_BEDROCK_MODEL_ID` | Worker (`BedrockReviewer`); chosen by S-8 |
+| `MIDFLIGHT_REVIEWER_MODEL` | Server and worker (`BedrockReviewer`). Unset means rules only. |
+
+The pre-push hook reads `midflight.url`, `midflight.project`, `midflight.token`, and
+optionally `midflight.task` from the repository's `.git/config`, set by `hook_setup`.
 
 ## Invariants
 
@@ -304,7 +376,9 @@ for tests and local runs. Tests use the fakes only.
   audit events are all saved, or none are. `expected_coord_rev` turns it into a
   compare-and-set (raises `RevisionConflict`), and a repeated `idempotency_key`
   writes nothing and returns `duplicate=True`. Save a claim and its review job in
-  one commit.
+  one commit. Saving a `Project` never changes `coord_rev`; only `bump_coord_rev`
+  does, so a project read earlier can't roll it back. A saved claim revision can only
+  change its `state` and `findings`, and an approved plan can't change at all.
 - **`Reviewer`** returns the model's raw reply. Application code validates it as
   `Finding`s and checks every cited id before using it (INV-01). `ReviewerUnavailable`
   means no review, never approval.
