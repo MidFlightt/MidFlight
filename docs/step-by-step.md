@@ -1,5 +1,10 @@
 # Step-by-step guide
 
+> **Changed October 8:** Midflight became a hosted connector (decisions D16–D20). The
+> steps below still work for local development, but the customer setup is now: install
+> the GitHub App, add the connector URL, sign in with GitHub, create or join a project.
+> The current task list is in [development-plan.md](development-plan.md) (H-1 to H-5).
+
 **Start here.** Find your name, then do the steps in order. Each step tells you what
 to do and how to know it worked. Where a step says *"Paste into your coding agent"*,
 copy the quoted prompt into Claude Code, or whatever agent you use, inside the

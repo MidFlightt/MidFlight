@@ -31,11 +31,16 @@ Conflicts between people's requirements are escalated to the lead. Midflight doe
 not choose a winner. A passing check is evidence of alignment, not proof that the
 code is correct.
 
-**Stack:** coding agents connect through a local MCP adapter and git hooks to a
-FastAPI backend on AWS Lambda. DynamoDB holds versioned state, and its stream
+**How a team uses it:** the lead installs the Midflight GitHub App on the repo and adds
+Midflight to their AI client as a connector (one URL), signs in with GitHub, and
+creates a project. Teammates add the same connector and join with the project's code.
+Nothing is cloned or self-hosted.
+
+**Stack:** coding agents connect to a hosted remote MCP endpoint (OAuth, Sign in with
+GitHub) served by a FastAPI backend on AWS Lambda behind a Function URL. DynamoDB holds versioned state, and its stream
 triggers a worker that runs explicit rules, then a Strands reviewer on Amazon
-Bedrock. A GitHub App reads commits and publishes checks. The lead uses a Streamlit
-dashboard. Details: [docs/architecture.md](docs/architecture.md).
+Bedrock. A GitHub App reads commits and publishes checks. The lead runs the project from
+their AI client with lead tools. Details: [docs/architecture.md](docs/architecture.md).
 
 ## Documentation
 

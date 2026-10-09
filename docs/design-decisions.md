@@ -13,7 +13,7 @@ When a default is confirmed or changed, update its row and the date.
 | --- | --- | --- | --- | --- |
 | D1 | Do the hackathon rules require AgentCore Runtime? | No. The Strands reviewer runs inside the worker Lambda and calls Bedrock directly. It stays behind the `Reviewer` port, so it can move to AgentCore later (stretch task X-1). | Decided Oct 7 | S-5, M-5 |
 | D2 | Canonical plan change for the demo | Add `currency: string` to `checkout-response`. The subtotal/tax example in the archived flowcharts is not used. | Default | F-2, S-6, scenarios |
-| D3 | Tools agents call | `submit_claim` (waits up to 60 s for the verdict; `status: withdrawn` withdraws), `check_in`, `acknowledge_directive`. Replaces `get_task_context` and `get_directives`. | Default | M-3, FR-07 |
+| D3 | Tools agents call | `submit_claim` (waits up to 60 s for the verdict; `status: withdrawn` withdraws), `check_in`, `acknowledge_directive`. Replaces `get_task_context` and `get_directives`. Project and lead tools join them in D16. | Default | M-3, FR-07 |
 | D4 | What triggers verification | `workflow_run.completed` for the contract-test workflow, so test evidence exists when verification starts | Default | M-6, FR-08 |
 | D5 | Incomplete claims | Saved as `draft`. No approval until interfaces and acceptance criteria are present. | Default | S-3, FR-03 |
 | D6 | The two demo agent hosts | Two Claude Code sessions | Default | M-4, F-3 |
@@ -34,6 +34,19 @@ place where two documents, or two tasks, would have built different things.
 | D13 | Directive kinds and dedupe. A verification failure on plan v2 creates a correction directive for T1, which collided with INV-05's (plan version, task) key. | `Directive.source` is `plan_change` or `verification`, and `Directive.blocking` is a field. Dedupe key: `plan_change` → (plan version, task); `verification` → (verification id). A newer plan supersedes the task's older directives that are still `queued` or `delivered`. | Default | S-1, S-6, S-10, INV-05 |
 | D14 | Escalation state transitions. UC-12 moves already-approved claims to `human_review_required`, and UC-13 can request a revision, but the state diagram allowed neither. | Add `approved → human_review_required`, `human_review_required → needs_revision` (lead requests revision), and `human_review_required → withdrawn`. | Default | S-1, S-7 |
 | D15 | REST paths. Use cases, step-by-step, and the one-shot prompt used different paths for the same calls. | One table in [domain.md](domain.md#rest-api). Paths are scoped by project id; the adapter reads `MIDFLIGHT_PROJECT`. `check_in` is a `POST` because it marks directives delivered. | Default | M-2, M-3, M-4, S-9 |
+
+## Hosted product (October 8, 2026)
+
+Midflight is one service that Team Yoga hosts for every team, like a Canva or Figma
+connector. No customer clones the repo, runs a server, or creates a GitHub App.
+
+| ID | Question | Decision | Status | Affects |
+| --- | --- | --- | --- | --- |
+| D16 | What do users install? | Nothing. A lead installs the public **MidFlight Team Yoga** GitHub App on their repo and adds Midflight to their AI client as a custom connector (one URL). Teammates add the same URL. A directory listing (one-click Connect) is a post-hackathon submission, not code. | Decided Oct 8 (Somesh) | H-1 to H-5, UC-01, UC-02 |
+| D17 | How do people sign in? | **Sign in with GitHub.** Midflight runs the OAuth authorization server the MCP spec asks for (with dynamic client registration, which Claude and ChatGPT use), and sends people to GitHub to log in through the same GitHub App's user authorization. A Midflight user is a GitHub account. Tokens are opaque, short-lived, and stored hashed. | Decided Oct 8 | H-3 |
+| D18 | How does a team form? | The person who creates a project is its lead. Creating it returns a **join code**; anyone signed in who enters the code joins as an agent. The lead assigns plan tasks to members, can rotate the code, and can remove a member. One GitHub account can lead or join many projects. | Decided Oct 8 | H-1 |
+| D19 | Where does it run? | One web Lambda behind a **Lambda Function URL** serves the REST API, the remote MCP endpoint (`/mcp`, stateless, JSON responses), OAuth, and the GitHub webhook. API Gateway is dropped: its 30-second limit is shorter than `submit_claim`'s 60-second wait. A worker Lambda reads the DynamoDB stream. Reserved concurrency caps cost and abuse in place of a WAF. | Decided Oct 8 | H-5 |
+| D20 | What happens to the local adapter and seeded tokens? | Development tools only. `midflight.api.local` and the stdio adapter stay for tests and laptops. A local dev login (pick a name instead of GitHub) exists only when `MIDFLIGHT_DEV_LOGIN=1` and is never deployed. The pre-push hook authenticates with a personal hook token the agent gets from a tool. | Decided Oct 8 | H-2, H-3, M-4 |
 
 ## Architecture baseline (October 7, 2026)
 
@@ -66,6 +79,6 @@ Simplifications adopted in the [development plan](development-plan.md#architectu
 | Q1 | Can developers submit claims directly, or only their agents? | Agents only | use-cases review question 2 |
 | Q2 | Can agents accept a Midflight-proposed contract without the lead? | No. Contract changes go through the lead (UC-03) or an escalation (UC-13). | use-cases review question 4 |
 | Q3 | Can an agent read a contract it consumes but doesn't own (UC-07 2d)? | Read-only view of contracts it consumes; anything else about another task is 403 | use-cases review question 6 |
-| Q4 | Does the submission need a publicly hosted dashboard? | No. Local Streamlit. Stretch task X-3 if the rules reward it. | requirements §13 |
+| Q4 | Does the submission need a publicly hosted dashboard? | No. The lead works through their AI client with the lead tools (`project_status`, plan and escalation tools, D16). A read-only status page served by the backend is stretch task X-3. | requirements §13, D16 |
 | Q5 | Input size limits, retry limits, review timeout | 60 s claim wait; 2 worker retries; limits set in M-5 | requirements §13 |
 | Q6 | Official submission cutoff | Finish Oct 10, submit Oct 11 | requirements §13 |
