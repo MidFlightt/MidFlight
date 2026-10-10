@@ -23,7 +23,7 @@ merge. Midflight catches that **before code is written**:
 4. **Verify:** when tests finish on a pushed commit, Midflight checks the real diff and
    posts a `midflight/verify` check on the pull request.
 
-Conflicts between people's requirements go to the lead; Midflight never picks a winner.
+A product decision two people disagree on goes to the lead; Midflight never picks a winner there. A technical question between two agents it settles itself, and the lead can overturn it.
 A green check is evidence of alignment, not proof that the code is correct.
 
 ## How an agent stays in sync: checkpoints and check-in

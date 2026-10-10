@@ -34,8 +34,10 @@ class FakeBedrock:
             raise ClientError({"Error": {"Code": "ThrottlingException"}}, "Converse")
         tool = request["toolConfig"]["toolChoice"]["tool"]["name"]
         answer: dict[str, Any] = {"findings": self.findings}
-        if tool == "confirm_conflict":  # the second look: a real one, for the lead
-            answer = {"contradiction": True, "decides": "lead", "why": "they differ"}
+        if tool == "confirm_conflict":  # the second look: a real contradiction
+            answer = {"contradiction": True, "why": "they differ"}
+        if tool == "decide_conflict":  # and a product question, so it's the lead's
+            answer = {"decides": "lead", "answer": "The lead decides about tax."}
         tool_use = {"toolUse": {"name": tool, "input": answer}}
         return {"output": {"message": {"content": [tool_use]}}}
 

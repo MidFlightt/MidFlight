@@ -60,6 +60,31 @@ the service did then. The other rows skip those claims (D29).
    "the plan does not mention refunds"). Better than the experiment's 7 of 9, not fixed.
 6. **gpt-oss-120b is too timid:** no false alarms, and fewer than half the real conflicts.
 
+## After S-12: who settles it
+
+From S-12 on, the reviewer does more than block. A flag that survives the second look
+gets a third narrow question: is this a product decision for the lead, or a technical
+one the reviewer settles, and what is the answer? So the replay now counts, per case,
+where it ends up. Same 13 cases, five reviews each, Nova 2 Lite:
+
+| | Result |
+| --- | --- |
+| Real questions stopped | 19 of 20 reviews |
+| Of those, sent to the right decider | 15 of 20 |
+| False alarms that reached the lead | 0 of 45 reviews |
+| False alarms that asked an agent to revise for nothing | 4 of 45 reviews |
+| Time per review | 2.9 s |
+
+"The right decider" is the lead for the cancellation fee (E-8) and the reviewer for the
+rest: what `total` holds (E-10), and the tax cases the plan already answers (E-3, E-4).
+Every miss on that line erred towards the lead: the reviewer sent the `total` question
+to the lead in 3 of 5 reviews. An earlier wording, with one combined question, did
+worse (16 of 20 stopped, 4 of 45 false alarms to the lead), which is why each question
+is its own call.
+
+The "revise for nothing" column is new. Before S-12 a blocking mismatch from the first
+pass went straight to the agent unchecked and wasn't counted here.
+
 ## Limits
 
 - 13 cases from two runs of one product, and the same cases were used to design the

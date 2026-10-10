@@ -209,22 +209,26 @@ def test_a_conflict_citing_a_claim_in_an_open_escalation_joins_it() -> None:
 
 
 class TwoStepBedrock:
-    """Answers the review with `findings`, then each second look with `second`."""
+    """Answers the review with `findings`, each second look with `second`, and each
+    question of who decides with `ruling`."""
 
-    def __init__(self, findings: list[dict[str, Any]], second: Any = None) -> None:
+    def __init__(
+        self, findings: list[dict[str, Any]], second: Any = None, ruling: Any = None
+    ) -> None:
         self.findings = findings
         self.second = second
+        self.ruling = ruling
         self.calls: list[dict[str, Any]] = []
 
     def converse(self, **request: Any) -> dict[str, Any]:
         self.calls.append(request)
         tool = request["toolConfig"]["toolChoice"]["tool"]["name"]
-        if tool == "report_findings":
-            answer: Any = {"findings": self.findings}
-        elif isinstance(self.second, Exception):
-            raise self.second
-        else:
-            answer = self.second
+        answer = {"report_findings": {"findings": self.findings}, "decide_conflict": self.ruling}
+        if tool == "confirm_conflict":
+            answer[tool] = self.second
+        if isinstance(answer[tool], Exception):
+            raise answer[tool]
+        answer = answer[tool]
         return {"output": {"message": {"content": [{"toolUse": {"name": tool, "input": answer}}]}}}
 
 
@@ -277,23 +281,26 @@ def test_only_blocking_findings_get_a_second_look() -> None:
 
 
 def test_the_second_look_says_who_decides_and_gives_the_answer() -> None:
+    real = {"contradiction": True, "why": "one field, two meanings"}
     # A technical question: the reviewer settles it, whatever the first pass called it.
-    technical = {
-        "contradiction": True,
-        "why": "one field, two meanings",
-        "decides": "reviewer",
-        "answer": "A booking's total never changes after cancelling.",
-    }
-    [finding] = review(TwoStepBedrock([conflict("C-1", "C-2")], technical))
+    technical = {"decides": "reviewer", "answer": "A booking's total never changes."}
+    bedrock = TwoStepBedrock([conflict("C-1", "C-2")], real, technical)
+    [finding] = review(bedrock)
     assert (finding["kind"], finding["severity"]) == ("semantic_mismatch", "blocking")
-    assert finding["proposed_correction"] == "A booking's total never changes after cancelling."
+    assert finding["proposed_correction"] == "A booking's total never changes."
+    tools = [c["toolConfig"]["toolChoice"]["tool"]["name"] for c in bedrock.calls]
+    assert tools == ["report_findings", "confirm_conflict", "decide_conflict"]
 
     # A product question: it goes to the lead, with the answer as a suggestion.
-    product = technical | {"decides": "lead", "answer": "Keep a 10% fee."}
+    product = {"decides": "lead", "answer": "Keep a 10% fee."}
     mismatch = conflict("C-1", "C-2") | {"kind": "semantic_mismatch"}
-    [finding] = review(TwoStepBedrock([mismatch], product))
+    [finding] = review(TwoStepBedrock([mismatch], real, product))
     assert (finding["kind"], finding["severity"]) == ("requirement_conflict", "blocking")
     assert finding["proposed_correction"] == "Keep a 10% fee."
+
+    # No ruling to be had: the first pass's kind stands, and it still blocks.
+    [finding] = review(TwoStepBedrock([conflict("C-1", "C-2")], real, None))
+    assert (finding["kind"], finding["severity"]) == ("requirement_conflict", "blocking")
 
 
 # The model often explains a conflict with one claim and cites other ids ------------------
