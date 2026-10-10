@@ -1,6 +1,6 @@
 # Midflight development plan
 
-Version 0.2 · October 8, 2026 · Owner: Somesh Agrawal (lead)
+Version 0.3 · October 9, 2026 · Owner: Somesh Agrawal (lead)
 
 This is the build plan from today to submission. It is written for both people and
 coding agents. If you are a coding agent, read [AGENTS.md](../AGENTS.md)
@@ -19,6 +19,12 @@ before you start any task.
 connector with GitHub sign-in and join codes. Everything built so far stays: the rules,
 the review, claims, check-in, and directives move behind a remote MCP endpoint. New
 tasks are H-1 to H-5. The local adapter and seeded tokens are now development tools.
+
+**Changed October 9 (version 0.3):** deployed to AWS, and every code task is built:
+plan-change directives, escalations, the Bedrock reviewer, GitHub verification, stale
+handling with a fault switch, the pre-push hook, and CI. What's left is people's work:
+the demo-shop repo (F-2), the GitHub App's webhook settings, Bedrock access for the AWS
+account, the eval (S-8), and the video.
 
 ## What a customer does
 
@@ -53,7 +59,7 @@ scenario plays on, and his acceptance runs are how we know a gate passed.
 
 All decisions live in [design-decisions.md](design-decisions.md): D1–D10 from the
 kickoff, D11–D15 from the consistency pass, and D16–D20 for the hosted product.
-Open: D7 (AWS account verification and Bedrock access) and D9 (video rules).
+Open: D7 (Bedrock access for the AWS account) and D9 (video rules).
 
 ## Architecture baseline
 
@@ -163,7 +169,7 @@ behind a public HTTPS tunnel, clearly labeled, and the AWS deploy moves to Satur
 Task IDs: **S-** Somesh, **M-** Mithilesh, **F-** Frederik, **H-** hosted product
 (Somesh). Each task is one branch and one PR, named `<id>-<slug>`.
 
-### Done (October 7–8)
+### Done (October 7–9)
 
 | ID | Task | Status |
 | --- | --- | --- |
@@ -174,12 +180,19 @@ Task IDs: **S-** Somesh, **M-** Mithilesh, **F-** Frederik, **H-** hosted produc
 | S-4 | YAML scenarios and the scenario trace page | ✅ PR #3 |
 | M-2 | REST API: token auth, plans, claims, jobs, check-in, directive answers | ✅ PR #4 |
 | M-3 | Local stdio MCP adapter (now a development tool, D20) | ✅ PR #5 |
-| M-1 | Scaffold | Partial: uv project done; **CI workflow missing** |
+| M-1 | Scaffold and CI (`.github/workflows/ci.yml`: ruff, format check, pytest) | ✅ |
 | H-1 | Projects, join codes, members | ✅ built and tested (branch `H-hosted-connector`) |
-| H-2 | Hosted MCP connector (`/mcp`, 12 tools) | ✅ built and tested |
+| H-2 | Hosted MCP connector (`/mcp`) | ✅ built and tested |
 | H-3 | Sign in with GitHub (OAuth), local dev login | ✅ built; tested end to end over HTTP with the dev login and against a fake GitHub |
 | H-4 | Repo checks (App installed, caller is admin) | ✅ built; tested against a fake GitHub |
-| H-5 | AWS: DynamoDB store, worker Lambda, SAM template, packaging | ✅ built and tested on moto; **not deployed yet** (waiting on the AWS account) |
+| H-5 | AWS: DynamoDB store, worker Lambda, SAM template, packaging | ✅ deployed October 9 ([infra/README.md](../infra/README.md#the-live-deployment)); a real Claude Code sign-in created a project on it |
+| S-6 | Plan-change directives (in the approval's own commit) | ✅ currency scenario: T1 and T2 get one directive each, T3 nothing |
+| S-7 | Escalations and `resolve_escalation` | ✅ tax conflict escalates; clarify, revise, and dismiss all audited |
+| S-5 | `BedrockReviewer` (Converse API with a forced tool, D21) | ✅ built and tested with a fake client. **Live call blocked:** Bedrock answers "Operation not allowed" for every model on this new account (see Human steps), so the deploy runs rules only |
+| M-6 | GitHub webhook and the App client (httpx instead of githubkit) | ✅ tested against a fake GitHub; needs the App's webhook settings to run live |
+| S-10 | Verify rules, re-check before publishing, correction directive | ✅ false completion (`total` instead of `total_cents`) fails with evidence |
+| M-7 | Stale handling and the demo fault switch (`simulate_github_outage`) | ✅ directives held and approvals paused while stale, released on recovery |
+| M-4 | Pre-push hook served by Midflight, `hook_setup` tool, `push-check` | ✅ the real script is tested: blocks on 409, warns and allows when unreachable |
 
 ### Friday, October 9: hosted product (G1, G2)
 
@@ -257,11 +270,15 @@ Steps only a person with the accounts can do. Somesh does them unless noted.
    account (preferred; no long-lived keys), or an IAM user with MFA and an access key.
 5. Install AWS CLI v2 and the SAM CLI, then sign in: `aws configure sso` (or
    `aws configure` for an access key). Region `us-east-1`.
-6. In the Bedrock playground (`us-east-1`), send one message each to the current Claude
-   Sonnet and Haiku (fill in the use-case form if asked) and note both inference
-   profile ids.
-7. Deploy, store the secrets, and deploy again with the public URL: follow
-   [infra/README.md](../infra/README.md). About 15 minutes.
+6. ~~Deploy~~ Done October 9 ([infra/README.md](../infra/README.md)).
+7. **Bedrock access (still open).** Every Bedrock call from this account answers
+   `ValidationException: Operation not allowed`, for Claude and for Amazon's own models,
+   so AWS hasn't enabled Bedrock for the new account yet. Open a free support case:
+   Support Center → Create case → Account and billing → "Please enable Amazon Bedrock
+   model invocation for account 376564125271 in us-east-1." When a playground message
+   works, redeploy with `ReviewerModel=us.anthropic.claude-sonnet-5-5`.
+8. Request a Lambda concurrency increase to 1,000 in `us-east-1` (Service Quotas →
+   AWS Lambda → Concurrent executions). New accounts allow 10.
 
 **GitHub App settings:**
 
@@ -270,7 +287,11 @@ Steps only a person with the accounts can do. Somesh does them unless noted.
    a password manager.
 3. General → Callback URLs: add `http://127.0.0.1:8000/oauth/github/callback` now, and
    `<Function URL>/oauth/github/callback` after the deploy.
-4. After the deploy, set the webhook URL to `<Function URL>/github/webhook`.
+4. After the deploy: Webhook → **Active**, URL `<Function URL>/github/webhook` (the
+   stack output `GitHubWebhookUrl`), and the webhook secret that's in your `.env`.
+5. Permissions: **Checks: read and write**; **Actions, Contents, Pull requests,
+   Metadata: read**. Subscribe to the **Workflow run** event. Accept the new permissions
+   on the installation if GitHub asks.
 
 ## Working agreements
 

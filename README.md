@@ -36,8 +36,14 @@ Midflight is one hosted service. Nobody clones this repo or runs a server.
 | **Teammate** | Adds the same connector, signs in with GitHub, and asks their agent to "join Midflight project `MF-XXXX-XXXX`". |
 
 In Claude Code the connector is one command:
-`claude mcp add --transport http midflight <url>/mcp`. In Claude or ChatGPT it's
-**Add custom connector** with the same URL.
+
+```bash
+claude mcp add --transport http midflight https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/mcp
+```
+
+In Claude or ChatGPT it's **Add custom connector** with the same URL. Developers can
+also ask their agent to set up the pre-push hook (`hook_setup`), which stops a push
+Midflight isn't ready for.
 
 ## Run it locally
 
@@ -64,7 +70,7 @@ Deploying to AWS: [infra/README.md](infra/README.md).
 
 A FastAPI server serves the MCP connector (`/mcp`), Sign in with GitHub, and a REST API.
 On AWS it runs as a Lambda behind a Function URL; DynamoDB holds the data, and its stream
-hands review jobs to a worker Lambda. Claims are checked by explicit rules first, then
+hands claim reviews and push verifications to a worker Lambda. Claims are checked by explicit rules first, then
 an AI reviewer on Amazon Bedrock whose findings are validated before they count. One
 GitHub App reads commits and publishes checks. Details:
 [docs/architecture.md](docs/architecture.md) and the [code guide](docs/code-guide.md).

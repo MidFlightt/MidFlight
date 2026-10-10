@@ -25,13 +25,13 @@ GitHub App and add one connector URL to their AI client; they sign in with GitHu
 join projects with a code. The local API and stdio adapter in this repo are development
 tools. New work is tasks H-1 to H-5 in the development plan.
 
-**Current state:** built and tested: the domain (models, states, rules, decide), the
-claim service, the REST API, the hosted MCP connector with Sign in with GitHub, projects
-with join codes, the DynamoDB store, the AWS worker, and the deploy template. Not built
-yet: plan-change directives (S-6), the Bedrock reviewer (S-5), GitHub verification (M-6,
-S-10), escalations (S-7), stale handling (M-7), the pre-push hook (M-4). The
-[code guide](docs/code-guide.md) explains every file. Don't assume a module exists;
-check first.
+**Current state (October 9):** every code task is built, tested, and deployed on AWS:
+the domain, claims and reviews, the hosted connector with Sign in with GitHub, projects
+with join codes, plan-change directives (S-6), escalations (S-7), the Bedrock reviewer
+(S-5, off until Bedrock is enabled for the account), GitHub verification (M-6, S-10),
+stale handling with a demo fault switch (M-7), the pre-push hook (M-4), and CI (M-1).
+Open: the eval (S-8) and people's tasks. The [code guide](docs/code-guide.md) explains
+every file. Don't assume a module exists; check first.
 
 ## Where things are
 
@@ -128,7 +128,7 @@ elsewhere, stop and ask your developer.
 | `midflight/mcp/`, `midflight/api/`, `midflight/main.py`, `midflight/config.py` | Somesh |
 | `midflight/adapters/memory_store.py`, `runners.py`, `clock.py`, `fake_github.py`, `github.py` | Somesh |
 | `midflight/adapters/dynamo_store.py`, `midflight/aws/`, `infra/` | Mithilesh (Somesh until he's back) |
-| `midflight/hooks/` (M-4), GitHub verification (M-6) | Mithilesh |
+| `midflight/hooks/` (M-4), `midflight/api/webhook.py`, `midflight/services/verification.py`, `midflight/services/sync.py` (M-6, M-7) | Mithilesh |
 | `tests/unit/`, `tests/integration/` | Owner of the code under test |
 | `tests/scenarios/*.yaml` | Somesh writes, Frederik checks against use cases |
 | `evals/` | Somesh |
