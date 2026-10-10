@@ -22,6 +22,7 @@ from midflight.domain.models import (
     Participant,
     Plan,
     Project,
+    User,
     Verification,
 )
 
@@ -120,6 +121,36 @@ class Store(Protocol):
     def list_audit(self, project_id: str, entity_id: str | None = None) -> list[AuditEvent]:
         """Oldest first, optionally only events that mention `entity_id`."""
         ...
+
+    # People and projects (H-1). Users aren't tied to one project, so they're saved
+    # directly rather than through a project commit.
+
+    def save_user(self, user: User) -> None: ...
+
+    def get_user(self, user_id: str) -> User | None: ...
+
+    def find_user_by_github_id(self, github_id: int) -> User | None: ...
+
+    def find_project_by_join_code(self, join_code: str) -> Project | None: ...
+
+    def find_project_by_repository(self, repository: str) -> Project | None: ...
+
+    def list_memberships(self, user_id: str) -> list[Participant]:
+        """Every project membership of this user, including revoked ones."""
+        ...
+
+    # Sign-in records (H-3): OAuth clients, codes, and tokens, keyed by kind and key.
+    # Keys for codes and tokens are hashes, never the secret itself.
+
+    def put_auth(
+        self, kind: str, key: str, value: dict[str, Any], expires_at: float | None = None
+    ) -> None: ...
+
+    def get_auth(self, kind: str, key: str) -> dict[str, Any] | None:
+        """The record, or None if it doesn't exist or has expired."""
+        ...
+
+    def delete_auth(self, kind: str, key: str) -> None: ...
 
 
 # Jobs ----------------------------------------------------------------------------------
@@ -228,6 +259,40 @@ class GitHub(Protocol):
 
     def create_check_run(self, repository: str, request: CheckRunRequest) -> int:
         """Publish a check run and return its id."""
+        ...
+
+
+# GitHub sign-in and repo access (H-3, H-4) ----------------------------------------------
+
+
+@dataclass(frozen=True)
+class GitHubAccount:
+    id: int
+    login: str
+    name: str | None = None
+
+
+class GitHubSignIn(Protocol):
+    """Sign in with GitHub through the Midflight App's user authorization (D17)."""
+
+    def authorize_url(self, state: str, redirect_uri: str) -> str:
+        """Where to send the person's browser to sign in."""
+        ...
+
+    def account_for_code(self, code: str, redirect_uri: str) -> GitHubAccount:
+        """Trade the code GitHub sent back for the signed-in account."""
+        ...
+
+
+class RepoAccess(Protocol):
+    """What Midflight needs to know before linking a project to a repo (H-4)."""
+
+    def installation_id(self, repository: str) -> int | None:
+        """The Midflight App's installation id on `owner/name`, or None if not installed."""
+        ...
+
+    def is_admin(self, repository: str, login: str) -> bool:
+        """Whether this GitHub user can administer the repo."""
         ...
 
 

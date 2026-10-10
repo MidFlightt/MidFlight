@@ -7,7 +7,9 @@ can't interleave with another commit (INV-02).
 from __future__ import annotations
 
 import threading
+import time
 from collections import defaultdict
+from typing import Any
 
 from midflight.domain.models import (
     AuditEvent,
@@ -20,6 +22,7 @@ from midflight.domain.models import (
     Plan,
     PlanStatus,
     Project,
+    User,
     Verification,
 )
 from midflight.ports import Commit, CommitResult, RevisionConflict
@@ -42,6 +45,8 @@ class MemoryStore:
         self._audit: list[AuditEvent] = []
         self._applied: dict[str, int] = {}
         self._counters: dict[tuple[str, str], int] = defaultdict(int)
+        self._users: dict[str, User] = {}
+        self._auth: dict[tuple[str, str], tuple[dict[str, Any], float | None]] = {}
 
     # Writes ----------------------------------------------------------------------------
 
@@ -217,3 +222,55 @@ class MemoryStore:
                 for e in self._audit
                 if e.project_id == project_id and (entity_id is None or entity_id in e.entity_ids)
             ]
+
+    # People and projects ---------------------------------------------------------------
+
+    def save_user(self, user: User) -> None:
+        with self._lock:
+            self._users[user.id] = User.model_validate(user.model_dump())
+
+    def get_user(self, user_id: str) -> User | None:
+        with self._lock:
+            return self._users.get(user_id)
+
+    def find_user_by_github_id(self, github_id: int) -> User | None:
+        with self._lock:
+            return next((u for u in self._users.values() if u.github_id == github_id), None)
+
+    def find_project_by_join_code(self, join_code: str) -> Project | None:
+        with self._lock:
+            return next((p for p in self._projects.values() if p.join_code == join_code), None)
+
+    def find_project_by_repository(self, repository: str) -> Project | None:
+        with self._lock:
+            wanted = repository.lower()
+            return next(
+                (p for p in self._projects.values() if p.repository.lower() == wanted), None
+            )
+
+    def list_memberships(self, user_id: str) -> list[Participant]:
+        with self._lock:
+            return [p for p in self._participants.values() if p.user_id == user_id]
+
+    # Sign-in records -------------------------------------------------------------------
+
+    def put_auth(
+        self, kind: str, key: str, value: dict[str, Any], expires_at: float | None = None
+    ) -> None:
+        with self._lock:
+            self._auth[(kind, key)] = (dict(value), expires_at)
+
+    def get_auth(self, kind: str, key: str) -> dict[str, Any] | None:
+        with self._lock:
+            found = self._auth.get((kind, key))
+            if found is None:
+                return None
+            value, expires_at = found
+            if expires_at is not None and expires_at < time.time():
+                del self._auth[(kind, key)]
+                return None
+            return dict(value)
+
+    def delete_auth(self, kind: str, key: str) -> None:
+        with self._lock:
+            self._auth.pop((kind, key), None)
