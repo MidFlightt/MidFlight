@@ -25,13 +25,14 @@ GitHub App and add one connector URL to their AI client; they sign in with GitHu
 join projects with a code. The local API and stdio adapter in this repo are development
 tools.
 
-**Current state (October 9):** every code task is built, tested, and deployed on AWS:
+**Current state (October 10):** every code task is built, tested, and deployed on AWS:
 the domain, claims and reviews, the hosted connector with Sign in with GitHub, projects
 with join codes, plan-change directives (S-6), escalations (S-7), the Bedrock reviewer
-(S-5, on Amazon Nova Pro through a teammate's AWS account, D7), GitHub verification
+(S-5, on Amazon Nova 2 Lite through a teammate's AWS account, D7), GitHub verification
 (M-6, S-10), stale handling with a demo fault switch (M-7), the pre-push hook (M-4), and
 CI (M-1).
-Open: the eval (S-8) and people's tasks. The [code guide](docs/code-guide.md) explains
+Since October 10 Midflight also passes assumptions between tasks, settles technical questions between agents itself, and asks the lead only for product decisions (S-11, S-12; D27 to D33).
+Open: the full eval (S-8; a first part is in `evals/`) and people's tasks. The [code guide](docs/code-guide.md) explains
 every file. Don't assume a module exists; check first.
 
 ## Where things are
