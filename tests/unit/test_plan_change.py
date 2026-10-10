@@ -143,10 +143,22 @@ def test_one_directive_per_plan_version_and_task(team) -> None:
     assert len(services.store.list_directives("demo")) == 2
 
 
-def test_a_newer_plan_supersedes_unanswered_directives(team) -> None:
+@pytest.mark.parametrize(
+    "old_state",
+    [DirectiveState.QUEUED, DirectiveState.DELIVERED, DirectiveState.NEEDS_CLARIFICATION],
+)
+def test_a_newer_plan_supersedes_unanswered_directives(team, old_state) -> None:
     services, people = team
     approve_all_three(services, people)
     change_plan(services, people["p-lead"])
+    if old_state is not DirectiveState.QUEUED:
+        for task in ("T1", "T2"):
+            actor = people[f"p-{task.lower()}"]
+            [directive] = services.check_ins.check_in(actor, task).directives
+            if old_state is DirectiveState.NEEDS_CLARIFICATION:
+                services.directives.acknowledge(
+                    actor, directive.id, DirectiveResponse.NEEDS_CLARIFICATION, "Which currency?"
+                )
     # Plan v3 changes the contract again (adds a field to it).
     plan = make_plan(2)
     contract = plan.contracts[0]
