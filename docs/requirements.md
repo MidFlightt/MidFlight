@@ -42,7 +42,7 @@ The initial target is a team of 2–4 developers, each working through a coding 
 - **P1 — After the MVP:** Proposed enhancements to implement only after P0 works reliably.
 - **Out of scope:** Explicitly excluded from the initial implementation.
 
-The MVP supports one configured GitHub repository, one integration lead, at least two participating coding-agent sessions, a structured shared plan, and verification of branches associated with open pull requests.
+The MVP is one hosted service (D16) that any team can join: each project has one GitHub repository, one integration lead, at least two participating coding-agent sessions, a structured shared plan, and verification of branches associated with open pull requests.
 
 All requirements are initially unimplemented. Acceptance checkboxes are completion gates, not a record of current functionality.
 
@@ -63,8 +63,9 @@ All requirements are initially unimplemented. Acceptance checkboxes are completi
 
 ### FR-01 — Configure the project and participants
 
-- Associate the project with one GitHub repository and its GitHub App installation.
-- Register the integration lead, developers, and coding-agent identities.
+- People sign in with GitHub through the hosted connector (D17); nothing is installed or self-hosted (D16).
+- A signed-in person creates a project for a repository where the Midflight GitHub App is installed and they have admin rights, and becomes its lead (D18).
+- Teammates join with the project's join code; the lead assigns plan tasks to members, can rotate the code, and can remove members.
 - Associate claims with the submitting agent, developer, task, and branch.
 - Enforce project and role boundaries on API requests.
 
@@ -152,7 +153,7 @@ Acceptance criteria:
 
 ### FR-07 — Integrate with coding agents through checkpoints
 
-- Provide a local MCP adapter exposing `submit_claim`, `check_in`, and `acknowledge_directive` (D3).
+- Serve a hosted remote MCP endpoint (OAuth, streamable HTTP) exposing `submit_claim`, `check_in`, and `acknowledge_directive` (D3), plus project and lead tools (D16).
 - `submit_claim` waits up to 60 seconds and returns the verdict in the same call. A longer review returns `pending` with a job ID, and the verdict arrives with the next `check_in`, without resubmitting the claim.
 - Every tool reply carries the task's unacknowledged directives.
 - Provide a git pre-push hook that refuses a push while a blocking directive is unacknowledged or the claim is not approved for the current plan version, and a Claude Code hook that runs `check_in` automatically.
@@ -293,12 +294,12 @@ These choices come from the [development plan](development-plan.md#architecture-
 | Language and validation | Python 3.12, Pydantic, uv |
 | Coordinating agent | Strands Agents SDK with a configurable Bedrock model (`MIDFLIGHT_BEDROCK_MODEL_ID`); candidates are the current Claude Sonnet and Haiku models, chosen from S-8 eval results |
 | Agent hosting | Runs inside the worker Lambda (AgentCore Runtime not required; D1) |
-| API | FastAPI and Mangum on Lambda behind API Gateway HTTP API |
+| API | FastAPI on a Lambda behind a Lambda Function URL (D19), serving REST, `/mcp`, OAuth, and the GitHub webhook |
 | Persistent state | DynamoDB through Boto3 |
 | Background processing | DynamoDB Streams trigger the worker Lambda; SQS dead-letter queue; Powertools idempotency |
 | GitHub | GitHub App through githubkit |
-| Agent adapter | Official MCP Python SDK 2.x (`MCPServer`, formerly FastMCP), local stdio transport, plus git and Claude Code hooks |
-| Dashboard | Streamlit; local hosting is acceptable for the hackathon demo |
+| Agent connection | Hosted remote MCP endpoint on the official MCP Python SDK 2.x (`MCPServer`), with its OAuth server and Sign in with GitHub (D16, D17); a git pre-push hook; the local stdio adapter is a development tool (D20) |
+| Lead interface | Lead tools in the same connector (`project_status`, plan and escalation tools); a read-only status page is stretch |
 | Tests and CI | pytest, GitHub Actions |
 | Deployment and operations | AWS SAM, Secrets Manager, CloudWatch |
 
@@ -384,7 +385,7 @@ IDs are from [development-plan.md](development-plan.md); use cases are in
 
 | Requirement | Use cases | Tasks | Invariants |
 | --- | --- | --- | --- |
-| FR-01 Project and participants | UC-01 | M-2, S-1 | INV-08, INV-12 |
+| FR-01 Project and participants | UC-01 | M-2, S-1, H-1, H-3, H-4 | INV-08, INV-12 |
 | FR-02 Versioned plan | UC-03 | S-1, S-6, M-2 | INV-04 |
 | FR-03 Claims | UC-04, UC-06 | S-3, M-2, M-3 | — |
 | FR-04 Claim checks | UC-04, UC-05, UC-12 | S-2, S-3, S-5, S-8 | INV-01, INV-02, INV-14 |

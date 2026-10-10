@@ -174,6 +174,37 @@ Never map an outcome to `neutral` or `skipped`.
 
 ## Interfaces
 
+**Hosted connector** (D16–D19, tasks H-1 to H-3). One remote MCP endpoint serves every
+team at `<Function URL>/mcp` (streamable HTTP, stateless, JSON responses). Clients
+discover its OAuth server from the 401 it returns without a token, register themselves
+(dynamic client registration), and send the person to **Sign in with GitHub**. A
+Midflight user is a GitHub account; each project membership is a `Participant` with a
+role. Tools that act on a project take an optional `project_id` and default to the
+caller's only project.
+
+| Tool | Who | Does | Task |
+| --- | --- | --- | --- |
+| `my_projects` | anyone signed in | Lists the caller's projects and role in each | H-2 |
+| `create_project` | anyone signed in | `repository` (`owner/name`): checks the App is installed and the caller is a repo admin, creates the project with the caller as lead, returns the join code | H-1, H-4 |
+| `join_project` | anyone signed in | `join_code`: joins as a member (`agent` role) | H-1 |
+| `submit_claim`, `check_in`, `acknowledge_directive` | members | As in the table below | M-3, H-2 |
+| `project_status` | lead | Plan version, members and their tasks, claims, open directives, escalations, verifications | H-2 |
+| `propose_plan`, `approve_plan` | lead | UC-03 | H-2 |
+| `assign_task` | lead | Sets a plan task's owner to a member (in the next plan version) | H-1, H-2 |
+| `rotate_join_code`, `remove_member` | lead | D18 | H-1 |
+| `resolve_escalation` | lead | UC-13 | S-7 |
+| `hook_setup` | members | Issues a personal hook token, shown once, and the pre-push hook install command | M-4 |
+
+Planned entities for H-1 and H-3 (added to `models.py` with both programmers'
+approval): `User` (id, GitHub user id, GitHub login), `Project` gains `name`,
+`join_code`, and `created_by`, and `Participant` gains `user_id`. OAuth clients, codes,
+and tokens are stored hashed by the OAuth server.
+
+The local stdio adapter (`midflight.mcp.server`) and the seeded local API remain as
+development tools (D20). A local dev login replaces GitHub only when
+`MIDFLIGHT_DEV_LOGIN=1`.
+
+
 **MCP tools** (decision D3, served by `midflight/mcp/server.py` on the MCP Python
 SDK 2's `MCPServer`). Every reply ends with the task's open directives, fenced and
 labeled as data. `submit_claim` fills `branch` and `base_sha` from the agent's git

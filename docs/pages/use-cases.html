@@ -142,7 +142,7 @@ td a:hover{text-decoration:underline}
   <div class="actors">
     <div class="actor"><span class="k">Primary · human</span><b>Integration Lead</b><span>Owns the plan. Approves changes, resolves conflicts, reads the dashboard.</span></div>
     <div class="actor"><span class="k">Primary · human</span><b>Developer</b><span>Owns a task. Connects their coding agent, installs the hooks, and reads its status.</span></div>
-    <div class="actor"><span class="k">Primary · software</span><b>Coding Agent</b><span>Claude Code, Cursor, etc. Calls Midflight through the MCP adapter at checkpoints.</span></div>
+    <div class="actor"><span class="k">Primary · software</span><b>Coding Agent</b><span>Claude Code, Claude, ChatGPT, Codex, etc. Calls Midflight through the hosted connector, signed in as its developer.</span></div>
     <div class="actor"><span class="k">Supporting · system</span><b>GitHub</b><span>Sends signed events, serves diffs and CI results, shows the check.</span></div>
     <div class="actor"><span class="k">Supporting · system</span><b>AI Reviewer</b><span>A Bedrock model. Proposes findings only and never decides an outcome.</span></div>
   </div>
@@ -290,40 +290,48 @@ sequenceDiagram
 
   <div class="group"><h3>Plan &amp; oversight</h3><span class="cap">Lead-only goals</span></div>
 
-  <article class="spec" id="uc01"><div class="hd"><span class="id">UC-01</span><h3>Set up project &amp; team</h3><span class="refs">FR-01 · NFR-07 · NFR-09</span></div><div class="bd">
-    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Integration Lead</dd></div><div><dt>Supporting</dt><dd>GitHub</dd></div><div><dt>Trigger</dt><dd>The team starts the hackathon project.</dd></div><div><dt>Preconditions</dt><dd>The Midflight GitHub App is installed on the demo repo.</dd></div></dl></div>
+  <article class="spec" id="uc01"><div class="hd"><span class="id">UC-01</span><h3>Set up project &amp; team</h3><span class="refs">FR-01 · NFR-07 · NFR-09 · D16–D18</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Integration Lead</dd></div><div><dt>Supporting</dt><dd>GitHub</dd></div><div><dt>Trigger</dt><dd>A team wants Midflight on one of its repositories.</dd></div><div><dt>Preconditions</dt><dd>None. Nothing is installed or self-hosted (D16).</dd></div></dl></div>
     <div class="flows"><div><h4>Main success scenario</h4><ol>
-      <li>The lead creates the project and links the repo and its App installation.</li>
-      <li>Midflight confirms it can read the repo through the installation.</li>
-      <li>The lead registers each developer and their agent identity (for example <code>frederik / claude-code</code>) and assigns tasks T1–T3.</li>
-      <li>Midflight issues each participant a revocable token, shows it once, and stores only its hash.</li>
-      <li>Midflight records an audit event for each registration.</li></ol></div>
+      <li>The lead installs the public Midflight GitHub App on the repository.</li>
+      <li>The lead adds Midflight to their AI client as a connector (one URL) and signs in with GitHub (D17).</li>
+      <li>The lead asks their agent to create a project for the repository.</li>
+      <li>Midflight checks the App is installed and the lead is a repo admin, creates the project with the lead as its lead, and returns a join code.</li>
+      <li>The lead shares the join code with the team.</li>
+      <li>Each teammate adds the same connector, signs in with GitHub, and joins with the code (UC-02).</li>
+      <li>The lead assigns the plan's tasks to members (UC-03). Each change is audited.</li></ol></div>
       <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
-      <li><b>2a</b><span>The repo isn't reachable through the installation. The project stays inactive and the lead sees which permission is missing.</span></li>
-      <li><b>4a</b><span>The lead revokes a token. Later calls with it return 401.</span></li>
-      <li><b>*a</b><span>A non-lead tries any setup action and gets 403.</span></li></ul></div>
-      <p class="post"><b>Postcondition:</b> Every participant can perform only the operations their role allows.</p></div>
+      <li><b>4a</b><span>The App isn't installed on the repository. Nothing is created; the reply links to the install page.</span></li>
+      <li><b>4b</b><span>The lead isn't a repo admin. Nothing is created; the reply names the permission needed.</span></li>
+      <li><b>6a</b><span>A wrong or rotated join code is refused.</span></li>
+      <li><b>*a</b><span>A member who isn't the lead tries a lead action and is refused (403).</span></li>
+      <li><b>*b</b><span>The lead removes a member or rotates the code; the member's calls are refused from then on.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> Every member can perform only the operations their role allows, in their own projects only.</p></div>
   </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
 sequenceDiagram
     autonumber
     actor L as Lead
-    participant API as Midflight API
+    participant C as Lead's AI client
+    participant M as Midflight (hosted)
     participant GH as GitHub
-    participant DB as DynamoDB
-    L->>API: create project (repo, App installation id)
-    API->>API: check lead token
-    API->>GH: read repo with installation token
-    alt repo not reachable
-        GH-->>API: 404 or missing permission
-        API-->>L: project inactive, missing permission named
-    else reachable
-        GH-->>API: repo metadata
-        API->>DB: save project
-        L->>API: register frederik / claude-code, assign T2
-        API->>API: generate token, keep only its hash
-        API->>DB: save participant, token hash, audit event
-        API-->>L: token (shown once)
-        L-->>L: hand token to Frederik privately
+    actor T as Teammate
+    L->>GH: install Midflight App on acme/shop
+    L->>C: add connector URL
+    C->>M: connect without a token
+    M-->>C: 401, sign in here
+    C->>GH: Sign in with GitHub (browser)
+    GH-->>M: GitHub account confirmed
+    M-->>C: access token
+    L->>C: create a Midflight project for acme/shop
+    C->>M: create_project(acme/shop)
+    M->>GH: is the App installed? is this user an admin?
+    alt not installed or not admin
+        M-->>C: nothing created, how to fix
+    else ok
+        M-->>C: project created, join code MF-7K2Q-9XPA
+        L-->>T: share the join code
+        T->>M: connector, sign in, join_project(MF-7K2Q-9XPA)
+        M-->>T: joined as a member
     end
 </pre></div></div>
   </article>
@@ -450,35 +458,43 @@ sequenceDiagram
 
   <div class="group"><h3>Agent work</h3><span class="cap">Before and during implementation</span></div>
 
-  <article class="spec" id="uc02"><div class="hd"><span class="id">UC-02</span><h3>Connect coding agent</h3><span class="refs">FR-07</span></div><div class="bd">
-    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Developer</dd></div><div><dt>Trigger</dt><dd>The developer receives a token from UC-01.</dd></div><div><dt>Preconditions</dt><dd>The agent host supports MCP over stdio.</dd></div></dl></div>
-    <div class="flows"><div><h4>Main success scenario</h4><ol><li>The developer installs the local MCP adapter.</li><li>They add it to the agent's MCP config, with the API URL and token as environment variables.</li><li>The agent lists three tools: <code>submit_claim</code>, <code>check_in</code>, <code>acknowledge_directive</code>. It also receives the adapter's instructions for planning checkpoints and reporting assumptions (D10).</li><li>The developer installs the git pre-push hook in their clone (UC-16).</li><li>Optionally, for Claude Code, they install the hook that runs <code>check_in</code> automatically.</li><li>A smoke call to <code>check_in</code> returns the developer's assigned task.</li></ol></div>
-      <div><h4>Alternate &amp; failure paths</h4><ul class="alts"><li><b>6a</b><span>The token is invalid. The adapter reports 401 and names the setting to fix.</span></li><li><b>6b</b><span>The API is unreachable. The adapter says review is unavailable and never tells the agent to proceed.</span></li></ul></div>
-      <p class="post"><b>Postcondition:</b> The agent and its git client can both reach Midflight.</p></div>
+  <article class="spec" id="uc02"><div class="hd"><span class="id">UC-02</span><h3>Connect coding agent</h3><span class="refs">FR-07 · D16 · D17</span></div><div class="bd">
+    <div class="meta"><dl><div><dt>Primary actor</dt><dd>Developer</dd></div><div><dt>Trigger</dt><dd>The developer wants their agent to take part in a project.</dd></div><div><dt>Preconditions</dt><dd>The developer has the project's join code, or is its lead.</dd></div></dl></div>
+    <div class="flows"><div><h4>Main success scenario</h4><ol>
+      <li>The developer adds the Midflight connector URL to their AI client: <code>claude mcp add --transport http midflight &lt;url&gt;/mcp</code> in Claude Code, or <b>Add custom connector</b> in Claude or ChatGPT.</li>
+      <li>The client discovers that Midflight needs sign-in and opens the browser; the developer signs in with GitHub.</li>
+      <li>The agent lists Midflight's tools and receives the instructions for planning checkpoints and reporting assumptions (D10).</li>
+      <li>If new to the project, the agent calls <code>join_project</code> with the code.</li>
+      <li>A <code>check_in</code> returns the developer's task, its requirements, and its contracts.</li></ol></div>
+      <div><h4>Alternate &amp; failure paths</h4><ul class="alts">
+      <li><b>2a</b><span>Sign-in is cancelled or fails. Midflight's tools stay unavailable.</span></li>
+      <li><b>4a</b><span>The developer belongs to several projects. Tools ask which one, or take a <code>project_id</code>.</span></li>
+      <li><b>5a</b><span>No task is assigned yet. The reply says so and asks the developer to tell the lead.</span></li>
+      <li><b>5b</b><span>Midflight is unreachable. The agent must not proceed as if anything were approved.</span></li></ul></div>
+      <p class="post"><b>Postcondition:</b> The agent reaches Midflight as its developer, in that developer's projects only.</p></div>
   </div><div class="seq"><h4>Sequence</h4><div class="canvas"><pre class="mermaid">
 sequenceDiagram
     autonumber
     actor D as Developer
-    participant A as Coding agent
-    participant AD as MCP adapter
-    participant API as Midflight API
-    D->>AD: install adapter, set MIDFLIGHT_URL and token
-    D->>D: install git pre-push hook (UC-16)
-    opt agent is Claude Code
-        D->>A: install hook that runs check_in
+    participant A as Coding agent (AI client)
+    participant M as Midflight (hosted)
+    participant GH as GitHub
+    D->>A: add connector URL
+    A->>M: list tools
+    M-->>A: 401, sign in at Midflight's OAuth server
+    A->>GH: Sign in with GitHub (browser)
+    GH-->>A: back to Midflight, access token issued
+    A->>M: list tools
+    M-->>A: tools and checkpoint instructions
+    opt new to the project
+        A->>M: join_project(code)
+        M-->>A: joined as a member
     end
-    A->>AD: list tools
-    AD-->>A: submit_claim, check_in, acknowledge_directive
-    A->>AD: check_in()
-    AD->>API: POST /projects/{pid}/check-in with bearer token
-    alt token invalid
-        API-->>AD: 401
-        AD-->>A: error, fix MIDFLIGHT_TOKEN
-    else API unreachable
-        AD-->>A: review unavailable, do not proceed as if approved
-    else ok
-        API-->>AD: task T2, plan v1
-        AD-->>A: assigned task T2
+    A->>M: check_in()
+    alt no task assigned
+        M-->>A: no task yet, ask the lead
+    else assigned
+        M-->>A: task T2, requirements, contracts
     end
 </pre></div></div>
   </article>

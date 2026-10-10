@@ -20,6 +20,11 @@ while they work:
 Team Yoga, AWS Agentic AI hackathon. Planned finish **Sat Oct 10, 2026**; Sun Oct 11
 is buffer and submission.
 
+**Product model (D16):** Midflight is one hosted service. Teams install the public
+GitHub App and add one connector URL to their AI client; they sign in with GitHub and
+join projects with a code. The local API and stdio adapter in this repo are development
+tools. New work is tasks H-1 to H-5 in the development plan.
+
 **Current state:** the specs; the shared models and ports (S-1); the claim rules
 (S-2); the claim service with the in-memory store, runners, and clock (S-3); the YAML
 scenarios (S-4); the REST API with token auth, plans, check-in, and directive answers
@@ -128,7 +133,7 @@ elsewhere, stop and ask your developer.
 | `midflight/adapters/memory_store.py`, `fake_reviewer.py`, `bedrock_reviewer.py`, `runners.py`, `clock.py` | Somesh |
 | `midflight/adapters/dynamo_store.py`, `github_app.py`, `fake_github.py` | Mithilesh |
 | `midflight/api/`, `worker/`, `mcp/`, `hooks/` | Mithilesh |
-| `midflight/dashboard/` | Somesh |
+| `midflight/api/oauth.py`, `midflight/mcp/remote.py`, `midflight/services/projects.py` | Somesh |
 | `tests/unit/` | Owner of the code under test |
 | `tests/scenarios/*.yaml` | Somesh writes, Frederik checks against use cases |
 | `evals/` | Somesh |
