@@ -1,0 +1,55 @@
+{
+  "case": "hirebot-pro",
+  "run": "N1",
+  "approach": "no channel",
+  "model": "sonnet",
+  "merge": [
+    "t1-catalog: merged",
+    "t2-pricing: merged",
+    "t3-bookings: merged",
+    "t4-reports: merged",
+    "t5-cli: merged"
+  ],
+  "scores": [
+    {
+      "passed": 13,
+      "of": 14,
+      "failed": [
+        "C13"
+      ]
+    },
+    {
+      "passed": 14,
+      "of": 14,
+      "failed": []
+    }
+  ],
+  "agent_starts_without_midflight": 0,
+  "stats": {
+    "cost": 1.1716,
+    "warmup_cost": 0.0,
+    "turns": 62,
+    "input": 86,
+    "output": 25847,
+    "cache_read": 1793258,
+    "cache_write": 138575,
+    "agent_minutes": 3.9,
+    "tool_calls": 51,
+    "midflight_calls": {},
+    "cost_by_agent": {
+      "t1": 0.18447080000000002,
+      "t2": 0.20875380000000002,
+      "t3": 0.22693000000000002,
+      "t4": 0.18059640000000002,
+      "t5": 0.22108680000000003,
+      "main": 0.14975580000000002
+    }
+  },
+  "notes": [
+    "Nobody asked the lead about cancellations: there was no channel to ask through. Bookings built a full refund, reports built the 20% fee, each from its own developer's note.",
+    "C13 failed at merge: revenue 940 (432 plus 20% of 2538) where the lead's decision gives 686. Every other check passed.",
+    "With no way to agree, the five agents still chose the same routes and field names: the README's command-line spec and plain REST habits were enough. No agent read another agent's folder (checked in the logs).",
+    "Bookings kept its own copy of the rate table and the pricing rules instead of calling pricing, so the price math exists twice.",
+    "One fix round. The fixer was handed C13's expected numbers, which is how the lead's decision finally got in."
+  ]
+}

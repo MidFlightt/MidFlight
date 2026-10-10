@@ -1,0 +1,46 @@
+{
+  "case": "hirebot-pro",
+  "run": "A1",
+  "approach": "team-chat file",
+  "model": "sonnet",
+  "merge": [
+    "t1-catalog: merged",
+    "t2-pricing: merged",
+    "t3-bookings: merged",
+    "t4-reports: merged",
+    "t5-cli: merged"
+  ],
+  "scores": [
+    {
+      "passed": 14,
+      "of": 14,
+      "failed": []
+    }
+  ],
+  "agent_starts_without_midflight": 0,
+  "stats": {
+    "cost": 1.8139,
+    "warmup_cost": 0.0,
+    "turns": 133,
+    "input": 178,
+    "output": 36279,
+    "cache_read": 4282310,
+    "cache_write": 148577,
+    "agent_minutes": 5.0,
+    "tool_calls": 121,
+    "midflight_calls": {},
+    "cost_by_agent": {
+      "t1": 0.24912179999999998,
+      "t2": 0.3407196,
+      "t3": 0.5359456000000002,
+      "t4": 0.29404779999999997,
+      "t5": 0.3940812
+    }
+  },
+  "notes": [
+    "The agents posted their routes, field names, and function names in the team chat before building, and read it before the plan change.",
+    "Bookings wrote 'CONFLICT ... Lead, please confirm' in the chat. The lead answered there once with the fixed decision; T3 and T4 were then told to read it (messages 11 and 12). One lead intervention.",
+    "Reports added in the chat: 'keep total on cancelled bookings (don't zero it out; refund is separate)'. That one line settled the question run B needed a second escalation round for.",
+    "14 of 14 at merge, no fix round."
+  ]
+}

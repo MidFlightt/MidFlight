@@ -1,0 +1,52 @@
+{
+  "case": "hirebot-small",
+  "run": "N1",
+  "approach": "no channel",
+  "model": "sonnet",
+  "merge": [
+    "t1-catalog: merged",
+    "t2-hiring: merged",
+    "t3-storefront: merged"
+  ],
+  "scores": [
+    {
+      "passed": 4,
+      "of": 8,
+      "failed": [
+        "C5",
+        "C6",
+        "C7",
+        "C8"
+      ]
+    },
+    {
+      "passed": 8,
+      "of": 8,
+      "failed": []
+    }
+  ],
+  "agent_starts_without_midflight": 0,
+  "stats": {
+    "cost": 0.7653,
+    "warmup_cost": 0.0,
+    "turns": 46,
+    "input": 64,
+    "output": 14902,
+    "cache_read": 1342382,
+    "cache_write": 86908,
+    "agent_minutes": 2.2,
+    "tool_calls": 39,
+    "midflight_calls": {},
+    "cost_by_agent": {
+      "t1": 0.152407,
+      "t2": 0.1989498,
+      "t3": 0.1870034,
+      "main": 0.22689619999999996
+    }
+  },
+  "notes": [
+    "Scored by hand in a browser (this case has no score.py).",
+    "Nobody asked the lead about tax: there was no channel to ask through.",
+    "After the fix round, check 8 was confirmed through the API with the page's request shape."
+  ]
+}

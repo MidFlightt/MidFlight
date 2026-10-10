@@ -1,0 +1,234 @@
+[
+  {
+    "checks": [
+      {
+        "id": "C1",
+        "name": "agents lists all six agents with their rates and capacity",
+        "command": "agents",
+        "expected": "six `agent:` lines with the README's rates and capacities",
+        "passed": true,
+        "observed": "agent: intern-o-tron rate=120 capacity=40\nagent: lgtm rate=80 capacity=60\nagent: meeting-ghost rate=150 capacity=30\nagent: overconfident-junior rate=60 capacity=50\nagent: hallucination-detective rate=200 capacity=20\nagent: rubber-duck rate=40 capacity=80"
+      },
+      {
+        "id": "C2",
+        "name": "agents --skill filters by skill",
+        "command": "agents --skill code-review",
+        "expected": "only hallucination-detective and lgtm",
+        "passed": true,
+        "observed": "agent: lgtm rate=80 capacity=60\nagent: hallucination-detective rate=200 capacity=20"
+      },
+      {
+        "id": "C3",
+        "name": "quote with a volume discount",
+        "command": "quote meeting-ghost=10 rubber-duck=25",
+        "expected": "subtotal 2500, volume_discount 100, promo_discount 0, tax 192, total 2592",
+        "passed": true,
+        "observed": "subtotal: 2500\nvolume_discount: 100\npromo_discount: 0\nrush_fee: 0\ntax: 192\ntotal: 2592"
+      },
+      {
+        "id": "C4",
+        "name": "quote with promo code BEEPBOOP",
+        "command": "quote meeting-ghost=10 rubber-duck=25 --promo BEEPBOOP",
+        "expected": "promo_discount 50, tax 188, total 2538",
+        "passed": true,
+        "observed": "subtotal: 2500\nvolume_discount: 100\npromo_discount: 50\nrush_fee: 0\ntax: 188\ntotal: 2538"
+      },
+      {
+        "id": "C5",
+        "name": "half-hour quote (plan change)",
+        "command": "quote meeting-ghost=2.5",
+        "expected": "subtotal 375, tax 30, total 405",
+        "passed": true,
+        "observed": "subtotal: 375\nvolume_discount: 0\npromo_discount: 0\nrush_fee: 0\ntax: 30\ntotal: 405"
+      },
+      {
+        "id": "C6",
+        "name": "rush order (plan change)",
+        "command": "quote meeting-ghost=10 --rush",
+        "expected": "subtotal 1500, rush_fee 375, tax 150, total 2025",
+        "passed": true,
+        "observed": "subtotal: 1500\nvolume_discount: 0\npromo_discount: 0\nrush_fee: 375\ntax: 150\ntotal: 2025"
+      },
+      {
+        "id": "C7",
+        "name": "booking an order",
+        "command": "book meeting-ghost=10 rubber-duck=25 --promo BEEPBOOP",
+        "expected": "a booking id, status confirmed, total 2538",
+        "passed": true,
+        "observed": "subtotal: 2500\nvolume_discount: 100\npromo_discount: 50\nrush_fee: 0\ntax: 188\ntotal: 2538\nbooking: edae516c\nstatus: confirmed"
+      },
+      {
+        "id": "C8",
+        "name": "show returns the booking",
+        "command": "show <booking id>",
+        "expected": "status confirmed, total 2538",
+        "passed": true,
+        "observed": "booking: edae516c\nstatus: confirmed\ntotal: 2538"
+      },
+      {
+        "id": "C9",
+        "name": "booking reserves hours",
+        "command": "availability meeting-ghost; availability rubber-duck",
+        "expected": "available 20, then available 55",
+        "passed": true,
+        "observed": "available: 20 | available: 55"
+      },
+      {
+        "id": "C10",
+        "name": "an order over capacity is refused",
+        "command": "book hallucination-detective=25",
+        "expected": "an `error:` line and exit code 1; hallucination-detective still has 20 hours",
+        "passed": true,
+        "observed": "exit 1: error: hallucination-detective has only 20 hours left, 25 requested | available: 20"
+      },
+      {
+        "id": "C11",
+        "name": "cancelling a booking",
+        "command": "cancel <booking id>; show <booking id>",
+        "expected": "status cancelled both times",
+        "passed": true,
+        "observed": "booking: edae516c\nstatus: cancelled | booking: edae516c\nstatus: cancelled\ntotal: 2538"
+      },
+      {
+        "id": "C12",
+        "name": "cancelling gives the hours back",
+        "command": "availability meeting-ghost",
+        "expected": "available 30",
+        "passed": true,
+        "observed": "available: 30"
+      },
+      {
+        "id": "C13",
+        "name": "the revenue report, with the cancellation fee the lead decided",
+        "command": "book lgtm=5; report",
+        "expected": "revenue 686 (432 + a 10% fee of 254), confirmed 1, cancelled 1, hours: lgtm=5 only",
+        "passed": false,
+        "observed": "subtotal: 400\nvolume_discount: 0\npromo_discount: 0\nrush_fee: 0\ntax: 32\ntotal: 432\nbooking: 71659a3a\nstatus: confirmed | revenue: 940\nconfirmed: 1\ncancelled: 1\nhours: lgtm=5"
+      },
+      {
+        "id": "C14",
+        "name": "a half-hour booking reserves half hours (plan change)",
+        "command": "book meeting-ghost=2.5; availability meeting-ghost",
+        "expected": "status confirmed, total 405, then available 27.5",
+        "passed": true,
+        "observed": "subtotal: 375\nvolume_discount: 0\npromo_discount: 0\nrush_fee: 0\ntax: 30\ntotal: 405\nbooking: f354d103\nstatus: confirmed | available: 27.5"
+      }
+    ]
+  },
+  {
+    "checks": [
+      {
+        "id": "C1",
+        "name": "agents lists all six agents with their rates and capacity",
+        "command": "agents",
+        "expected": "six `agent:` lines with the README's rates and capacities",
+        "passed": true,
+        "observed": "agent: intern-o-tron rate=120 capacity=40\nagent: lgtm rate=80 capacity=60\nagent: meeting-ghost rate=150 capacity=30\nagent: overconfident-junior rate=60 capacity=50\nagent: hallucination-detective rate=200 capacity=20\nagent: rubber-duck rate=40 capacity=80"
+      },
+      {
+        "id": "C2",
+        "name": "agents --skill filters by skill",
+        "command": "agents --skill code-review",
+        "expected": "only hallucination-detective and lgtm",
+        "passed": true,
+        "observed": "agent: lgtm rate=80 capacity=60\nagent: hallucination-detective rate=200 capacity=20"
+      },
+      {
+        "id": "C3",
+        "name": "quote with a volume discount",
+        "command": "quote meeting-ghost=10 rubber-duck=25",
+        "expected": "subtotal 2500, volume_discount 100, promo_discount 0, tax 192, total 2592",
+        "passed": true,
+        "observed": "subtotal: 2500\nvolume_discount: 100\npromo_discount: 0\nrush_fee: 0\ntax: 192\ntotal: 2592"
+      },
+      {
+        "id": "C4",
+        "name": "quote with promo code BEEPBOOP",
+        "command": "quote meeting-ghost=10 rubber-duck=25 --promo BEEPBOOP",
+        "expected": "promo_discount 50, tax 188, total 2538",
+        "passed": true,
+        "observed": "subtotal: 2500\nvolume_discount: 100\npromo_discount: 50\nrush_fee: 0\ntax: 188\ntotal: 2538"
+      },
+      {
+        "id": "C5",
+        "name": "half-hour quote (plan change)",
+        "command": "quote meeting-ghost=2.5",
+        "expected": "subtotal 375, tax 30, total 405",
+        "passed": true,
+        "observed": "subtotal: 375\nvolume_discount: 0\npromo_discount: 0\nrush_fee: 0\ntax: 30\ntotal: 405"
+      },
+      {
+        "id": "C6",
+        "name": "rush order (plan change)",
+        "command": "quote meeting-ghost=10 --rush",
+        "expected": "subtotal 1500, rush_fee 375, tax 150, total 2025",
+        "passed": true,
+        "observed": "subtotal: 1500\nvolume_discount: 0\npromo_discount: 0\nrush_fee: 375\ntax: 150\ntotal: 2025"
+      },
+      {
+        "id": "C7",
+        "name": "booking an order",
+        "command": "book meeting-ghost=10 rubber-duck=25 --promo BEEPBOOP",
+        "expected": "a booking id, status confirmed, total 2538",
+        "passed": true,
+        "observed": "subtotal: 2500\nvolume_discount: 100\npromo_discount: 50\nrush_fee: 0\ntax: 188\ntotal: 2538\nbooking: 7e830252\nstatus: confirmed"
+      },
+      {
+        "id": "C8",
+        "name": "show returns the booking",
+        "command": "show <booking id>",
+        "expected": "status confirmed, total 2538",
+        "passed": true,
+        "observed": "booking: 7e830252\nstatus: confirmed\ntotal: 2538"
+      },
+      {
+        "id": "C9",
+        "name": "booking reserves hours",
+        "command": "availability meeting-ghost; availability rubber-duck",
+        "expected": "available 20, then available 55",
+        "passed": true,
+        "observed": "available: 20 | available: 55"
+      },
+      {
+        "id": "C10",
+        "name": "an order over capacity is refused",
+        "command": "book hallucination-detective=25",
+        "expected": "an `error:` line and exit code 1; hallucination-detective still has 20 hours",
+        "passed": true,
+        "observed": "exit 1: error: hallucination-detective has only 20 hours left, 25 requested | available: 20"
+      },
+      {
+        "id": "C11",
+        "name": "cancelling a booking",
+        "command": "cancel <booking id>; show <booking id>",
+        "expected": "status cancelled both times",
+        "passed": true,
+        "observed": "booking: 7e830252\nstatus: cancelled | booking: 7e830252\nstatus: cancelled\ntotal: 2538"
+      },
+      {
+        "id": "C12",
+        "name": "cancelling gives the hours back",
+        "command": "availability meeting-ghost",
+        "expected": "available 30",
+        "passed": true,
+        "observed": "available: 30"
+      },
+      {
+        "id": "C13",
+        "name": "the revenue report, with the cancellation fee the lead decided",
+        "command": "book lgtm=5; report",
+        "expected": "revenue 686 (432 + a 10% fee of 254), confirmed 1, cancelled 1, hours: lgtm=5 only",
+        "passed": true,
+        "observed": "subtotal: 400\nvolume_discount: 0\npromo_discount: 0\nrush_fee: 0\ntax: 32\ntotal: 432\nbooking: 7d82d1d4\nstatus: confirmed | revenue: 686\nconfirmed: 1\ncancelled: 1\nhours: lgtm=5"
+      },
+      {
+        "id": "C14",
+        "name": "a half-hour booking reserves half hours (plan change)",
+        "command": "book meeting-ghost=2.5; availability meeting-ghost",
+        "expected": "status confirmed, total 405, then available 27.5",
+        "passed": true,
+        "observed": "subtotal: 375\nvolume_discount: 0\npromo_discount: 0\nrush_fee: 0\ntax: 30\ntotal: 405\nbooking: 3c35a32b\nstatus: confirmed | available: 27.5"
+      }
+    ]
+  }
+]
