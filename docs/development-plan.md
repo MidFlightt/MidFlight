@@ -133,7 +133,7 @@ midflight/
 docs/                                   F reviews wording; S approves content
 ```
 
-The demo-shop repository (`midflight-demo-shop`, separate repo) is owned by F.
+The demo-shop repository (`MidFlightt/midflight-demo-shop`, separate repo) is owned by F.
 
 ## Phases and gates
 
