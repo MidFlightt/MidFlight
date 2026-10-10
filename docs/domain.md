@@ -236,8 +236,26 @@ Decision D15. FastAPI serves OpenAPI at `/docs`. Every call except `/healthz` an
 | `POST /github/webhook` | GitHub (signature) | Verification trigger | UC-10 |
 | `POST /admin/fault`, `POST /admin/reconcile` | lead | Labeled demo fault switch, manual reconcile | UC-15 |
 
-The project and the lead's token are created by a bootstrap command
-(`midflight admin bootstrap --seed demo`), so there is no public create-project call.
+The project and the lead's token are created by seeding, so there is no public
+create-project call. Locally, `midflight.api.local` seeds the demo project at startup and
+keeps the tokens in `.midflight/local-tokens.json`; the cloud bootstrap command comes
+with M-5.
+
+M-2 built every row except `/escalations/{eid}/resolve` (S-7), `/github/webhook` (M-6),
+and `/admin/*` (M-7). Refusals return 400 with `findings` when rules caused them; a body
+that doesn't fit the schema returns 422.
+
+**`check_in` reply** (`POST /projects/{pid}/check-in`; `task_id` defaults to the agent's
+own task):
+
+| Field | Meaning |
+| --- | --- |
+| `plan_version`, `changed` | The current plan, and whether anything changed since the agent's last check-in |
+| `task`, `requirements`, `contracts` | The task's plan context: its requirements and every contract it provides or consumes, with fields (FR-07) |
+| `claim` | The agent's current claim verdict for the task, or `null` before the first claim |
+| `directives`, `delivered_now` | Open directives; ids that became `delivered` with this reply. Held while stale. |
+| `stale`, `stale_reason` | GitHub data can't be trusted right now (INV-09) |
+| `ready_to_push`, `push_blockers` | What the pre-push hook checks: an approved claim for the current plan and no open blocking directive (UC-16) |
 
 **GitHub**
 

@@ -85,7 +85,11 @@ class MemoryStore:
             return f"{prefix}-{self._counters[(project_id, prefix)]}"
 
     def _check(self, project_id: str, entity: Entity) -> None:
-        """Refuse writes that would rewrite history. Raises before anything is saved."""
+        """Refuse invalid data and writes that would rewrite history, before saving anything.
+
+        `model_copy(update=...)` skips validation, so every entity is checked again here.
+        """
+        type(entity).model_validate(entity.model_dump())
         owner = entity.id if isinstance(entity, Project) else entity.project_id
         if owner != project_id:
             raise ValueError(f"{type(entity).__name__} belongs to {owner}, not {project_id}")

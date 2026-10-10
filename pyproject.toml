@@ -5,11 +5,14 @@ description = "Keeps a small team's coding agents aligned while they work."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.143.0",
     "pydantic>=2.9",
+    "uvicorn>=0.54.0",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=8",
     "pyyaml>=6.0.3",
     "ruff>=0.8",
@@ -26,6 +29,10 @@ packages = ["midflight"]
 testpaths = ["tests"]
 pythonpath = ["tests"]
 addopts = "-q"
+filterwarnings = [
+    # Starlette suggests httpx2 for its TestClient; httpx works and is what we pin.
+    "ignore:Using `httpx` with `starlette.testclient`",
+]
 
 [tool.ruff]
 line-length = 100

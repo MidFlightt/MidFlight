@@ -11,19 +11,16 @@ import hashlib
 from datetime import UTC, datetime
 from typing import Any
 
+from midflight.demo import demo_plan
 from midflight.domain.models import (
     Claim,
     ClaimState,
-    Contract,
     FieldType,
     InterfaceUse,
     Participant,
     Plan,
-    PlanStatus,
     Project,
-    Requirement,
     Role,
-    Task,
 )
 from midflight.ports import Commit, Store
 from midflight.services.claims import ClaimSubmission
@@ -34,48 +31,7 @@ BASE_SHA = "9f3e1a2"
 
 
 def make_plan(version: int = 1) -> Plan:
-    fields = {"total_cents": FieldType.INTEGER}
-    if version >= 2:
-        fields["currency"] = FieldType.STRING
-    return Plan(
-        project_id=PROJECT,
-        version=version,
-        status=PlanStatus.APPROVED,
-        requirements=[
-            Requirement(id="R-1", description="Show the order total at checkout"),
-            Requirement(id="R-2", description="Explain how to contribute"),
-        ],
-        tasks=[
-            Task(
-                id="T1",
-                title="Checkout API",
-                owner="p-t1",
-                requirement_ids=["R-1"],
-                provides=["checkout-response"],
-            ),
-            Task(
-                id="T2",
-                title="Checkout page",
-                owner="p-t2",
-                requirement_ids=["R-1"],
-                consumes=["checkout-response"],
-            ),
-            Task(id="T3", title="Contributor guide", owner="p-t3", requirement_ids=["R-2"]),
-        ],
-        contracts=[
-            Contract(
-                id="checkout-response",
-                version=version,
-                provider_task="T1",
-                consumer_tasks=["T2"],
-                fields=fields,
-            )
-        ],
-        approved_by="p-lead",
-        approved_at=NOW,
-        change_reason="initial plan" if version == 1 else "add currency",
-        changed_ids=[] if version == 1 else ["checkout-response"],
-    )
+    return demo_plan(version, approved_at=NOW)
 
 
 def make_claim(task_id: str = "T2", **overrides: Any) -> Claim:
