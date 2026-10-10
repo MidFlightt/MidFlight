@@ -31,7 +31,7 @@ JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 REPOSITORY = re.compile(r"^[\w.-]+/[\w.-]+$")
 APP_INSTALL_HINT = (
     "Install the Midflight GitHub App on the repository first: "
-    "https://github.com/apps/midflight-team-yoga/installations/new"
+    "https://github.com/apps/midflightt/installations/new"
 )
 
 
