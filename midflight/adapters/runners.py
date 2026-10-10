@@ -1,4 +1,4 @@
-"""Job runners for tests and laptops. In AWS, the DynamoDB stream plays this role."""
+"""Job runners: run a background job now (laptops, tests) or later (AWS)."""
 
 from __future__ import annotations
 
@@ -48,3 +48,11 @@ class DeferredRunner(_Dispatch):
     def run_all(self) -> None:
         while self.pending:
             self.run_next()
+
+
+class StreamRunner:
+    """AWS: do nothing here. The job was saved in the same commit as its claim, and the
+    DynamoDB stream hands new job items to the worker Lambda (`midflight.aws.worker`)."""
+
+    def submit(self, job: Job) -> None:
+        return None
