@@ -1,0 +1,10 @@
+name: Two tasks touch the same file; it is visible, not blocked
+requirement: "requirements §11: Two tasks harmlessly touch the same file"
+use_cases: [UC-05]
+steps:
+  - say: T1 edits README.md as part of the API work
+    submit: {as: T1, name: api}
+    expect: {state: approved, findings: []}
+  - say: T3's contributor guide also edits README.md
+    submit: {as: T3, name: guide}
+    expect: {state: approved, findings: [file_overlap], blocking: []}

@@ -1,0 +1,27 @@
+name: T2 expects total, the contract has total_cents; caught before coding, then fixed
+requirement: "requirements §11: Frontend expects decimal total while backend provides integer total_cents"
+use_cases: [UC-04, UC-05, UC-06]
+steps:
+  - submit: {as: T1, name: api}
+    expect: {state: approved}
+  - say: T2 assumes a decimal total in dollars
+    submit:
+      as: T2
+      name: page
+      claim:
+        consumes: [{contract_id: checkout-response, fields: {total: number}}]
+        assumptions: ["total is a decimal number of dollars"]
+    expect:
+      state: needs_revision
+      blocking: [contract_field_missing]
+      correction: "Read `total_cents: integer`, not `total`."
+  - say: The agent revises the same claim, as the correction says
+    submit:
+      as: T2
+      revise: page
+      claim:
+        consumes: [{contract_id: checkout-response, fields: {total_cents: integer}}]
+        assumptions: ["total_cents is an integer number of cents"]
+        reason: Use total_cents as Midflight suggested
+    expect: {state: approved, revision: 2, findings: []}
+  - claims: {api: approved, page: approved}

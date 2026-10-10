@@ -1,0 +1,17 @@
+name: Withdrawing frees the task; only approved work can be closed
+requirement: "UC-06 alternate path 1a, decision D11"
+use_cases: [UC-06]
+steps:
+  - submit: {as: T1, name: first}
+    expect: {state: approved}
+  - say: The agent changes approach and withdraws
+    withdraw: {as: T1, claim: first, reason: switching approach}
+    expect: {state: withdrawn}
+  - say: A new provider claim is no longer blocked by the withdrawn one
+    submit: {as: T1, name: second}
+    expect: {state: approved, findings: []}
+  - say: Another agent can't close it
+    close: {as: T2, claim: second}
+    expect: {error: PermissionDenied}
+  - close: {as: T1, claim: second, reason: merged}
+    expect: {state: closed}

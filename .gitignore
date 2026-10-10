@@ -21,5 +21,8 @@ dist/
 build/
 *.egg-info/
 
+# Local API tokens (midflight.api.local)
+.midflight/
+
 # Personal learning notes (VibeWise)
 .vibe-wise/

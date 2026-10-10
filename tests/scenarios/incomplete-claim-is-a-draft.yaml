@@ -1,0 +1,15 @@
+name: A claim without interfaces or criteria is a draft until completed
+requirement: "UC-04 alternate path 2d, decisions D5 and D12"
+use_cases: [UC-04, UC-06]
+steps:
+  - submit:
+      as: T2
+      name: page
+      claim: {consumes: [], acceptance_criteria: []}
+    expect: {state: draft, findings: [incomplete_claim]}
+  - say: Adding the interface and a criterion makes it reviewable
+    submit: {as: T2, revise: page}
+    expect: {state: approved, revision: 2}
+  - say: T3 has no interfaces and says so explicitly
+    submit: {as: T3, name: guide}
+    expect: {state: approved}

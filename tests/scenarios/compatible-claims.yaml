@@ -1,0 +1,11 @@
+name: Compatible backend and frontend claims are both approved
+requirement: "requirements §11: Compatible backend/frontend claims"
+use_cases: [UC-04, UC-05]
+steps:
+  - say: T1 will provide checkout-response with total_cents
+    submit: {as: T1, name: api}
+    expect: {state: approved, findings: [], contracts: [checkout-response]}
+  - say: T2 will read total_cents from it
+    submit: {as: T2, name: page}
+    expect: {state: approved, findings: [], contracts: [checkout-response]}
+  - claims: {api: approved, page: approved}

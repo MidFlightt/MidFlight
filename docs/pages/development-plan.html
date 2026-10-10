@@ -267,7 +267,8 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <div class="wrap">
 
 <header class="hero">
-  <span class="eyebrow">Team Yoga · Midflight · plan v0.1 · Wed Oct 7 → Sun Oct 11, 2026</span>
+  <p style="background:var(--f-soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0 0 14px"><b>Changed October 8 (plan v0.2):</b> Midflight is now a hosted connector. Teams install the GitHub App, add one connector URL, sign in with GitHub, and join projects with a code. Nothing is cloned or self-hosted. New tasks H-1 to H-5; decisions D16–D20.</p>
+  <span class="eyebrow">Team Yoga · Midflight · plan v0.2 · Wed Oct 7 → Sun Oct 11, 2026</span>
   <h1>Midflight Build Plan</h1>
   <p class="lede">Midflight keeps a team's coding agents aligned while they work. This page is the plan for building it in four days: who builds what, in what order, what blocks what, and the demo that proves each day worked. The agent-readable version with every detail is <code>docs/development-plan.md</code>.</p>
   <div class="loop" aria-label="What Midflight does">
@@ -310,7 +311,7 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
   <div class="people">
     <div class="person c-s"><div class="who"><b>Somesh</b><span>Lead · the logic</span></div>
       <div class="tag">Decides what Midflight thinks</div>
-      <ul><li>Domain models and ports that everyone builds on</li><li>Conflict rules, claim and plan services, propagation</li><li>AI reviewer and the eval that picks the model</li><li>Escalations, verify rules, lead dashboard</li></ul>
+      <ul><li>Domain models and ports that everyone builds on</li><li>Conflict rules, claim and plan services, propagation</li><li>AI reviewer and the eval that picks the model</li><li>The hosted connector: projects, join codes, Sign in with GitHub, remote MCP</li><li>Escalations and verify rules</li></ul>
       <div class="meta" id="meta-S"></div></div>
     <div class="person c-m"><div class="who"><b>Mithilesh</b><span>Programmer · the connections</span></div>
       <div class="tag">Connects Midflight to the world</div>
@@ -372,7 +373,7 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
   <div class="sechead">
     <span class="eyebrow">06 · Before any code</span>
     <h2>Decisions before any code</h2>
-    <p class="muted">D1–D10 were settled in the kickoff call; D11–D15 came from the consistency pass that checked the specs against each other. If nobody objects, the default applies. Somesh records the outcomes in <code>docs/design-decisions.md</code> (task S-0).</p>
+    <p class="muted">D1–D10 were settled in the kickoff call; D11–D15 came from the consistency pass; D16–D20 made Midflight a hosted connector. If nobody objects, the default applies. Somesh records the outcomes in <code>docs/design-decisions.md</code> (task S-0).</p>
   </div>
   <div class="tbl"><table class="decisions">
     <thead><tr><th>ID</th><th>Question</th><th>Default or outcome</th><th>Status</th><th>Affects</th></tr></thead>
@@ -383,7 +384,7 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
       <tr><td class="id">D4</td><td>What triggers verification</td><td>The contract-test workflow finishing (<code>workflow_run.completed</code>)</td><td><span class="st def">Default</span></td><td class="id">M-6</td></tr>
       <tr><td class="id">D5</td><td>Incomplete claims</td><td>Saved as draft; no approval until interfaces and criteria exist</td><td><span class="st def">Default</span></td><td class="id">S-3</td></tr>
       <tr><td class="id">D6</td><td>The two demo agent hosts</td><td>Two Claude Code sessions</td><td><span class="st def">Default</span></td><td class="id">M-4 · F-3</td></tr>
-      <tr><td class="id">D7</td><td>AWS account, region, Bedrock model access</td><td>A region with current Claude models, e.g. <code>us-east-1</code></td><td><span class="st todo">Somesh confirms</span></td><td class="id">S-5 · M-5</td></tr>
+      <tr><td class="id">D7</td><td>AWS account, region, Bedrock model access</td><td><code>us-east-1</code>; reviewer model Claude Sonnet 5.5. Bedrock access for the new account is still pending</td><td><span class="st todo">Somesh confirms</span></td><td class="id">S-5 · M-5</td></tr>
       <tr><td class="id">D8</td><td>Pre-push hook when Midflight is down</td><td>Warn and allow; the GitHub check still verifies</td><td><span class="st def">Default</span></td><td class="id">M-4</td></tr>
       <tr><td class="id">D9</td><td>Video length and submission format</td><td>Check the rules page; plan for 3 minutes</td><td><span class="st todo">Frederik checks</span></td><td class="id">F-1 · F-5</td></tr>
       <tr><td class="id">D10</td><td>How agents sync while they implement</td><td>Agent-planned checkpoints: the adapter's instructions tell agents to list assumptions, <code>check_in</code> at the critical points of their task, and revise the claim when an assumption or scope changes</td><td><span class="st done">Decided</span></td><td class="id">M-3</td></tr>
@@ -392,6 +393,11 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
       <tr><td class="id">D13</td><td>Directive kinds and dedupe</td><td><code>source</code> is <code>plan_change</code> (one per plan version and task) or <code>verification</code> (one per verification)</td><td><span class="st def">Default</span></td><td class="id">S-6 · S-10</td></tr>
       <tr><td class="id">D14</td><td>Escalation state transitions</td><td>Approved claims can be escalated; the lead can send an escalated claim back to <code>needs_revision</code></td><td><span class="st def">Default</span></td><td class="id">S-1 · S-7</td></tr>
       <tr><td class="id">D15</td><td>REST paths</td><td>One table in <code>docs/domain.md</code>, scoped by project id</td><td><span class="st def">Default</span></td><td class="id">M-2 · M-3</td></tr>
+      <tr><td class="id">D16</td><td>What users install</td><td>Nothing: install the public GitHub App and add one connector URL; teammates join with a code</td><td><span class="st done">Decided</span></td><td class="id">H-1 – H-5</td></tr>
+      <tr><td class="id">D17</td><td>How people sign in</td><td>Sign in with GitHub, through Midflight's OAuth server and the App's user authorization</td><td><span class="st done">Decided</span></td><td class="id">H-3</td></tr>
+      <tr><td class="id">D18</td><td>How a team forms</td><td>The project creator is the lead and gets a join code; anyone with the code joins as an agent</td><td><span class="st done">Decided</span></td><td class="id">H-1</td></tr>
+      <tr><td class="id">D19</td><td>Where it runs</td><td>One web Lambda behind a Function URL (REST, /mcp, OAuth, webhook) plus the worker; no API Gateway (30 s limit)</td><td><span class="st done">Decided</span></td><td class="id">H-5</td></tr>
+      <tr><td class="id">D20</td><td>The local adapter and seeded tokens</td><td>Development tools only; a dev login exists only locally</td><td><span class="st done">Decided</span></td><td class="id">H-2 · H-3</td></tr>
     </tbody>
   </table></div>
 </section>
@@ -437,10 +443,10 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
       <li>After M-3: claim before coding, <code>check_in</code> before pushing</li>
     </ul></div>
     <div class="card cut"><h3>If we fall behind, cut in this order</h3><ol>
-      <li>The Claude Code hook (keep the pre-push hook)</li>
+      <li>The pre-push hook (directives still ride on every reply)</li>
       <li>The AI reviewer inside verification (rules and tests decide)</li>
-      <li>Dashboard polish (a plain table is enough)</li>
       <li>A live GitHub outage (use the labelled fault switch)</li>
+      <li>ChatGPT in the demo (Claude Code shows the connector)</li>
     </ol></div>
     <div class="card keep"><h3>Never cut</h3><ul>
       <li>A conflict caught before coding (G1)</li>
@@ -474,11 +480,11 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 ├─ midflight/
 │  ├─ domain/models.py · ports.py                               <span class="o b">both approve</span>
 │  ├─ domain/rules.py · impact.py · states.py                   <span class="o s">Somesh</span>
-│  ├─ services/  claims · plans · directives · escalations · verify  <span class="o s">Somesh</span>
+│  ├─ services/  claims · plans · check_in · directives · projects · escalations · verify  <span class="o s">Somesh</span>
 │  ├─ adapters/  memory_store · fake_reviewer · bedrock_reviewer · runners · clock     <span class="o s">Somesh</span>
 │  ├─ adapters/  dynamo_store · github_app · fake_github             <span class="o m">Mithilesh</span>
-│  ├─ api/ · worker/ · mcp/ · hooks/                            <span class="o m">Mithilesh</span>
-│  └─ dashboard/app.py                                          <span class="o s">Somesh</span>
+│  ├─ api/app.py · api/oauth.py · mcp/remote.py                 <span class="o s">Somesh</span>
+│  └─ worker/ · hooks/                                          <span class="o m">Mithilesh</span>
 ├─ tests/scenarios/*.yaml                                       <span class="o s">Somesh writes</span><span class="o f">Frederik checks</span>
 ├─ evals/                                                       <span class="o s">Somesh</span>
 ├─ infra/template.yaml                                          <span class="o m">Mithilesh</span>
@@ -503,21 +509,22 @@ midflight-demo-shop/   <span class="dim">separate repo: the stage the demo runs 
 
   var DAYS = [
     {iso:"2026-10-07", date:"Wed Oct 7", name:"Foundations",
-     goal:"Agree the decisions, set up the repo and CI, and land the shared models everyone builds on.",
-     tonight:"Nothing flashy yet. A green CI on main, merged models, and a storyboard. Tomorrow nobody waits on anybody.",
-     gates:[{id:"G0", when:"Wed night", title:"Foundations", pass:"Decisions D1–D15 recorded. CI green on main. models.py and ports.py merged. Storyboard v1 exists."}]},
+     goal:"Agree the decisions and land the shared models everyone builds on.",
+     tonight:"Done: decisions D1–D15, merged models and ports.",
+     gates:[{id:"G0", when:"Wed night", title:"Foundations", pass:"Done. Decisions recorded; models.py and ports.py merged."}]},
     {iso:"2026-10-08", date:"Thu Oct 8", name:"Local slice",
-     goal:"The first real end-to-end loop on a laptop: two coding agents, one contract, a conflict caught before any code is written.",
-     tonight:"T2's agent claims it will read total. Midflight replies needs_revision with the total_cents fix in the same call. The agent revises and is approved.",
-     gates:[{id:"G1", when:"Thu night", title:"Conflict caught before coding", pass:"Two real agent sessions: T2 claims total, gets needs_revision with the total_cents correction in the same call, revises, gets approved."}]},
-    {iso:"2026-10-09", date:"Fri Oct 9", name:"Change and cloud",
-     goal:"Plan changes reach the right agents mid-work, the lead gets a dashboard, and the whole thing moves to AWS.",
-     tonight:"On AWS, the lead adds currency. T1 and T2 get a directive at their next step, T3 gets nothing, and a push is blocked until the directive is acknowledged.",
-     gates:[{id:"G2", when:"Fri night", title:"Change reaches agents", pass:"Deployed on AWS. Plan v2 adds currency. Directives reach T1 and T2 through check_in and the hook, T3 gets nothing, push blocked until acknowledged. Model chosen from eval numbers."}]},
+     goal:"The whole claim loop on a laptop: rules, review, race-safe saves, the API, and an agent connection.",
+     tonight:"Done: T2 claims total, gets needs_revision with the total_cents fix in the same call, revises, and is approved, through the API and an MCP client.",
+     gates:[{id:"G1a", when:"Thu night", title:"Conflict caught before coding", pass:"Done locally: the total vs total_cents conflict is caught, explained, and fixed through MCP and the real API."}]},
+    {iso:"2026-10-09", date:"Fri Oct 9", name:"Hosted product",
+     goal:"Turn the local slice into a hosted connector: projects with join codes, Sign in with GitHub, the remote /mcp endpoint, and the AWS deploy.",
+     tonight:"Teammates on their own laptops paste one connector URL, sign in with GitHub, join with the code, and the currency change reaches T1 and T2 only.",
+     gates:[{id:"G1", when:"Fri midday", title:"Hosted flow, locally", pass:"Claude Code adds the connector at localhost, signs in, creates the demo project, a teammate joins with the code, and the total vs total_cents conflict is caught."},
+            {id:"G2", when:"Fri night", title:"Live, change reaches agents", pass:"Deployed on AWS. Teammates connect from their own laptops. The lead approves plan v2: directives for T1 and T2, none for T3."}]},
     {iso:"2026-10-10", date:"Sat Oct 10", name:"Verify and ship",
      goal:"Check real pushed code on GitHub, handle outages safely, then record the final video and write the submission.",
      tonight:"A wrong field gives a red midflight/verify check with evidence; the fix turns it green. Then the final video and a backup take.",
-     gates:[{id:"G3", when:"Sat midday", title:"Verify on GitHub", pass:"A real push to demo-shop: midflight/verify fails for a missing total_cents, then passes after the fix. Stale and duplicate-webhook cases behave."},
+     gates:[{id:"G3", when:"Sat midday", title:"Verify on GitHub", pass:"A real push to demo-shop: midflight/verify fails for a missing field, then passes after the fix. Stale and duplicate-webhook cases behave."},
             {id:"G4", when:"Sat night", title:"Ship", pass:"Final video and a full backup take recorded. Submission draft complete and reviewed."}]},
     {iso:"2026-10-11", date:"Sun Oct 11", name:"Buffer",
      goal:"Spare day. Fix what broke, re-record if needed, and submit. Stretch work only if G3 passed early.",
@@ -527,38 +534,41 @@ midflight-demo-shop/   <span class="dim">separate repo: the stage the demo runs 
 
   // day: 0-3 build days; 5 = stretch (shown on the buffer day)
   var TASKS = [
-    {id:"S-0",who:"S",day:0,short:"Kickoff",name:"Run the kickoff and record decisions",what:"Settle D1–D10 in a 30-minute call (D11–D15 came from the consistency pass). Record them in docs/design-decisions.md; update FR-07 and the MCP row in the architecture doc only if D3 changes.",done:"Decisions merged to main",deps:[],uc:"—",crit:true},
-    {id:"S-1",who:"S",day:0,short:"Models, ports",name:"Domain models and ports",what:"Pydantic models for every entity and enum in docs/domain.md (Project, Participant, Plan, Requirement, Task, Contract, Claim, Finding, Directive, Escalation, Verification, Job, AuditEvent) with typed contract fields, and the five port protocols: Store, JobRunner, Reviewer, GitHub, Clock.",done:"Merged with Mithilesh's approval tonight; every model round-trips to JSON",deps:["S-0"],uc:"all",crit:true,note:"Blocks everyone"},
-    {id:"M-1",who:"M",day:0,short:"Scaffold + CI",name:"Project scaffold and CI",what:"uv project on Python 3.12 with ruff and pytest, the planned folder layout, ci.yml running both on every PR, and .env.example.",done:"CI green on main; uv run pytest passes",deps:[],uc:"—"},
-    {id:"F-1",who:"F",day:0,short:"Storyboard",name:"Hackathon rules, storyboard, script v1",what:"Read the rules page: deadline, video length, format, what to submit. Rewrite the demo sequence in docs/demo.md: what's on screen, what's said, seconds per scene.",done:"Rules posted in chat; docs/demo.md PR reviewed by Somesh",deps:[],uc:"all"},
+    {id:"S-0",who:"S",day:0,short:"Kickoff",name:"Kickoff decisions",what:"Decisions D1–D10 at kickoff, D11–D15 from the consistency pass, recorded in docs/design-decisions.md.",done:"Done",deps:[],uc:"—",note:"✅ Done"},
+    {id:"S-1",who:"S",day:0,short:"Models, ports",name:"Domain models and ports",what:"Pydantic models for every entity and enum in docs/domain.md, the claim and directive transitions, and the five port protocols.",done:"Done: merged to main",deps:["S-0"],uc:"all",crit:true,note:"✅ Merged"},
+    {id:"M-1",who:"M",day:0,short:"Scaffold + CI",name:"Project scaffold and CI",what:"uv project on Python 3.12 with ruff and pytest, and ci.yml running lint, format check, and tests on every PR.",done:"CI green on main",deps:[],uc:"—",note:"✅ CI added"},
+    {id:"F-1",who:"F",day:0,short:"Storyboard",name:"Hackathon rules, storyboard, script v1",what:"Read the rules page: deadline, video length, format, what to submit. Rewrite the demo sequence in docs/demo.md from the storyboard.",done:"Rules posted in chat; docs/demo.md PR reviewed by Somesh",deps:[],uc:"all"},
 
-    {id:"S-2",who:"S",day:1,short:"Rules",name:"Conflict rules",what:"domain/rules.py: claim references exist in the plan, consumed contract fields and types match, shared files reported as non-blocking info.",done:"A unit test per rule, including total vs total_cents",deps:["S-1"],uc:"UC-05",crit:true},
-    {id:"S-5",who:"S",day:1,short:"AI reviewer",name:"Fake and Bedrock reviewers",what:"FakeReviewer with scripted findings; BedrockReviewer via Strands with structured output as Finding. Replies that break the schema or cite unknown IDs are rejected.",done:"A test proves a malformed reply can never approve",deps:["S-1"],uc:"UC-05"},
-    {id:"S-3",who:"S",day:1,short:"Claim service",name:"Claim service, race-safe",what:"MemoryStore and services/claims.py: submit, revise, withdraw, check. A verdict saves only if the coordination revision hasn't changed; otherwise the review reruns.",done:"Scenario tests pass, including two simultaneous conflicting claims",deps:["S-1","S-2"],uc:"UC-04 · 05 · 06",crit:true},
-    {id:"S-4",who:"S",day:1,short:"Scenarios",name:"Scenario runner",what:"YAML scenarios in tests/scenarios/ drive the services with fakes, one file per demo scenario covered so far.",done:"One YAML per §11 scenario covered so far",deps:["S-3"],uc:"UC-01 – 06"},
-    {id:"M-2",who:"M",day:1,short:"API + auth",name:"FastAPI API with auth",what:"In-memory store and inline job runner. Hashed bearer tokens, lead and agent roles. Endpoints for project, participants, plan, claims, jobs, check-in and directive responses.",done:"TestClient tests for 401, 403 and the happy paths",deps:["S-1","M-1"],uc:"UC-01 · 03 · 04 · 07"},
-    {id:"M-3",who:"M",day:1,short:"MCP adapter",name:"MCP adapter: three agent tools",what:"FastMCP server with submit_claim (waits up to 60 s for the verdict), check_in and acknowledge_directive. Every reply carries pending directives. The server instructions tell agents to list assumptions, check in at the critical points of their task, and revise the claim when an assumption changes (D10).",done:"Works from a real Claude Code session; /mcp shows three tools; the agent states its assumptions and checkpoints before coding",deps:["M-2","S-3"],uc:"UC-02 · 04 · 07 · 09"},
-    {id:"F-2",who:"F",day:1,short:"demo-shop",name:"The demo-shop repo",what:"The stage: checkout API returning total_cents, a checkout page, contract tests, a contract.yml workflow that restores tests/contract/ from main before running (NFR-10) and uploads contract-results with the head SHA, CODEOWNERS on tests and workflows.",done:"Workflow green on main; a wrong field turns it red",deps:[],uc:"UC-10"},
-    {id:"F-3",who:"F",day:1,short:"Agents + G1",name:"Two agent sessions, record G1",what:"Two Claude Code windows, T1 backend and T2 frontend, connected to local Midflight. Drive the total vs total_cents conflict as a user and record it.",done:"G1 footage saved",deps:["M-3","F-2"],uc:"UC-02 · 04"},
+    {id:"S-2",who:"S",day:1,short:"Rules",name:"Conflict rules",what:"domain/rules.py: references, contract field and type match with the nearest real field as the fix, scope, duplicate providers, shared files as info.",done:"Done: PR #1",deps:["S-1"],uc:"UC-05",crit:true,note:"✅ PR #1"},
+    {id:"S-3",who:"S",day:1,short:"Claim service",name:"Claim service, race-safe",what:"MemoryStore and services/claims.py: submit, revise, withdraw, close, review. A verdict saves only if coord_rev hasn't moved; reviewer replies are checked before use.",done:"Done: PR #2",deps:["S-1","S-2"],uc:"UC-04 · 05 · 06",crit:true,note:"✅ PR #2"},
+    {id:"S-4",who:"S",day:1,short:"Scenarios",name:"Scenario runner and trace page",what:"YAML scenarios in tests/scenarios/ drive the services with fakes; docs/pages/scenarios.html traces every step.",done:"Done: PR #3",deps:["S-3"],uc:"UC-01 – 06",note:"✅ PR #3"},
+    {id:"M-2",who:"M",day:1,short:"API + auth",name:"REST API",what:"FastAPI with token auth, plans, claims, jobs, check-in with the task's plan context, and directive answers.",done:"Done: PR #4",deps:["S-1","M-1"],uc:"UC-01 · 03 · 04 · 07",crit:true,note:"✅ PR #4"},
+    {id:"M-3",who:"M",day:1,short:"MCP adapter",name:"Agent tools (local adapter)",what:"submit_claim (verdict in the same call), check_in, acknowledge_directive, and the D10 instructions. Now a development tool; H-2 serves the same tools remotely.",done:"Done: PR #5",deps:["M-2","S-3"],uc:"UC-02 · 04 · 07 · 09",note:"✅ PR #5"},
 
-    {id:"S-6",who:"S",day:2,short:"Propagation",name:"Plan-change propagation",what:"domain/impact.py and services/plans.py: approve a version, diff it, find affected tasks, reset their approvals, one directive per task, supersede older ones.",done:"Currency change: directives for T1 and T2, none for T3, no duplicates",deps:["S-3"],uc:"UC-03 · 08"},
-    {id:"S-7",who:"S",day:2,short:"Escalations",name:"Escalate and resolve",what:"Requirement conflicts go to the lead, who clarifies the plan, requests a revision, or dismisses with a reason. Original evidence kept.",done:"Tax-inclusive vs tax-exclusive scenario escalates and resolves, with audit",deps:["S-3"],uc:"UC-12 · 13"},
-    {id:"S-8",who:"S",day:2,short:"Model eval",name:"Eval harness and model choice",what:"About 20 labelled cases: real conflicts, harmless overlap, vague claims, injection text. Three runs per candidate model, measuring detection, unnecessary blocks, latency, tokens.",done:"Table in evals/results.md; model chosen and announced",deps:["S-5"],uc:"UC-05"},
-    {id:"M-5",who:"M",day:2,short:"AWS deploy",name:"Deploy to AWS",what:"SAM template: HTTP API, API Lambda, DynamoDB with streams, worker Lambda, dead-letter queue, Secrets Manager. DynamoStore with conditional writes, tested with moto. Powertools idempotency.",done:"sam deploy works from a clean clone; the G1 scenario passes against the cloud URL",deps:["M-2","S-3"],uc:"NFR-01 – 06",crit:true},
-    {id:"S-9",who:"S",day:2,short:"Dashboard",name:"Lead dashboard (Streamlit)",what:"Plan version, tasks and claim states, directive delivery, escalations with resolve buttons, stale banner, timeline. Refreshes every 5 seconds.",done:"The lead can resolve an escalation without the terminal",deps:["M-2","S-6"],uc:"UC-13 · 14"},
-    {id:"M-4",who:"M",day:2,short:"Hooks",name:"pre-push and Claude Code hooks",what:"A git pre-push hook calls check_in and refuses the push on an unacknowledged directive (warns and allows if Midflight is down). A Claude Code hook prints new directives into the agent's context.",done:"A push is blocked while a directive waits",deps:["M-3","S-6"],uc:"UC-16 · 02 · 07"},
-    {id:"F-4",who:"F",day:2,short:"Acceptance",name:"Acceptance sheet, record G2",what:"docs/acceptance-runs.md: one row per demo scenario with what you do, what should happen, what did happen, and timing. Run G2 as a user and record it.",done:"Checklist rows filled; G2 footage saved",deps:["S-6","M-4"],uc:"all"},
+    {id:"H-1",who:"S",day:2,short:"Projects",name:"Projects and join codes",what:"A user is a GitHub account. Whoever creates a project is its lead and gets a join code; teammates join with it. The lead assigns tasks, rotates the code, removes members.",done:"Create, join, wrong code refused, only the lead assigns, no cross-project access",deps:["S-3"],uc:"UC-01",crit:true,note:"✅ Built"},
+    {id:"H-3",who:"S",day:2,short:"GitHub sign-in",name:"Sign in with GitHub (OAuth)",what:"The OAuth server the MCP spec needs (discovery, dynamic client registration, PKCE, hashed tokens), sending people to GitHub through the App's user authorization. A dev login exists only locally.",done:"Claude Code against localhost: add connector, browser sign-in, tools work",deps:["H-1"],uc:"UC-01 · 02",crit:true,note:"✅ Built"},
+    {id:"H-2",who:"S",day:2,short:"Remote MCP",name:"Hosted MCP endpoint",what:"/mcp on the backend (stateless HTTP): agent tools, my_projects, create_project, join_project, and lead tools project_status, propose_plan, approve_plan, assign_task.",done:"An MCP client over HTTP runs the whole G1 flow",deps:["H-1","H-3"],uc:"UC-01 – 04 · 07 · 09",crit:true,note:"✅ Built"},
+    {id:"H-4",who:"S",day:2,short:"Repo linking",name:"Link the repo through the App",what:"create_project checks the App is installed on the repo and the caller is a repo admin, and stores the installation id.",done:"Clear refusal when the App is missing or the caller isn't an admin",deps:["H-1","H-3"],uc:"UC-01",note:"✅ Built"},
+    {id:"H-5",who:"M",day:2,short:"AWS deploy",name:"Deploy to AWS",what:"SAM: web Lambda behind a Function URL (REST, /mcp, OAuth, webhook), worker Lambda on the DynamoDB stream, single-table DynamoDB, DLQ, Secrets Manager, least-privilege roles, reserved concurrency.",done:"Claude Code on another laptop connects to the Function URL and runs G1",deps:["H-2"],uc:"NFR-01 – 11",crit:true,note:"✅ Deployed Oct 9"},
+    {id:"S-6",who:"S",day:2,short:"Directives",name:"Plan-change directives",what:"Approve v2, find affected tasks, reset their approvals, one directive per task (D13), supersede older ones.",done:"Currency: directives for T1 and T2, none for T3, no duplicates",deps:["S-3"],uc:"UC-03 · 08",crit:true,note:"✅ Built"},
+    {id:"S-5",who:"S",day:2,short:"AI reviewer",name:"Fake and Bedrock reviewers",what:"FakeReviewer with scripted findings; BedrockReviewer via the Converse API with a forced findings tool (D21). Needs the AWS account verified.",done:"One real Bedrock call returns a validated finding",deps:["S-3"],uc:"UC-05",note:"✅ Built; live call waits on Bedrock access"},
+    {id:"F-2",who:"F",day:2,short:"demo-shop",name:"The demo-shop repo",what:"Checkout API returning total_cents, a checkout page, contract tests, a contract.yml that restores tests/contract/ from main and uploads contract-results with the head SHA.",done:"Workflow green on main; a wrong field turns it red",deps:[],uc:"UC-10",crit:true},
 
-    {id:"S-10",who:"S",day:3,short:"Verify rules",name:"Verify rules",what:"services/verify.py: declared files, contract fields present, tests passed, tests untouched; reviewer pass; re-check head and plan; queue a correction directive on failure.",done:"The false-completion scenario fails with evidence",deps:["S-2","S-5"],uc:"UC-10"},
-    {id:"M-6",who:"M",day:3,short:"GitHub App",name:"GitHub App and check runs",what:"Webhook with signature check and delivery-ID dedupe. On workflow_run, fetch head, diff, contents and test artifact with githubkit, then publish midflight/verify.",done:"A real push produces midflight/verify; a bad signature returns 401",deps:["M-5"],uc:"UC-10 · 11",crit:true},
-    {id:"M-7",who:"M",day:3,short:"Stale state",name:"Stale state and fault switch",what:"On GitHub errors or rate limits, mark the project stale, hold directives, retry after the reset, reconcile. Add a clearly labelled fault switch for the demo.",done:"Stale banner shows, directives held, then released on recovery",deps:["M-6"],uc:"UC-15"},
+    {id:"M-6",who:"M",day:3,short:"GitHub verify",name:"Webhook and check runs",what:"Signed webhook, delivery dedupe, routed by installation id to its project. Fetch head, diff, contents and the test artifact; publish midflight/verify.",done:"A real push produces midflight/verify; a bad signature returns 401",deps:["H-4","H-5"],uc:"UC-10 · 11",crit:true,note:"✅ Built; needs the App's webhook settings"},
+    {id:"S-10",who:"S",day:3,short:"Verify rules",name:"Verify rules",what:"Declared files, contract fields present, tests passed, tests untouched; reviewer pass; re-check head and plan; correction directive.",done:"The false-completion scenario fails with evidence",deps:["S-2","S-5"],uc:"UC-10",crit:true,note:"✅ Built"},
+    {id:"S-7",who:"S",day:3,short:"Escalations",name:"Escalate and resolve",what:"Requirement conflicts go to the lead, who resolves them with the resolve_escalation tool. Original evidence kept.",done:"Tax-inclusive vs tax-exclusive escalates and resolves, with audit",deps:["S-3","H-2"],uc:"UC-12 · 13",note:"✅ Built"},
+    {id:"M-7",who:"M",day:3,short:"Stale state",name:"Stale state and fault switch",what:"On GitHub errors or rate limits, mark the project stale, hold directives, reconcile on recovery. A labelled fault switch for the demo.",done:"Directives held while stale, released on recovery",deps:["M-6"],uc:"UC-15",note:"✅ Built"},
+    {id:"M-4",who:"M",day:3,short:"Pre-push hook",name:"Pre-push hook",what:"A git pre-push hook that checks in with a personal hook token from the hook_setup tool and refuses the push on an unanswered directive.",done:"A push is blocked while a directive waits",deps:["H-2"],uc:"UC-16",note:"✅ Built"},
+    {id:"S-8",who:"S",day:3,short:"Model eval",name:"Eval harness and model choice",what:"About 20 labelled cases: real conflicts, harmless overlap, vague claims, injection text. Recall, unnecessary blocks, latency, tokens.",done:"Table in evals/results.md; model chosen",deps:["S-5"],uc:"UC-05"},
     {id:"F-5",who:"F",day:3,short:"Final video",name:"Record the final demo and a backup",what:"Record the storyboard end to end after G3, then a second full take as backup. Edit, captions, title card.",done:"Video exported; backup take saved",deps:["M-6","S-10"],uc:"all",crit:true},
-    {id:"F-6",who:"F",day:3,short:"Submission",name:"Submission write-up",what:"What it does, the architecture picture, measured results from S-8 and F-4, screenshots in the README.",done:"Draft reviewed by Somesh",deps:["F-5","S-8"],uc:"—",crit:true},
+    {id:"F-6",who:"F",day:3,short:"Submission",name:"Submission write-up",what:"What it does, the architecture picture, measured results, screenshots in the README.",done:"Draft reviewed by Somesh",deps:["F-5","S-8"],uc:"—"},
 
-    {id:"X-1",who:"M",day:5,short:"AgentCore",name:"Stretch: reviewer on AgentCore",what:"Host the reviewer on AgentCore Runtime behind the same Reviewer port. Only if everything else is done.",done:"Same eval results through AgentCore",deps:["M-6"],uc:"—",stretch:true},
-    {id:"X-2",who:"S",day:5,short:"Proposals",name:"Stretch: contract proposals",what:"Midflight proposes a contract when two claims touch the same data but no contract links them.",done:"A proposal the lead can accept in the dashboard",deps:["S-10"],uc:"—",stretch:true},
-    {id:"X-3",who:"F",day:5,short:"Hosted dash",name:"Stretch: hosted dashboard",what:"A public dashboard URL, only if the hackathon rules reward one.",done:"Judges can open it",deps:["S-9"],uc:"—",stretch:true},
-    {id:"X-4",who:"S",day:5,short:"Tracked checkpoints",name:"Stretch: tracked checkpoints",what:"Agents declare their checkpoints in the claim, check_in reports which one was reached, and the dashboard flags an agent that is overdue while a directive waits. Needs a new Claim field (both programmers approve).",done:"Dashboard shows each agent's last checkpoint",deps:["S-9"],uc:"UC-07",stretch:true}
+    {id:"X-1",who:"M",day:5,short:"AgentCore",name:"Stretch: reviewer on AgentCore",what:"Host the reviewer on AgentCore Runtime behind the same Reviewer port.",done:"Same eval results through AgentCore",deps:["M-6"],uc:"—",stretch:true},
+    {id:"X-2",who:"S",day:5,short:"Proposals",name:"Stretch: contract proposals",what:"Midflight proposes a contract when two claims touch the same data but no contract links them.",done:"A proposal the lead can accept",deps:["S-10"],uc:"—",stretch:true},
+    {id:"X-3",who:"F",day:5,short:"Status page",name:"Stretch: read-only status page",what:"A project status page served by the backend for judges and leads.",done:"Judges can open it",deps:["H-2"],uc:"UC-14",stretch:true},
+    {id:"X-4",who:"S",day:5,short:"Tracked checkpoints",name:"Stretch: tracked checkpoints",what:"Agents declare checkpoints in the claim and check_in reports which one was reached. Needs a new Claim field.",done:"Status shows each agent's last checkpoint",deps:["H-2"],uc:"UC-07",stretch:true},
+    {id:"X-5",who:"S",day:5,short:"Directories",name:"Stretch: connector directories",what:"Submit Midflight to the Claude and ChatGPT connector directories for one-click Connect.",done:"Submissions sent",deps:["H-5"],uc:"—",stretch:true},
+    {id:"X-6",who:"M",day:5,short:"Plugin",name:"Stretch: Claude Code plugin",what:"A plugin bundling the connector and a check-in hook.",done:"/plugin install midflight works",deps:["H-2"],uc:"—",stretch:true}
   ];
   var BUFFER = {
     S:["Fix anything the gates exposed","Review the submission and video"],
@@ -771,7 +781,7 @@ midflight-demo-shop/   <span class="dim">separate repo: the stage the demo runs 
 
   // ---------- capability matrix ----------
   (function(){
-    var G=["G0","G1","G2","G3","G4"], when=["Wed","Thu","Fri","Sat noon","Sat night"];
+    var G=["G0","G1","G2","G3","G4"], when=["Wed","Fri noon","Fri night","Sat noon","Sat night"];
     var RUNS=["Tests only","Laptop","AWS","AWS + GitHub","AWS + GitHub"];
     var ROWS=[
       ["Foundations"],
@@ -785,12 +795,13 @@ midflight-demo-shop/   <span class="dim">separate repo: the stage the demo runs 
       ["A new plan version reaches only the affected tasks (T1, T2, not T3)",2,"S-6"],
       ["A push is blocked until the directive is acknowledged",2,"M-4"],
       ["Requirement conflicts go to the lead to resolve",2,"S-7"],
-      ["The lead sees everything on a dashboard with a timeline",2,"S-9"],
+      ["Teams connect with one URL, sign in with GitHub, and join with a code",2,"H-1 · H-2 · H-3"],
+      ["The lead runs the project from their AI client (status, plans, tasks)",2,"H-2"],
       ["Verify"],
       ["A false \"done\" turns midflight/verify red; the fix turns it green",3,"S-10 · M-6"],
       ["Duplicate webhooks and outdated results can't pass",3,"M-6"],
       ["Operations"],
-      ["Runs on AWS: API, DynamoDB, worker, dead-letter queue",2,"M-5"],
+      ["Runs on AWS: Function URL, DynamoDB, worker, dead-letter queue",2,"H-5"],
       ["Model chosen from measured eval numbers",2,"S-8"],
       ["A GitHub outage marks state stale and holds directives",3,"M-7"],
       ["Ship"],
@@ -814,7 +825,7 @@ midflight-demo-shop/   <span class="dim">separate repo: the stage the demo runs 
   (function(){
     var S=[
       [0,20,"The problem","Two agents, one contract, drift nobody sees until merge","Intro",""],
-      [20,40,"Plan and claims","Dashboard shows plan v1; both agents claim","G1","UC-03 · 04"],
+      [20,40,"Setup in 20 seconds","Install the App, paste the connector URL, sign in, join with a code","G1","UC-01 · 02"],
       [40,70,"Caught before coding","total vs total_cents, fixed in the same call","G1","UC-05 · 06"],
       [70,95,"The plan changes","currency reaches T1 and T2 at their next step; T3 stays quiet","G2","UC-08 · 07"],
       [95,120,"\"Done\" isn't done","Wrong field, red check with evidence","G3","UC-10 · 11"],
