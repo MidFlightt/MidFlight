@@ -1,7 +1,11 @@
 """Everything the agents and the lead say during a trial (docs/experiment.md).
 
-Approach A ("usual") and approach B ("midflight") get the same task text. Only the
-coordination lines differ: A has a shared team-chat file; B is connected to Midflight.
+Every approach gets the same task text. Only the coordination line differs:
+
+- N ("no channel"): nothing. Each agent only hears from its own developer, like
+  teammates whose agents run on separate laptops.
+- A ("team chat"): a shared team-chat file every agent can read and write.
+- B ("midflight"): connected to Midflight.
 """
 
 PROJECT_B = "midflight-9854"
@@ -39,6 +43,11 @@ INTRO = (
 
 
 def coordination(approach: str, task: str, chat: str) -> str:
+    if approach == "N":
+        return (
+            "You have no way to talk to the other agents; tell your developer anything "
+            "the team should know."
+        )
     if approach == "A":
         return (
             f"Team chat: the shared file {chat}. Read it before you start and before you "
@@ -92,9 +101,9 @@ def first_prompt(approach: str, task: str, chat: str) -> str:
 
 def second_prompt(approach: str, task: str) -> str:
     parts = []
-    if approach == "A":
+    if approach != "B":
         parts.append(LEAD_CHANGE)  # pasted into every agent's chat
     if task in DEVELOPER_NOTE:
         parts.append(DEVELOPER_NOTE[task])
-    parts.append(FINISH if approach == "A" else FINISH_B)
+    parts.append(FINISH_B if approach == "B" else FINISH)
     return "\n\n".join(parts)

@@ -68,15 +68,22 @@ def phase(run: str, number: int) -> None:
     state = load_state(run)
     chat = str(RUNS / run / "TEAM_CHAT.md")
 
-    def one(task: str) -> tuple[str, dict]:
+    with_midflight = state["approach"] == "B"
+    if with_midflight:
+        warm_up(run)
+
+    def one(indexed: tuple[int, str]) -> tuple[str, dict]:
+        index, task = indexed
+        if with_midflight:
+            time.sleep(20 * index)  # start one at a time, so start-up requests don't pile up
         if number == 1:
             prompt = prompts.first_prompt(state["approach"], task, chat)
-            return task, call(run, task, f"p1", prompt)
+            return task, call(run, task, "p1", prompt)
         prompt = prompts.second_prompt(state["approach"], task)
         return task, call(run, task, f"p{number}", prompt, state["sessions"][task])
 
     with ThreadPoolExecutor(max_workers=3) as pool:
-        results = list(pool.map(one, BRANCHES))
+        results = list(pool.map(one, enumerate(BRANCHES)))
     for task, result in results:
         state["sessions"][task] = result["session_id"]
         print(f"{task}: {result['num_turns']} turns, ${result['cost']:.2f}: "
@@ -132,7 +139,7 @@ def call(run: str, task: str, label: str, prompt: str, session: str | None = Non
     """One headless Claude Code call in the task's folder; the stream is saved to logs/."""
     state = load_state(run)
     use_midflight = state["approach"] == "B" if midflight is None else midflight
-    args = [shutil.which("claude") or "claude", "-p", "--model", MODEL,
+    args = [claude_exe(), "-p", "--model", MODEL,
             "--max-turns", MAX_TURNS, "--output-format", "stream-json", "--verbose",
             "--permission-mode", "acceptEdits",
             "--allowedTools", *TOOLS, *(MIDFLIGHT_TOOLS if use_midflight else [])]
@@ -145,10 +152,71 @@ def call(run: str, task: str, label: str, prompt: str, session: str | None = Non
         args += ["--resume", session]
     cwd = RUNS / run / task
     log = RUNS / run / "logs" / f"{task}-{label}.jsonl"
+    for attempt in range(1, 9):
+        if run_agent(args, prompt, cwd, log, needs_midflight=use_midflight):
+            return summarize(log)
+        # Midflight's tools weren't loaded when the agent started: it was stopped before
+        # doing any work. Wait and start it again.
+        print(f"{task}: Midflight wasn't ready (attempt {attempt}); retrying in 20 s", flush=True)
+        time.sleep(20)
+    sys.exit(f"{task}: Midflight never initialized; nothing was run")
+
+
+def run_agent(args: list[str], prompt: str, cwd: Path, log: Path, needs_midflight: bool) -> bool:
+    """Run one agent to the end, saving its event stream. With `needs_midflight`, the
+    agent is stopped at once (returning False) unless its start-up message lists every
+    Midflight tool, so no agent ever works without Midflight by accident."""
     with log.open("w", encoding="utf-8") as out:
-        subprocess.run(args, input=prompt, cwd=cwd, stdout=out, stderr=subprocess.STDOUT,
-                       text=True, encoding="utf-8", timeout=3600)
-    return summarize(log)
+        proc = subprocess.Popen(args, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8")
+        assert proc.stdin and proc.stdout
+        proc.stdin.write(prompt)
+        proc.stdin.close()
+        ready = not needs_midflight
+        for line in proc.stdout:
+            out.write(line)
+            if ready:
+                continue
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if event.get("type") == "system" and event.get("subtype") == "init":
+                loaded = set(event.get("tools", []))
+                if set(MIDFLIGHT_TOOLS) <= loaded:
+                    ready = True
+                else:
+                    proc.kill()
+                    break
+        proc.wait()
+    return ready
+
+
+def claude_exe() -> str:
+    """The Claude Code program itself (not the .cmd wrapper), so it can be stopped."""
+    found = shutil.which("claude") or "claude"
+    exe = Path(found).parent / "node_modules/@anthropic-ai/claude-code/bin/claude.exe"
+    return str(exe) if exe.exists() else found
+
+
+def warm_up(run: str) -> None:
+    """Before a Midflight phase: one small call that wakes the server and refreshes the
+    sign-in, so three agents starting together don't race to do either."""
+    root = RUNS / run
+    args = [claude_exe(), "-p", "--model", MODEL, "--max-turns", "3",
+            "--output-format", "stream-json", "--verbose", "--strict-mcp-config",
+            "--mcp-config", str(HERE / "midflight-only.mcp.json"),
+            "--allowedTools", "mcp__midflight-live__my_projects", *MIDFLIGHT_TOOLS]
+    log = root / "logs" / f"warmup-{int(time.time())}.jsonl"
+    prompt = "Call the Midflight my_projects tool once and reply with one word: ready."
+    for attempt in range(1, 6):
+        ok = run_agent(args, prompt, root, log, needs_midflight=True)
+        if ok:
+            print("Midflight is warm and connected", flush=True)
+            return
+        print(f"warm-up: Midflight not ready (attempt {attempt})", flush=True)
+        time.sleep(20)
+    sys.exit("Midflight didn't connect during warm-up")
 
 
 def summarize(log: Path) -> dict:
@@ -172,9 +240,16 @@ def summarize(log: Path) -> dict:
 
 
 def stats(run: str) -> None:
-    totals = {"cost": 0.0, "turns": 0, "input": 0, "output": 0, "cache_read": 0,
-              "cache_write": 0, "tool_calls": 0, "midflight_calls": {}}
+    """Totals for a run. Claude Code reports a session's cost cumulatively across
+    resumed calls, so cost is the highest value per agent; turns, tokens, and time are
+    per call and are summed. Warm-up calls exist only in this harness and are listed
+    apart."""
+    totals = {"cost": 0.0, "warmup_cost": 0.0, "turns": 0, "input": 0, "output": 0,
+              "cache_read": 0, "cache_write": 0, "agent_minutes": 0.0, "tool_calls": 0,
+              "midflight_calls": {}, "cost_by_agent": {}}
     for log in sorted((RUNS / run / "logs").glob("*.jsonl")):
+        agent = log.name.split("-")[0]
+        warmup = agent == "warmup"
         for line in log.read_text(encoding="utf-8").splitlines():
             try:
                 event = json.loads(line)
@@ -182,13 +257,21 @@ def stats(run: str) -> None:
                 continue
             if event.get("type") == "result":
                 usage = event.get("usage", {})
-                totals["cost"] += event.get("total_cost_usd", 0.0) or 0.0
+                cost = event.get("total_cost_usd", 0.0) or 0.0
+                if warmup:
+                    totals["warmup_cost"] += cost
+                    continue
+                by_agent = totals["cost_by_agent"]
+                by_agent[agent] = max(by_agent.get(agent, 0.0), cost)
+                if not usage.get("output_tokens"):
+                    continue  # a call that did nothing (for example, a usage limit)
                 totals["turns"] += event.get("num_turns", 0)
                 totals["input"] += usage.get("input_tokens", 0)
                 totals["output"] += usage.get("output_tokens", 0)
                 totals["cache_read"] += usage.get("cache_read_input_tokens", 0)
                 totals["cache_write"] += usage.get("cache_creation_input_tokens", 0)
-            if event.get("type") == "assistant":
+                totals["agent_minutes"] += (event.get("duration_ms", 0) or 0) / 60000
+            if event.get("type") == "assistant" and not warmup:
                 for block in event.get("message", {}).get("content", []):
                     if block.get("type") == "tool_use":
                         totals["tool_calls"] += 1
@@ -198,6 +281,8 @@ def stats(run: str) -> None:
                             totals["midflight_calls"][short] = (
                                 totals["midflight_calls"].get(short, 0) + 1
                             )
+    totals["cost"] = round(sum(totals["cost_by_agent"].values()), 4)
+    totals["agent_minutes"] = round(totals["agent_minutes"], 1)
     print(json.dumps(totals, indent=2))
     state = load_state(run)
     state["stats"] = totals
@@ -213,6 +298,7 @@ def save_state(run: str, state: dict) -> None:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # agents write any character
     command, run, *rest = sys.argv[1:]
     match command:
         case "setup":
