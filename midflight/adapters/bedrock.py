@@ -105,7 +105,9 @@ The statements contradict each other only if they answer the same question \
 differently, so that the product would be wrong whichever way the other part was \
 built. "Sessions expire after 30 minutes" and "sessions never expire" contradict \
 each other. Statements do not contradict each other when: they are about different \
-things; one is silent or vague about what the other decides; they say the same thing \
+things; one is silent or vague about what the other decides (a requirement that \
+"does not mention" or "does not specify" something is silent about it); they say the \
+same thing \
 in different words; they describe duplicated or overlapping work; one passes along a \
 value the other computes; or the problem only appears if you add a step that none of \
 them states.

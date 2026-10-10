@@ -18,6 +18,7 @@ has everything needed to check them or run them again.
 | --- | --- |
 | `run.py` | The driver: sets up a trial, runs the agents, merges, scores, records |
 | `midflight-only.mcp.json` | The MCP configuration run B's agents get: only Midflight |
+| `walkthrough.py` | One simulated run of the whole workflow, written to `docs/pages/walkthrough.html` |
 | `cases/<case>/README.md` | The case: the product, the parts, the surprises |
 | `cases/<case>/case.py` | **The exact words every agent is given**, per approach and phase |
 | `cases/<case>/starter/` | The near-empty repository every trial starts from |

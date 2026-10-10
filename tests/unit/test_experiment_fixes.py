@@ -199,6 +199,12 @@ def test_a_conflict_citing_a_claim_in_an_open_escalation_joins_it() -> None:
     # T2 and T3 each conflict with T1, citing no requirement: one question, one escalation.
     [escalation] = services.store.list_escalations("demo")
     assert escalation.claim_ids == [t2.claim_id, t1.claim_id, t3.claim_id]
+    # The lead reads one escalation, so it carries what every side wrote.
+    assert [e.ref for e in escalation.evidence] == [
+        "C-2 rev 1 (T2)",
+        "C-1 rev 1 (T1)",
+        "C-3 rev 1 (T3)",
+    ]
     assert services.store.get_claim(t3.claim_id).state is ClaimState.HUMAN_REVIEW_REQUIRED
 
 

@@ -194,7 +194,7 @@ In order of what it cost. "Fixed (S-11)" means the change of October 10 describe
 | Problem | What it cost | Status |
 | --- | --- | --- |
 | An assumption about another task that no contract covers is approved and goes nowhere | The heavier case's only failing check | **Fixed (S-11, D27):** check-in shows each task what other claims assume about it |
-| The reviewer reports conflicts that aren't contradictions | 7 of 9 escalations on the heavier case, 2 of 4 on the small one | **Fixed on the recorded cases (S-11, D29):** a second, narrower check before a conflict blocks, on Nova 2 Lite. 0 of 45 false-alarm reviews blocked, 19 of 20 real-conflict reviews blocked ([evals/results.md](../evals/results.md)). Not yet shown on new cases |
+| The reviewer reports conflicts that aren't contradictions | 7 of 9 escalations on the heavier case, 2 of 4 on the small one | **Fixed on the recorded cases (S-11, D29):** a second, narrower check before a conflict blocks, on Nova 2 Lite. 1 of 45 false-alarm reviews blocked, 20 of 20 real-conflict reviews blocked ([evals/results.md](../evals/results.md)). On freshly worded claims it is not that clean: in the [simulated run](pages/walkthrough.html), two of four blocks were false alarms |
 | An agent told "the lead must decide" stops completely | The command line was stopped three times over a question that wasn't about it | **Fixed (S-11, D28):** the reply names the question and says the rest is clear to build |
 | After the lead decides, the first agent to revise is compared with its neighbour's old claim | One more escalation, one more round | **Fixed (S-11, D29):** claims awaiting revision aren't compared |
 | One question opens two escalations | The lead decides the same thing twice | **Fixed (PR #17, S-11):** a conflict joins an open escalation about the same requirement or involving a claim it cites |
@@ -225,11 +225,17 @@ In order of what it cost. "Fixed (S-11)" means the change of October 10 describe
 | Reviewer | Real conflicts blocked | False alarms blocked |
 | --- | --- | --- |
 | Before: Nova Pro, one pass | 20 of 20 reviews | 13 of 45 reviews |
-| After: Nova 2 Lite, with the second look | 19 of 20 reviews | 0 of 45 reviews |
+| After: Nova 2 Lite, with the second look | 20 of 20 reviews | 1 of 45 reviews |
 
 Two honest notes. Rewording the first pass on its own made it worse on both models; the
 second look is what works. And these are the cases the changes were designed on, so the
-table shows the bugs are fixed, not that new ones won't appear.
+table shows the bugs are fixed, not that new ones won't appear. A simulated run with
+freshly worded claims already shows the limit: Midflight stopped a claim four times, and
+two of those were false alarms.
+
+To see the whole workflow with these changes, step by step, open
+[the walkthrough](pages/walkthrough.html): what each agent told Midflight and exactly what
+it answered.
 
 ## Using this in the demo
 
