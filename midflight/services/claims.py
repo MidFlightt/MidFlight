@@ -447,7 +447,16 @@ class ClaimService:
             ),
             None,
         )
+        explanation = " ".join(f.explanation for f in conflicts)
+        evidence = [*(e for f in conflicts for e in f.evidence), *_what_they_assume(involved)]
+        # The other side's claims wait for the lead too (D14).
+        waiting = ClaimState.HUMAN_REVIEW_REQUIRED
+        moved = [
+            move_claim(c, waiting) for c in involved[1:] if waiting in CLAIM_TRANSITIONS[c.state]
+        ]
         if same_question is not None:
+            # The lead reads one escalation, so it carries every side's words.
+            shown = {e.ref for e in same_question.evidence}
             joined = Escalation.model_validate(
                 same_question.model_dump()
                 | {
@@ -455,35 +464,24 @@ class ClaimService:
                         dict.fromkeys([*same_question.claim_ids, *(c.id for c in involved)])
                     ),
                     "finding_ids": [*same_question.finding_ids, *(f.id for f in conflicts)],
+                    "explanation": f"{same_question.explanation} {explanation}",
+                    "evidence": [
+                        *same_question.evidence,
+                        *(e for e in evidence if e.ref not in shown),
+                    ],
                 }
             )
-            return [joined]
+            return [joined, *moved]
         escalation = Escalation(
             id=self._store.next_id(project.id, "E"),
             project_id=project.id,
             competing_requirement_ids=sorted(i for i in cited if plan.requirement(i)),
             claim_ids=[c.id for c in involved],
             finding_ids=[f.id for f in conflicts],
-            evidence=[
-                *(e for f in conflicts for e in f.evidence),
-                *(
-                    Evidence(
-                        kind=EvidenceKind.CLAIM,
-                        ref=f"{c.id} rev {c.revision} ({c.task_id})",
-                        excerpt="Assumes: " + "; ".join(c.assumptions)[:480],
-                    )
-                    for c in involved
-                    if c.assumptions
-                ),
-            ],
-            explanation=" ".join(f.explanation for f in conflicts),
+            evidence=evidence,
+            explanation=explanation,
             created_at=self._clock.now(),
         )
-        # The other side's claims wait for the lead too (D14).
-        waiting = ClaimState.HUMAN_REVIEW_REQUIRED
-        moved = [
-            move_claim(c, waiting) for c in involved[1:] if waiting in CLAIM_TRANSITIONS[c.state]
-        ]
         return [escalation, *moved]
 
     def _set_aside_dismissed(
@@ -671,6 +669,19 @@ def _only_between_people(
             "task's claims, so it isn't a conflict between people.)",
         }
     )
+
+
+def _what_they_assume(claims: Sequence[Claim]) -> list[Evidence]:
+    """Each claim's own assumptions, so the lead reads the sides in their own words."""
+    return [
+        Evidence(
+            kind=EvidenceKind.CLAIM,
+            ref=f"{c.id} rev {c.revision} ({c.task_id})",
+            excerpt="Assumes: " + "; ".join(c.assumptions)[:480],
+        )
+        for c in claims
+        if c.assumptions
+    ]
 
 
 def _named_ids(finding: Finding, others: Sequence[Claim]) -> set[str]:
