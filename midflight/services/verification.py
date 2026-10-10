@@ -429,6 +429,8 @@ def _title(outcome: VerificationOutcome, findings: Sequence[Finding], plan: Plan
     blocking = [f for f in findings if f.blocking]
     if outcome is VerificationOutcome.VERIFIED or not blocking:
         return f"{_HEADLINE[outcome]} against plan v{plan.version}"
+    # A missing contract field says what to fix more plainly than a failed test does.
+    blocking.sort(key=lambda f: f.kind is not FindingKind.MISSING_CHANGE)
     return f"{_HEADLINE[outcome]}: {blocking[0].explanation}"[:200]
 
 

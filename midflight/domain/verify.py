@@ -21,6 +21,7 @@ Rules, in plain words (all block except the last):
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 
 from midflight.domain.models import (
@@ -205,6 +206,15 @@ def verifiable(claim: Claim) -> bool:
     return claim.state in (ClaimState.APPROVED, ClaimState.CLOSED)
 
 
+# A line comment: `#` or `//` at the start of a line or after a space (not the `//` in
+# `https://`), to the end of the line.
+_LINE_COMMENT = re.compile(r"(?:^|(?<=\s))(?:#|//)[^\n]*", re.MULTILINE)
+
+
+def _without_comments(text: str) -> str:
+    return _LINE_COMMENT.sub("", text)
+
+
 def _missing_fields(
     verification_id: str,
     claim: Claim,
@@ -214,7 +224,8 @@ def _missing_fields(
     numbered: int,
 ) -> list[Finding]:
     """Each contract field the task provides, or the claim says it reads, must appear in
-    at least one of the task's files at the head commit."""
+    the code of at least one of the task's files at the head commit. Comments don't
+    count, so a comment naming the field can't stand in for using it."""
     task = plan.task(claim.task_id)
     if task is None:
         return []
@@ -227,7 +238,7 @@ def _missing_fields(
         contract = plan.contract(use.contract_id)
         if contract:
             needed[use.contract_id] = [f for f in use.fields if f in contract.fields]
-    text = "\n".join(contents.values())
+    text = "\n".join(_without_comments(t) for t in contents.values())
     findings = []
     for contract_id, fields in needed.items():
         contract = plan.contract(contract_id)
