@@ -34,24 +34,34 @@ Each Lambda can only touch this table, this secret, and (the worker) this queue.
 
 ## Deploy
 
+The commands below use the `midflight` CLI profile from `aws configure sso`. Each
+deploy first **previews** the changes (a CloudFormation change set) and applies them
+only after you've read the list.
+
 ```bash
 uv run python infra/package.py
-sam deploy --guided --template-file infra/template.yaml --stack-name midflight --capabilities CAPABILITY_IAM
+sam deploy --template-file infra/template.yaml --stack-name midflight --capabilities CAPABILITY_IAM --resolve-s3 --region us-east-1 --profile midflight --no-execute-changeset
 ```
 
-`--guided` asks a few questions the first time; accept the defaults (region
-`us-east-1`), say **yes** to "WebFunction Function Url has no authentication" (Midflight
-does its own sign-in), and **yes** to saving the answers in `samconfig.toml`. The stack
-prints its outputs, including `FunctionUrl`.
-
-Then:
+Read the change set it prints (the first time: 13 resources added), then apply it with
+the ARN it ends with:
 
 ```bash
-uv run python infra/put_secrets.py
-sam deploy --template-file infra/template.yaml --parameter-overrides PublicUrl=<FunctionUrl without the trailing slash>
+aws cloudformation execute-change-set --profile midflight --region us-east-1 --change-set-name <change set ARN>
+aws cloudformation wait stack-create-complete --stack-name midflight --profile midflight --region us-east-1
+aws cloudformation describe-stacks --stack-name midflight --profile midflight --region us-east-1 --query "Stacks[0].Outputs"
 ```
 
-The second deploy tells the server its own address, which sign-in needs.
+The outputs include `FunctionUrl`. Then store the secrets and tell the server its own
+address, which sign-in needs:
+
+```bash
+AWS_PROFILE=midflight AWS_REGION=us-east-1 uv run python infra/put_secrets.py
+sam deploy --template-file infra/template.yaml --stack-name midflight --capabilities CAPABILITY_IAM --resolve-s3 --region us-east-1 --profile midflight --no-execute-changeset --parameter-overrides PublicUrl=<FunctionUrl without the trailing slash>
+```
+
+Apply that change set the same way (only the two functions change; wait with
+`stack-update-complete`).
 
 Finally, in the GitHub App's settings:
 
@@ -71,7 +81,16 @@ projects".
 
 ## Updating
 
-Run `uv run python infra/package.py` and `sam deploy` again. Data in DynamoDB is kept.
+Run `uv run python infra/package.py` and the `sam deploy ... --no-execute-changeset`
+command again, keeping `--parameter-overrides PublicUrl=...`; then apply the change set.
+Data in DynamoDB is kept.
+
+## The live deployment
+
+Deployed October 9, 2026: stack `midflight`, `us-east-1`.
+
+- Connector URL: `https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/mcp`
+- GitHub callback URL: `https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/oauth/github/callback`
 
 ## If something goes wrong
 
