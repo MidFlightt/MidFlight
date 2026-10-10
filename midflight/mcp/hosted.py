@@ -54,6 +54,7 @@ from midflight.mcp.instructions import (
 )
 from midflight.mcp.replies import check_in_text, directives_block, refused_text, verdict_text
 from midflight.services.claims import ClaimSubmission
+from midflight.services.decisions import MIDFLIGHT, decided_by, decisions_in_force
 from midflight.services.directives import ACK_NOTE
 from midflight.services.errors import PermissionDenied, ServiceError
 from midflight.services.plans import PlanDraft
@@ -392,7 +393,23 @@ def build_hosted_server(
                 lines += [f"    {ev.ref}: {ev.excerpt}" for ev in e.evidence if ev.excerpt]
             if escalations and m.participant.role is Role.LEAD:
                 lines.append(
-                    "Decide each one with resolve_escalation. Midflight won't pick a side."
+                    "Decide each one with resolve_escalation. These are product decisions; "
+                    "Midflight won't pick a side on them."
+                )
+            decisions = decisions_in_force(
+                store.list_escalations(project.id), store.list_claims(project.id)
+            )
+            lines.append(f"\nDecisions in force: {len(decisions)}")
+            lines += [
+                f"- {d.id} ({decided_by(d)}; claims {', '.join(d.claim_ids)}): {d.reason}"
+                for d in decisions
+            ]
+            if m.participant.role is Role.LEAD and any(
+                d.resolved_by == MIDFLIGHT for d in decisions
+            ):
+                lines.append(
+                    "Overturn anything Midflight settled with resolve_escalation: "
+                    "request_revision with your own ruling, or dismiss to withdraw it."
                 )
             return "\n".join(lines)
 
@@ -456,11 +473,13 @@ def build_hosted_server(
         return answer(act)
 
     @server.tool(
-        description="Lead only. Decide an open escalation (a conflict between people's "
-        "requirements). clarify_plan: you already approved a plan version that settles it; "
-        "the claims are reviewed again. request_revision: the involved agents revise their "
-        "claims to match your reason. dismiss: not a real conflict; the claims are reviewed "
-        "again without it. Always give the reason the team will see."
+        description="Lead only. Decide an open escalation (a product decision two people "
+        "answer differently), or overturn something Midflight settled without you. "
+        "clarify_plan: you already approved a plan version that settles it; the claims are "
+        "reviewed again. request_revision: the involved agents revise their claims to match "
+        "your reason; to accept the suggested answer, give it as the reason. dismiss: not a "
+        "real conflict, or withdraw what Midflight settled. Always give the reason the team "
+        "will see."
     )
     def resolve_escalation(
         escalation_id: str,

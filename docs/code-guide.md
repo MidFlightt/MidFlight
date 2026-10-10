@@ -52,7 +52,7 @@ touches AWS or GitHub.
 | `decide.py` | Findings in, verdict out: `approved`, `needs_revision`, `draft`, `human_review_required`, or held `pending`. |
 | `impact.py` | What changed between two plan versions, and which tasks that touches. |
 | `neighbours.py` | Which of the other agents' assumptions are about a given task, so check-in can pass them on (D27). |
-| `verify.py` | The checks on a pushed commit: missing evidence, failed contract tests, a contract field missing from the task's files, edits to protected test or CI files, undeclared files. |
+| `verify.py` | The checks on a pushed commit: missing evidence, failed contract tests, edits to protected test or CI files, files that belong to another task, and (only without test results) a contract field missing from the task's files. No AI (D33). |
 
 ### `midflight/services/`: what Midflight does
 
@@ -62,7 +62,8 @@ touches AWS or GitHub.
 | `claims.py` | Submit, revise, withdraw, close a claim; run the review job (rules, then the AI reviewer, then decide, saved only if nothing changed meanwhile). |
 | `review.py` | Checks the AI reviewer's reply before anything uses it; a bad reply is thrown away. |
 | `plans.py` | Propose and approve plan versions (lead only). Approving a change also sends one directive to each affected task and sends their approvals back for review, in the same commit. |
-| `escalations.py` | The lead's decision on a conflict between people's requirements: clarify the plan, request revisions, or dismiss. |
+| `escalations.py` | The lead's decision on a product question (clarify the plan, request revisions, or dismiss), and the lead overturning what Midflight settled. |
+| `decisions.py` | What counts as a decision in force (the lead's, Midflight's, or an agreement between tasks), and sending claims back for revision with one (D30, D31). |
 | `verification.py` | The verification job: read the push from GitHub, run the checks, publish `midflight/verify`, and queue a correction directive or an escalation. |
 | `sync.py` | Stale and fresh GitHub data, and the demo fault switch. |
 | `check_in.py` | What an agent gets at a checkpoint: its task, requirements, contracts, claim verdict, directives, what other tasks assume about it, open escalations, and whether it may push. |
@@ -202,7 +203,7 @@ To see journey 3 step by step for every demo scenario, open
 | One directive per plan version and task (INV-05) | `services/plans.py`, in the approval's commit |
 | Repository text is data, never instructions (INV-07) | `adapters/bedrock.py` puts it inside `<data>`; `mcp/replies.py` fences directives |
 | Nothing approved and directives held while stale (INV-09) | `domain/decide.py`, `services/check_in.py`, `services/sync.py` |
-| Midflight never picks between people (INV-11) | `services/claims.py` opens an escalation; `services/escalations.py` records the lead's decision |
+| Midflight never picks between people's product requirements (INV-11) | `adapters/bedrock.py` sorts a confirmed conflict into product or technical; `services/claims.py` escalates the first and settles the second; `services/escalations.py` records the lead's decision or overturn |
 | Edits to contract tests or CI are escalated (INV-15) | `domain/verify.py` |
 | Only the lead approves plans and manages the team (INV-08) | `services/plans.py`, `services/projects.py`, `mcp/hosted.py` |
 | Tokens and codes stored as hashes (INV-12) | `api/oauth.py`, `services/participants.py` |
@@ -230,6 +231,7 @@ To see journey 3 step by step for every demo scenario, open
 | `unit/test_escalations.py` | The tax conflict escalates; each resolution |
 | `unit/test_bedrock.py` | The Bedrock reviewer against a fake Bedrock |
 | `evals/replay_escalations.py` | Replays the experiment's recorded escalations through the AI reviewer and counts real conflicts blocked and false alarms blocked. Numbers in `evals/results.md`. |
+| `unit/test_decisions.py` | Technical questions settled by Midflight, product questions for the lead, agreements, and the lead overturning (D30 to D32) |
 | `unit/test_experiment_fixes.py` | What the HireBot experiment changed: assumptions passed on, scoped blocks, fewer false alarms (D27 to D29) |
 | `unit/test_verification.py` | Pushes verified, failed, incomplete, escalated; the webhook; outages and the fault switch |
 | `unit/test_hook.py` | The pre-push hook: the real script, its token, the push check |

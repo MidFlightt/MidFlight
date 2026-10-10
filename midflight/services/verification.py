@@ -6,7 +6,8 @@
 2. The job handler `run` reads fresh data from GitHub, never the webhook's copy: the
    pull request head, the diff, the task's files, and the test results for that exact
    commit (FR-08).
-3. The rules in `midflight.domain.verify` run, then the AI reviewer if they pass.
+3. The rules in `midflight.domain.verify` run. That is all: CI ran the tests, and no AI
+   reads the code (D33). Failing tests become a directive for the task's agent.
 4. Before publishing, it reads the head and the plan version again. If either moved,
    the result is dropped; the newer run verifies the newer state (UC-10 6a).
 5. It publishes the check and saves the verification, with a correction directive for
@@ -39,7 +40,12 @@ from midflight.domain.models import (
     Verification,
     VerificationOutcome,
 )
-from midflight.domain.states import SUPERSEDABLE_DIRECTIVE_STATES, check_conclusion, move_directive
+from midflight.domain.states import (
+    ACTIVE_CLAIM_STATES,
+    SUPERSEDABLE_DIRECTIVE_STATES,
+    check_conclusion,
+    move_directive,
+)
 from midflight.domain.verify import (
     ARTIFACT_NAME,
     check_commit,
@@ -54,16 +60,12 @@ from midflight.ports import (
     CheckRunRequest,
     Clock,
     Commit,
-    CommitReviewRequest,
     GitHub,
     GitHubUnavailable,
     JobRunner,
-    Reviewer,
-    ReviewerUnavailable,
     Store,
 )
 from midflight.services.audit import audit_event, new_correlation_id
-from midflight.services.review import parse_reviewer_findings, reviewer_unavailable
 from midflight.services.sync import FAULT_REASON, SyncService
 
 # The workflow whose completion starts a verification (D4), by file name.
@@ -93,14 +95,12 @@ class VerificationService:
         runner: JobRunner,
         sync: SyncService,
         github: GitHub | None = None,
-        reviewer: Reviewer | None = None,
     ) -> None:
         self._store = store
         self._clock = clock
         self._runner = runner
         self._sync = sync
         self._github = github
-        self._reviewer = reviewer
 
     # Webhook (UC-10 step 1) ------------------------------------------------------------
 
@@ -210,13 +210,18 @@ class VerificationService:
         }
 
         vid = self._store.next_id(project.id, "V")
+        # Rules only: CI ran the tests, and Midflight doesn't second-guess a suite that
+        # passed (D33). Files in another task's active claim are that task's.
+        owners = {
+            path: other.task_id
+            for other in self._store.list_claims(project.id)
+            if other.state in ACTIVE_CLAIM_STATES
+            and (claim is None or other.task_id != claim.task_id)
+            for path in other.files
+        }
         findings = check_commit(
-            vid, usable, plan, head_sha, changed.paths, changed.truncated, contents, tests
+            vid, usable, plan, head_sha, changed.paths, changed.truncated, contents, tests, owners
         )
-        if usable is not None and not any(f.blocking for f in findings):
-            findings += self._reviewer_findings(
-                vid, plan, usable, head_sha, changed.patch, contents, findings
-            )
         outcome = decide_verification(findings)
 
         # Re-check before publishing: a newer commit or plan makes this result obsolete.
@@ -333,48 +338,6 @@ class VerificationService:
         )
 
     # Helpers ---------------------------------------------------------------------------
-
-    def _reviewer_findings(
-        self,
-        vid: str,
-        plan: Plan,
-        claim: Claim,
-        head_sha: str,
-        diff: str,
-        contents: dict[str, str],
-        rule_findings: Sequence[Finding],
-    ) -> list[Finding]:
-        if self._reviewer is None:
-            return []
-        request = CommitReviewRequest(
-            plan=plan,
-            claim=claim,
-            head_sha=head_sha,
-            diff=diff,
-            files=contents,
-            rule_findings=rule_findings,
-        )
-        known = {
-            claim.id,
-            *(r.id for r in plan.requirements),
-            *(t.id for t in plan.tasks),
-            *(c.id for c in plan.contracts),
-        }
-        reason = "no usable reply"
-        for _ in range(2):
-            try:
-                raw = self._reviewer.review_commit(request)
-            except ReviewerUnavailable as error:
-                reason = str(error) or "timed out"
-                continue
-            parsed = parse_reviewer_findings(raw, known, claim)
-            if parsed is not None:
-                return [
-                    f.model_copy(update={"id": f"{vid}:reviewer:{n}"})
-                    for n, f in enumerate(parsed, start=1)
-                ]
-            reason = "the reply didn't match the findings schema or cited unknown ids"
-        return [reviewer_unavailable(claim, reason)]
 
     def _claim_for(self, project_id: str, branch: str) -> Claim | None:
         """The newest claim on this branch that wasn't withdrawn."""

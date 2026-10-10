@@ -9,6 +9,7 @@ from typing import Any
 from midflight.domain.models import Participant
 from midflight.services.check_in import CheckIn
 from midflight.services.claims import Verdict
+from midflight.services.decisions import decided_by
 
 
 def dump(model: Any) -> Any:
@@ -56,4 +57,8 @@ def check_in_json(c: CheckIn) -> dict[str, Any]:
             for e in c.escalations
         ],
         "you_decide": c.you_decide,
+        "decisions": [
+            {"id": d.id, "how": decided_by(d), "reason": d.reason, "claim_ids": d.claim_ids}
+            for d in c.decisions
+        ],
     }

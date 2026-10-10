@@ -19,8 +19,8 @@ Follow these rules for every task:
    - whenever you make a new assumption, or need a file or interface that is not in
      your claim
    - before you push
-3. At each checkpoint, call check_in. Deal with findings, directives, and what other
-   tasks assume about yours before you continue.
+3. At each checkpoint, call check_in. Deal with findings, directives, decisions, and
+   what other tasks assume about yours before you continue.
 4. If an assumption or your scope has changed since your last claim, submit a revised
    claim with the updated assumptions and wait for the verdict. Do not build on an
    assumption Midflight has not checked.
