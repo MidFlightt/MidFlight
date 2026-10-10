@@ -52,5 +52,5 @@ Both failures are C13, the revenue report, for different reasons:
   that assumption in every claim, and Midflight never passed it on.
 
 Each run's `summary.json` ends with the lead's notes: what was asked, what was answered,
-and for B1 all nine escalations (three real, six false alarms). The write-up is
+and for B1 all nine escalations (two real, seven false alarms). The write-up is
 [docs/experiment.md](../../../docs/experiment.md).

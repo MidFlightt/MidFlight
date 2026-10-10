@@ -42,7 +42,7 @@ Two cases:
    business rule two developers disagreed about. It was built wrong, and only our hidden
    checks noticed. The team chat and Midflight both got that question to the lead.
 5. **Midflight's own mistakes cost more than the problems it prevented.** On the heavier
-   case its AI reviewer raised nine escalations. Three were real. Six were not, and each
+   case its AI reviewer raised nine escalations. Two were real. Seven were not, and each
    stopped an agent. Meanwhile it reviewed four revisions of a claim that stated an
    assumption about another task, approved the last with "Findings: none", and never
    passed the assumption on. That assumption is the check that failed.
@@ -146,11 +146,11 @@ What worked:
 
 What didn't:
 
-- **Six of nine escalations were false alarms.** Two in phase 1 (one set "bookings
-  computes the quote itself" against "pricing embeds the rate table"), one from timing (a
-  revised claim compared with a neighbour's not-yet-revised one), and three that weren't
-  contradictions at all (in one, "gives the hours back" was read as "the total
-  changes").
+- **Seven of nine escalations were false alarms.** Two in phase 1 (one set "bookings
+  computes the quote itself" against "pricing embeds the rate table"), one that said the
+  plan requires something it doesn't, one from timing (a revised claim compared with a
+  neighbour's not-yet-revised one), and three that weren't contradictions at all (in
+  one, "gives the hours back" was read as "the total changes").
 - **Every escalation stops the whole agent.** The command-line agent was stopped three
   times and none of the three changed a line it wrote. It cost $0.68, against $0.39 in
   the team-chat run.
@@ -189,20 +189,47 @@ rounds of escalations. Details: [B1's summary](../experiment/cases/hirebot-pro/r
 
 ## What the experiment found wrong with Midflight
 
-In order of what it cost.
+In order of what it cost. "Fixed (S-11)" means the change of October 10 described below.
 
 | Problem | What it cost | Status |
 | --- | --- | --- |
-| An assumption about another task that no contract covers is approved and goes nowhere | The heavier case's only failing check | **Open, first priority.** Deliver it to that task's agent as a question at its next check-in, and show the claim as approved with an unconfirmed assumption |
-| The reviewer reports conflicts that aren't contradictions | 6 of 9 escalations on the heavier case, 2 of 4 on the small one | Partly fixed (PRs #15, #17: active claims only, temperature 0, stricter wording). Still the biggest cost. Next: a stronger model, a second "would building both as written break anything?" pass, and the S-8 eval built from these thirteen labelled escalations |
-| An agent told "the lead must decide" stops completely | The command line was stopped three times over a question that wasn't about it | Open: block only the part of the work the question touches |
-| After the lead decides, the first agent to revise is compared with its neighbour's old claim | One more escalation, one more round | Open: don't compare against a claim that is waiting to be revised; close an escalation when newer revisions of its claims are approved |
-| One question still opens two escalations when only one of them cites a requirement | The lead decides the same thing twice | Partly fixed (PR #17 joins escalations about the same requirement) |
+| An assumption about another task that no contract covers is approved and goes nowhere | The heavier case's only failing check | **Fixed (S-11, D27):** check-in shows each task what other claims assume about it |
+| The reviewer reports conflicts that aren't contradictions | 7 of 9 escalations on the heavier case, 2 of 4 on the small one | **Fixed on the recorded cases (S-11, D29):** a second, narrower check before a conflict blocks, on Nova 2 Lite. 0 of 45 false-alarm reviews blocked, 19 of 20 real-conflict reviews blocked ([evals/results.md](../evals/results.md)). Not yet shown on new cases |
+| An agent told "the lead must decide" stops completely | The command line was stopped three times over a question that wasn't about it | **Fixed (S-11, D28):** the reply names the question and says the rest is clear to build |
+| After the lead decides, the first agent to revise is compared with its neighbour's old claim | One more escalation, one more round | **Fixed (S-11, D29):** claims awaiting revision aren't compared |
+| One question opens two escalations | The lead decides the same thing twice | **Fixed (PR #17, S-11):** a conflict joins an open escalation about the same requirement or involving a claim it cites |
+| The reviewer explains a conflict with one claim but cites other ids | The other side isn't part of the escalation and never hears the decision | **Fixed (S-11):** claims named in the explanation count |
+| The lead only learns of an escalation by asking for the project status | Agents wait until the lead looks | Partly fixed (S-11, D28): a lead who checks in sees every open escalation. Still no push notification |
 | Agents sometimes start with Midflight connected but no tools; AWS throttles the service at 10 simultaneous requests | 13 restarts in one run | Open: raise the Lambda quota, keep an instance warm. The pre-push hook and the GitHub check remain the backstop |
-| The lead only learns of an escalation by asking for the project status | Agents wait until the lead looks | Open: notify the lead |
-| Contracts describe data, not how one part reaches another (a route, a function name) | Agents fill the gap with assumptions | Open: let a contract name an endpoint or a function |
+| Contracts describe data, not how one part reaches another (a route, a function name) | Agents fill the gap with assumptions | Open (it changes the shared models). D27 covers the gap for now |
 | The reviewer was shown a withdrawn claim | Two agents stopped for nothing | Fixed (PR #15) |
 | A directive said "requirement R-4 changed" without saying what R-4 is | An extra check-in | Fixed (PR #15) |
+
+### What changed on October 10 (S-11)
+
+1. **Assumptions are passed on.** At check-in an agent sees what other tasks' claims
+   assume about its task, as written: "T4 (C-12): T3's app/bookings.py exposes
+   list_bookings()". It is the team chat's one advantage, built into Midflight. No AI is
+   involved: an assumption is about a task when it names the task, its title, or one of
+   its files.
+2. **A block covers only the disputed part.** The reply names the question the lead must
+   decide and says the rest is clear to build. Every agent the question involves sees
+   it at check-in, and so does the lead.
+3. **A conflict gets a second look before it stops anyone.** The reviewer's first pass
+   may flag freely. Each flagged conflict then goes back to the model as one narrow
+   question, with the statements themselves: do they answer the same question
+   differently? Only a yes blocks. If the second look fails, the block stands.
+4. **The reviewer moved from Nova Pro to Nova 2 Lite**, chosen by replaying the 13
+   recorded escalations five times each.
+
+| Reviewer | Real conflicts blocked | False alarms blocked |
+| --- | --- | --- |
+| Before: Nova Pro, one pass | 20 of 20 reviews | 13 of 45 reviews |
+| After: Nova 2 Lite, with the second look | 19 of 20 reviews | 0 of 45 reviews |
+
+Two honest notes. Rewording the first pass on its own made it worse on both models; the
+second look is what works. And these are the cases the changes were designed on, so the
+table shows the bugs are fixed, not that new ones won't appear.
 
 ## Using this in the demo
 
@@ -228,7 +255,7 @@ In order of what it cost.
 | Isn't a shared notes file enough? | On one machine, in these trials, it was better and cheaper. It needs one disk every agent can write to, which teammates on separate laptops don't have, and it relies on every agent choosing to read it. Midflight is that channel, hosted, plus a record and a check on the pushed code. |
 | What does it cost? | Agent spend of $1.12 against $0.96 (small) and $2.68 against $1.81 (heavier); 27 and 58 extra tool calls; and the lead's time: writing the plan, then four rounds of escalations on the heavier case. |
 | Doesn't it save rework? | Not in these trials. A repair round cost $0.15 to $0.22. Midflight's overhead on the heavier case was $0.87 over the team chat. It pays off only where a mistake is expensive to find, such as the revenue number that was wrong without anything failing. |
-| How often is it wrong? | Too often today: 8 of 13 escalations across the two Midflight runs were false alarms, all from the AI reviewer (Amazon Nova Pro). The deterministic rules made no wrong block. Application code, not the model, decides state, so a false alarm costs time, not correctness. |
+| How often is it wrong? | Too often in these runs: 9 of 13 escalations across the two Midflight runs were false alarms, all from the AI reviewer (Amazon Nova Pro). The deterministic rules made no wrong block. Application code, not the model, decides state, so a false alarm costs time, not correctness. |
 | What did it miss? | An assumption one agent stated about another's code. Midflight recorded it and didn't pass it on. That is the first fix on our list. |
 | Does it get in the way? | Yes. An agent told to wait for the lead stops everything, even work the question doesn't touch. |
 | Is one trial each evidence? | No. It's a first look. Every prompt, reply, and check result is in `experiment/cases/*/results/`, and `experiment/run.py` reruns any of it. |
