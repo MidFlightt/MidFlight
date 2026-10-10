@@ -32,7 +32,7 @@ Midflight is one hosted service. Nobody clones this repo or runs a server.
 
 | Who | Does |
 | --- | --- |
-| **Lead** | Installs the **MidFlight Team Yoga** GitHub App on the repo. Adds Midflight to their AI client as a connector (one URL) and signs in with GitHub. Asks their agent to "create a Midflight project for `owner/repo`" and shares the join code it gets. Writes the plan by talking to the agent. |
+| **Lead** | Installs the **MidFlightt** GitHub App on the repo. Adds Midflight to their AI client as a connector (one URL) and signs in with GitHub. Asks their agent to "create a Midflight project for `owner/repo`" and shares the join code it gets. Writes the plan by talking to the agent. |
 | **Teammate** | Adds the same connector, signs in with GitHub, and asks their agent to "join Midflight project `MF-XXXX-XXXX`". |
 
 In Claude Code the connector is one command:
