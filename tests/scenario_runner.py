@@ -159,6 +159,7 @@ class Play:
         self.runner.register(JobKind.CLAIM_REVIEW, self.service.run_review)
         self.people = seed(self.store, scenario.plan_version)
         self.named: dict[str, str] = {}
+        self.last_error: ServiceError | None = None
 
     def run(self) -> None:
         for number, step in enumerate(self.scenario.steps, start=1):
@@ -197,6 +198,7 @@ class Play:
                     assert claim.state is state, f"{name} is {claim.state}, expected {state}"
         except ServiceError as raised:
             error = raised
+        self.last_error = error
         self._check(step.expect, claim_id, error, before)
 
     def _submit(self, action: Submit) -> str:
