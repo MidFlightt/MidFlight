@@ -19,6 +19,7 @@ What answers where:
 | `/authorize`, `/token`, `/register`, `/.well-known/...` | Sign-in protocol (MCP SDK) |
 | `/oauth/github/callback`, `/oauth/dev-login` | Sign-in pages a browser visits |
 | `/projects/...`, `/claims/...`, `/jobs/...`, ... | REST API for scripts and hooks |
+| `/github/webhook` | GitHub tells Midflight a contract-test run finished |
 | `/docs` | REST API reference |
 """
 
@@ -42,9 +43,9 @@ from midflight.api.app import Services, build_services, create_app
 from midflight.api.oauth import MidflightOAuth, add_sign_in_routes
 from midflight.config import Settings, load_dotenv
 from midflight.mcp.hosted import build_hosted_server
-from midflight.ports import Clock, GitHubSignIn, RepoAccess, Reviewer, Store
+from midflight.ports import Clock, GitHub, GitHubSignIn, RepoAccess, Reviewer, Store
 from midflight.services.projects import ProjectService
-from midflight.wiring import reviewer_for, store_for
+from midflight.wiring import github_for, reviewer_for, store_for
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,7 @@ def create_server(
     repos: RepoAccess | None = None,
     github_sign_in: GitHubSignIn | None = None,
     reviewer: Reviewer | None = None,
+    github: GitHub | None = None,
 ) -> Server:
     """Build the whole server. Tests pass their own store, clock, and GitHub fakes."""
     store = store or store_for(settings)
@@ -70,9 +72,10 @@ def create_server(
     repos = repos or _repo_access(settings)
     github_sign_in = github_sign_in or _github_sign_in(settings)
     reviewer = reviewer or reviewer_for(settings)
+    github = github or github_for(settings)
 
     runner = StreamRunner() if settings.table_name else None
-    services = build_services(store, clock, reviewer, runner)
+    services = build_services(store, clock, reviewer, runner, github)
     projects = ProjectService(store, clock, repos, services.plans)
     oauth = MidflightOAuth(store, projects, settings.public_url, github_sign_in, settings.dev_login)
 
@@ -98,7 +101,7 @@ def create_server(
     if settings.seed_demo:
         demo.seed(store, demo.local_tokens(), clock.now())
 
-    app = create_app(services, lifespan=lifespan)
+    app = create_app(services, lifespan=lifespan, webhook_secret=settings.github_webhook_secret)
     app.mount("/", mcp_app)  # the REST routes match first; everything else is MCP and sign-in
     return Server(app, services, projects, oauth)
 

@@ -115,6 +115,7 @@ async def test_connector_offers_the_tools_and_getting_started_instructions() -> 
         "approve_plan",
         "assign_task",
         "resolve_escalation",
+        "simulate_github_outage",
         "rotate_join_code",
         "remove_member",
     } == names
