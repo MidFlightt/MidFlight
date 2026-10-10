@@ -57,12 +57,13 @@ def build_services(
         inline = InlineRunner()
         claims = ClaimService(store, inline, clock, reviewer)
         inline.register(JobKind.CLAIM_REVIEW, claims.run_review)
+        runner = inline
     else:
         claims = ClaimService(store, runner, clock, reviewer)
     return Services(
         store=store,
         claims=claims,
-        plans=PlanService(store, clock),
+        plans=PlanService(store, clock, runner),
         participants=ParticipantService(store, clock),
         check_ins=CheckInService(store, clock, claims),
         directives=DirectiveService(store, clock),
