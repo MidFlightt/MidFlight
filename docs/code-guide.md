@@ -229,6 +229,7 @@ To see journey 3 step by step for every demo scenario, open
 | `unit/test_plan_change.py` | A plan change reaches T1 and T2, not T3; supersede; held while stale |
 | `unit/test_escalations.py` | The tax conflict escalates; each resolution |
 | `unit/test_bedrock.py` | The Bedrock reviewer against a fake Bedrock |
+| `evals/replay_escalations.py` | Replays the experiment's recorded escalations through the AI reviewer and counts real conflicts blocked and false alarms blocked. Numbers in `evals/results.md`. |
 | `unit/test_experiment_fixes.py` | What the HireBot experiment changed: assumptions passed on, scoped blocks, fewer false alarms (D27 to D29) |
 | `unit/test_verification.py` | Pushes verified, failed, incomplete, escalated; the webhook; outages and the fault switch |
 | `unit/test_hook.py` | The pre-push hook: the real script, its token, the push check |

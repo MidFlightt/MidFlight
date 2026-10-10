@@ -11,6 +11,7 @@ commit (UC-12); `midflight.services.escalations` resolves it (UC-13).
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -434,7 +435,7 @@ class ClaimService:
         ]
         if not conflicts or any(claim.id in e.claim_ids for e in still_open):
             return []
-        cited = {i for f in conflicts for i in f.affected_ids}
+        cited = {i for f in conflicts for i in _named_ids(f, others)}
         involved = [claim, *(o for o in others if o.id in cited and o.id != claim.id)]
         requirements = {i for i in cited if plan.requirement(i)}
         claim_ids = {c.id for c in involved}
@@ -657,7 +658,7 @@ def _only_between_people(
     between people, so it's kept as a note instead of stopping the agent for the lead."""
     if finding.kind is not FindingKind.REQUIREMENT_CONFLICT or not finding.blocking:
         return finding
-    cited = set(finding.affected_ids)
+    cited = _named_ids(finding, others)
     tasks = {c.task_id for c in (claim, *others) if c.id in cited}
     cites_requirement = any(plan.requirement(i) is not None for i in cited)
     if len(tasks) >= 2 or cites_requirement:
@@ -670,6 +671,19 @@ def _only_between_people(
             "task's claims, so it isn't a conflict between people.)",
         }
     )
+
+
+def _named_ids(finding: Finding, others: Sequence[Claim]) -> set[str]:
+    """The ids a finding is about: the ones it cites, plus any claim its explanation
+    names. The model sometimes explains a conflict with claim C-10 and cites only a
+    requirement; without this the other side would never hear the lead's decision."""
+    named = {
+        o.id
+        for o in others
+        if o.state in _COMPARED_STATES
+        and re.search(rf"(?<![\w-]){re.escape(o.id)}(?![\w-])", finding.explanation)
+    }
+    return set(finding.affected_ids) | named
 
 
 def _known_ids(plan: Plan, claim: Claim, others: Sequence[Claim]) -> set[str]:

@@ -266,3 +266,34 @@ def test_only_blocking_conflicts_get_a_second_look() -> None:
     bedrock = TwoStepBedrock([mismatch])
     assert review(bedrock) == [mismatch]
     assert len(bedrock.calls) == 1
+
+
+# The model often explains a conflict with one claim and cites other ids ------------------
+
+
+def names_t1_in_words_only(request: ClaimReviewRequest) -> list[Any]:
+    """Cites a requirement, but the explanation is about T1's claim."""
+    t1 = [c for c in request.other_claims if c.task_id == "T1"]
+    if request.claim.task_id == "T1" or not t1:
+        return []
+    words = f"Claim {request.claim.id} keeps a fee, while claim {t1[0].id} refunds in full."
+    return [conflict("R-1") | {"explanation": words}]
+
+
+def test_a_claim_named_only_in_the_explanation_is_part_of_the_escalation() -> None:
+    services, people = team(Reviewer(names_t1_in_words_only))
+    t1 = services.claims.submit(people["p-t1"], submission("T1"))
+    t2 = services.claims.submit(people["p-t2"], submission("T2"))
+
+    [escalation] = services.store.list_escalations("demo")
+    assert escalation.claim_ids == [t2.claim_id, t1.claim_id]
+    # So T1's agent waits for the lead too, and will get the decision.
+    assert services.store.get_claim(t1.claim_id).state is ClaimState.HUMAN_REVIEW_REQUIRED
+
+
+def test_the_second_look_reads_the_claims_the_explanation_names() -> None:
+    finding = conflict("R-1") | {"explanation": "C-2 says one thing while C-1 says another."}
+    bedrock = TwoStepBedrock([finding], {"contradiction": True, "why": "they differ"})
+    review(bedrock)
+    text = bedrock.calls[1]["messages"][0]["content"][0]["text"]
+    assert "cancelling gives the hours back" in text and "total never changes" in text
