@@ -1,0 +1,41 @@
+{
+  "case": "hirebot-small",
+  "run": "A1",
+  "approach": "team-chat file",
+  "model": "sonnet",
+  "merge": [
+    "t1-catalog: merged",
+    "t2-hiring: merged",
+    "t3-storefront: merged"
+  ],
+  "scores": [
+    {
+      "passed": 8,
+      "of": 8,
+      "failed": []
+    }
+  ],
+  "agent_starts_without_midflight": 0,
+  "stats": {
+    "cost": 0.9607,
+    "warmup_cost": 0.0,
+    "turns": 78,
+    "input": 92,
+    "output": 20235,
+    "cache_read": 2125252,
+    "cache_write": 83287,
+    "agent_minutes": 2.9,
+    "tool_calls": 70,
+    "midflight_calls": {},
+    "cost_by_agent": {
+      "t1": 0.1814666,
+      "t2": 0.373485,
+      "t3": 0.4057808
+    }
+  },
+  "notes": [
+    "Scored by hand in a browser (this case has no score.py).",
+    "The storefront agent wrote 'CONFLICT for the lead' in the team chat; the lead answered there with the fixed decision, then T2 and T3 were told to read it.",
+    "The first attempt to send that message hit the Claude usage limit and did nothing; it was sent again after the limit reset."
+  ]
+}

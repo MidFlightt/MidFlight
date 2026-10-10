@@ -17,7 +17,7 @@ time: **Meeting Ghost × 10 hours and Rubber Duck Pro × 25 hours.**
 
 A number counts if it's shown with or without a thousands separator. The lead's
 decision (rates before tax; 8% tax added at checkout as its own line) is fixed in
-`experiment/prompts.py` and decides check 3.
+[`case.py`](case.py) and decides check 3.
 
 After scoring at merge, the fixer agent gets the failing checks (as written above, with
 what the page showed) and repairs; the checks are repeated after each round, up to 3

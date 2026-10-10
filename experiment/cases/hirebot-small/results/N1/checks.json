@@ -1,0 +1,138 @@
+[
+  {
+    "checks": [
+      {
+        "id": "C1",
+        "name": "The page lists all six agents with their names and hourly rates",
+        "command": "by hand, in the browser",
+        "expected": "The page lists all six agents with their names and hourly rates",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C2",
+        "name": "The price summary's subtotal for the cart is 2,500",
+        "command": "by hand, in the browser",
+        "expected": "The price summary's subtotal for the cart is 2,500",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C3",
+        "name": "The tax is its own line (200) and the total is 2,700",
+        "command": "by hand, in the browser",
+        "expected": "The tax is its own line (200) and the total is 2,700",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C4",
+        "name": "With promo code BEEPBOOP: discount 250, tax 180, total 2,430",
+        "command": "by hand, in the browser",
+        "expected": "With promo code BEEPBOOP: discount 250, tax 180, total 2,430",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C5",
+        "name": "Hiring works and the page shows a booking id",
+        "command": "by hand, in the browser",
+        "expected": "Hiring works and the page shows a booking id",
+        "passed": false,
+        "observed": "the page showed: Hiring failed: [{\"type\":\"missing\",\"loc\":[\"body\",\"items\",0,\"agent\"],\"msg\":\"Field required\",...}]"
+      },
+      {
+        "id": "C6",
+        "name": "The confirmation shows total 2,430 and the discount",
+        "command": "by hand, in the browser",
+        "expected": "The confirmation shows total 2,430 and the discount",
+        "passed": false,
+        "observed": "not reached"
+      },
+      {
+        "id": "C7",
+        "name": "GET /api/bookings/{id} returns total 2,430",
+        "command": "by hand, in the browser",
+        "expected": "GET /api/bookings/{id} returns total 2,430",
+        "passed": false,
+        "observed": "not reached"
+      },
+      {
+        "id": "C8",
+        "name": "A second hire without the code gives total 2,700",
+        "command": "by hand, in the browser",
+        "expected": "A second hire without the code gives total 2,700",
+        "passed": false,
+        "observed": "not reached"
+      }
+    ]
+  },
+  {
+    "checks": [
+      {
+        "id": "C1",
+        "name": "The page lists all six agents with their names and hourly rates",
+        "command": "by hand, in the browser",
+        "expected": "The page lists all six agents with their names and hourly rates",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C2",
+        "name": "The price summary's subtotal for the cart is 2,500",
+        "command": "by hand, in the browser",
+        "expected": "The price summary's subtotal for the cart is 2,500",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C3",
+        "name": "The tax is its own line (200) and the total is 2,700",
+        "command": "by hand, in the browser",
+        "expected": "The tax is its own line (200) and the total is 2,700",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C4",
+        "name": "With promo code BEEPBOOP: discount 250, tax 180, total 2,430",
+        "command": "by hand, in the browser",
+        "expected": "With promo code BEEPBOOP: discount 250, tax 180, total 2,430",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C5",
+        "name": "Hiring works and the page shows a booking id",
+        "command": "by hand, in the browser",
+        "expected": "Hiring works and the page shows a booking id",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C6",
+        "name": "The confirmation shows total 2,430 and the discount",
+        "command": "by hand, in the browser",
+        "expected": "The confirmation shows total 2,430 and the discount",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C7",
+        "name": "GET /api/bookings/{id} returns total 2,430",
+        "command": "by hand, in the browser",
+        "expected": "GET /api/bookings/{id} returns total 2,430",
+        "passed": true,
+        "observed": "as expected"
+      },
+      {
+        "id": "C8",
+        "name": "A second hire without the code gives total 2,700",
+        "command": "by hand, in the browser",
+        "expected": "A second hire without the code gives total 2,700",
+        "passed": true,
+        "observed": "as expected"
+      }
+    ]
+  }
+]

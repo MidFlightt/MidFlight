@@ -10,6 +10,9 @@ Every approach gets the same task text. Only the coordination line differs:
 
 PROJECT_B = "midflight-9854"
 
+# agent -> its git branch
+BRANCHES = {"t1": "t1-catalog", "t2": "t2-hiring", "t3": "t3-storefront"}
+
 TASKS = {
     "t1": (
         "Your part: the agent catalog, in app/catalog.py. Build GET /api/agents, which "
