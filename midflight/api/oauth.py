@@ -73,6 +73,7 @@ class MidflightOAuth(
         self._store = store
         self._projects = projects
         self._public_url = public_url
+        self.resource_url = f"{public_url}/mcp"
         self._github = github
         self.dev_login = dev_login
 
@@ -192,6 +193,8 @@ class MidflightOAuth(
     ) -> OAuthToken:
         if subject is None:
             raise TokenError("invalid_grant", "this grant isn't tied to a signed-in person")
+        # Every token is for this server's /mcp, even if the client didn't say so.
+        resource = resource or self.resource_url
         access, refresh = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         now = int(time.time())
         common: dict[str, Any] = {
