@@ -31,10 +31,23 @@ MODEL = "sonnet"
 MAX_TURNS = "40"
 BRANCHES = {"t1": "t1-catalog", "t2": "t2-hiring", "t3": "t3-storefront"}
 TOOLS = [
-    "Read", "Edit", "Write", "Glob", "Grep",
-    "Bash(uv run:*)", "Bash(python:*)", "Bash(curl:*)", "Bash(ls:*)", "Bash(cat:*)",
-    "Bash(git add:*)", "Bash(git commit:*)", "Bash(git status:*)", "Bash(git diff:*)",
-    "Bash(git log:*)", "Bash(git rev-parse:*)", "Bash(git branch:*)",
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(uv run:*)",
+    "Bash(python:*)",
+    "Bash(curl:*)",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(git add:*)",
+    "Bash(git commit:*)",
+    "Bash(git status:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git rev-parse:*)",
+    "Bash(git branch:*)",
 ]
 MIDFLIGHT_TOOLS = [
     f"mcp__midflight-live__{name}"
@@ -54,8 +67,17 @@ def setup(run: str) -> None:
     shutil.copytree(HERE / "starter", main)
     git(main, "init", "-q", "-b", "main")
     git(main, "add", "-A")
-    git(main, "-c", "user.name=HireBot", "-c", "user.email=hirebot@example.com",
-        "commit", "-q", "-m", "HireBot starter")
+    git(
+        main,
+        "-c",
+        "user.name=HireBot",
+        "-c",
+        "user.email=hirebot@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "HireBot starter",
+    )
     for task, branch in BRANCHES.items():
         git(main, "worktree", "add", "-q", "-b", branch, str(root / task))
     (root / "logs").mkdir()
@@ -86,8 +108,9 @@ def phase(run: str, number: int) -> None:
         results = list(pool.map(one, enumerate(BRANCHES)))
     for task, result in results:
         state["sessions"][task] = result["session_id"]
-        print(f"{task}: {result['num_turns']} turns, ${result['cost']:.2f}: "
-              f"{result['text'][-300:]}")
+        print(
+            f"{task}: {result['num_turns']} turns, ${result['cost']:.2f}: {result['text'][-300:]}"
+        )
     save_state(run, state)
 
 
@@ -101,14 +124,32 @@ def say(run: str, task: str, message: str) -> None:
 def merge(run: str) -> None:
     main = RUNS / run / "main"
     report = []
-    for task, branch in BRANCHES.items():
-        done = git(main, "-c", "user.name=HireBot", "-c", "user.email=hirebot@example.com",
-                   "merge", "--no-edit", branch, check=False)
+    for branch in BRANCHES.values():
+        done = git(
+            main,
+            "-c",
+            "user.name=HireBot",
+            "-c",
+            "user.email=hirebot@example.com",
+            "merge",
+            "--no-edit",
+            branch,
+            check=False,
+        )
         if done.returncode != 0:
             conflicted = git(main, "diff", "--name-only", "--diff-filter=U").stdout.split()
             git(main, "add", "-A")
-            git(main, "-c", "user.name=HireBot", "-c", "user.email=hirebot@example.com",
-                "commit", "-q", "-m", f"merge {branch} (conflicts left for the fixer)")
+            git(
+                main,
+                "-c",
+                "user.name=HireBot",
+                "-c",
+                "user.email=hirebot@example.com",
+                "commit",
+                "-q",
+                "-m",
+                f"merge {branch} (conflicts left for the fixer)",
+            )
             report.append(f"{branch}: CONFLICT in {', '.join(conflicted)}")
         else:
             report.append(f"{branch}: merged")
@@ -122,10 +163,15 @@ def fix(run: str, message: str) -> None:
     state = load_state(run)
     label = f"fix{len([k for k in state if k.startswith('fix')]) + 1}"
     session = state.get("fixer")
-    prompt = message if session else (
-        "You are fixing HireBot (read README.md) after three parts, built separately by "
-        "three agents, were merged. Make the app work as a whole. " + message +
-        " Commit when done and finish with a two-line summary."
+    prompt = (
+        message
+        if session
+        else (
+            "You are fixing HireBot (read README.md) after three parts, built separately by "
+            "three agents, were merged. Make the app work as a whole. "
+            + message
+            + " Commit when done and finish with a two-line summary."
+        )
     )
     result = call(run, "main", label, prompt, session, midflight=False)
     state["fixer"] = result["session_id"]
@@ -134,15 +180,33 @@ def fix(run: str, message: str) -> None:
     print(f"fixer: {result['num_turns']} turns, ${result['cost']:.2f}: {result['text'][-400:]}")
 
 
-def call(run: str, task: str, label: str, prompt: str, session: str | None = None,
-         midflight: bool | None = None) -> dict:
+def call(
+    run: str,
+    task: str,
+    label: str,
+    prompt: str,
+    session: str | None = None,
+    midflight: bool | None = None,
+) -> dict:
     """One headless Claude Code call in the task's folder; the stream is saved to logs/."""
     state = load_state(run)
     use_midflight = state["approach"] == "B" if midflight is None else midflight
-    args = [claude_exe(), "-p", "--model", MODEL,
-            "--max-turns", MAX_TURNS, "--output-format", "stream-json", "--verbose",
-            "--permission-mode", "acceptEdits",
-            "--allowedTools", *TOOLS, *(MIDFLIGHT_TOOLS if use_midflight else [])]
+    args = [
+        claude_exe(),
+        "-p",
+        "--model",
+        MODEL,
+        "--max-turns",
+        MAX_TURNS,
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        *TOOLS,
+        *(MIDFLIGHT_TOOLS if use_midflight else []),
+    ]
     # Only the MCP servers named here: none for approach A, only Midflight for B (other
     # servers slow the start, and Midflight must be connected before the first turn).
     args += ["--strict-mcp-config"]
@@ -167,8 +231,15 @@ def run_agent(args: list[str], prompt: str, cwd: Path, log: Path, needs_midfligh
     agent is stopped at once (returning False) unless its start-up message lists every
     Midflight tool, so no agent ever works without Midflight by accident."""
     with log.open("w", encoding="utf-8") as out:
-        proc = subprocess.Popen(args, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True, encoding="utf-8")
+        proc = subprocess.Popen(
+            args,
+            cwd=cwd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+        )
         assert proc.stdin and proc.stdout
         proc.stdin.write(prompt)
         proc.stdin.close()
@@ -203,10 +274,23 @@ def warm_up(run: str) -> None:
     """Before a Midflight phase: one small call that wakes the server and refreshes the
     sign-in, so three agents starting together don't race to do either."""
     root = RUNS / run
-    args = [claude_exe(), "-p", "--model", MODEL, "--max-turns", "3",
-            "--output-format", "stream-json", "--verbose", "--strict-mcp-config",
-            "--mcp-config", str(HERE / "midflight-only.mcp.json"),
-            "--allowedTools", "mcp__midflight-live__my_projects", *MIDFLIGHT_TOOLS]
+    args = [
+        claude_exe(),
+        "-p",
+        "--model",
+        MODEL,
+        "--max-turns",
+        "3",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--strict-mcp-config",
+        "--mcp-config",
+        str(HERE / "midflight-only.mcp.json"),
+        "--allowedTools",
+        "mcp__midflight-live__my_projects",
+        *MIDFLIGHT_TOOLS,
+    ]
     log = root / "logs" / f"warmup-{int(time.time())}.jsonl"
     prompt = "Call the Midflight my_projects tool once and reply with one word: ready."
     for attempt in range(1, 6):
@@ -244,9 +328,19 @@ def stats(run: str) -> None:
     resumed calls, so cost is the highest value per agent; turns, tokens, and time are
     per call and are summed. Warm-up calls exist only in this harness and are listed
     apart."""
-    totals = {"cost": 0.0, "warmup_cost": 0.0, "turns": 0, "input": 0, "output": 0,
-              "cache_read": 0, "cache_write": 0, "agent_minutes": 0.0, "tool_calls": 0,
-              "midflight_calls": {}, "cost_by_agent": {}}
+    totals = {
+        "cost": 0.0,
+        "warmup_cost": 0.0,
+        "turns": 0,
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "agent_minutes": 0.0,
+        "tool_calls": 0,
+        "midflight_calls": {},
+        "cost_by_agent": {},
+    }
     for log in sorted((RUNS / run / "logs").glob("*.jsonl")):
         agent = log.name.split("-")[0]
         warmup = agent == "warmup"
