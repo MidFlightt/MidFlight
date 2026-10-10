@@ -25,7 +25,7 @@ Parameters:
     Type: String
     Default: ""
     Description: >
-      Bedrock model id for the AI reviewer, e.g. us.amazon.nova-pro-v1:0 or
+      Bedrock model id for the AI reviewer, e.g. us.amazon.nova-2-lite-v1:0 or
       us.anthropic.claude-sonnet-5-5. Empty means rules only. Set it only once Bedrock answers for this account: while Bedrock
       refuses calls, every complete claim would wait in pending.
   ReviewerRoleArn:

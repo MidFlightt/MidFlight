@@ -128,6 +128,14 @@ def test_a_technical_question_is_settled_at_once_for_both_claims(settled) -> Non
     )
 
 
+def test_a_decision_ends_when_every_claim_it_was_about_is_gone(settled) -> None:
+    team, t1, t2 = settled
+    team.services.claims.withdraw(team.people["p-t1"], t1)
+    assert len(team.decisions()) == 1  # T2 still builds to it
+    team.services.claims.withdraw(team.people["p-t2"], t2)
+    assert team.decisions() == []
+
+
 def test_a_mismatch_with_the_plan_alone_is_just_a_revision() -> None:
     team = Team(lambda r: [finding("semantic_mismatch", r.claim.id, "R-1", answer="Use cents.")])
     t2 = team.claim("T2")
