@@ -1,0 +1,18 @@
+name: Unknown ids, an old plan, or someone else's task are refused with nothing saved
+requirement: "UC-04 alternate paths 2a, 2b, 2c"
+use_cases: [UC-04]
+plan_version: 2
+steps:
+  - say: A contract that doesn't exist
+    submit:
+      as: T2
+      claim:
+        plan_version: 2
+        consumes: [{contract_id: cart, fields: {items: array}}]
+    expect: {error: InvalidRequest, hint_contains: "checkout-response", nothing_saved: true}
+  - say: A claim written against plan v1 after v2 was approved
+    submit: {as: T2, claim: {plan_version: 1}}
+    expect: {error: InvalidRequest, hint_contains: "plan v2", nothing_saved: true}
+  - say: T3's agent tries to claim T2's task
+    submit: {as: T3, claim: {task_id: T2, plan_version: 2}}
+    expect: {error: PermissionDenied, nothing_saved: true}

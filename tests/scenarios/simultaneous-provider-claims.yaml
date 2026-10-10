@@ -1,0 +1,8 @@
+name: Two provider claims arrive at once; never both approved
+requirement: "requirements §11: Simultaneous conflicting claims"
+use_cases: [UC-05]
+steps:
+  - say: Two sessions both claim to provide checkout-response at the same moment
+    race: {as: T1, names: [first, second]}
+  - say: The second review finished first, so the first one reran and saw it
+    claims: {first: needs_revision, second: approved}
