@@ -198,7 +198,7 @@ The project and the lead's token are created by a bootstrap command
 
 | Item | Value |
 | --- | --- |
-| GitHub App | `MidFlight Team Yoga`, App ID `5233457`, owned by the `MidFlightt` organization, installed only on `midflight-demo-shop` |
+| GitHub App | `MidFlight Team Yoga`, App ID `5233457`, owned by the `MidFlightt` organization, installed only on `midflight-demo-shop` (installation id `169380149`) |
 | App permissions | Checks: read and write. Actions, Contents, Pull requests, Metadata: read. Nothing else. |
 | App events | `workflow_run` only |
 | App authentication | As the App (App ID + private key + installation id). No user sign-in, no client secret. |
