@@ -36,8 +36,12 @@ APP_INSTALL_HINT = (
 
 
 def new_join_code() -> str:
-    part = lambda: "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(4))  # noqa: E731
-    return f"MF-{part()}-{part()}"
+    """A code like `MF-7K2Q-9XPA`: 40 random bits, easy to read aloud."""
+    return f"MF-{_code_block()}-{_code_block()}"
+
+
+def _code_block() -> str:
+    return "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(4))
 
 
 def participant_id(project_id: str, github_login: str) -> str:
