@@ -47,4 +47,13 @@ def check_in_json(c: CheckIn) -> dict[str, Any]:
         "stale_reason": c.stale_reason,
         "ready_to_push": c.ready_to_push,
         "push_blockers": list(c.push_blockers),
+        "assumed_by_others": [
+            {"task_id": a.task_id, "claim_id": a.claim_id, "text": a.text}
+            for a in c.assumed_by_others
+        ],
+        "escalations": [
+            {"id": e.id, "claim_ids": e.claim_ids, "explanation": e.explanation}
+            for e in c.escalations
+        ],
+        "you_decide": c.you_decide,
     }
