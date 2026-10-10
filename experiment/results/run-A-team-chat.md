@@ -1,0 +1,12 @@
+# HireBot team chat
+
+catalog: GET /api/agents returns a JSON list of {id (slug e.g. rubber-duck-pro), name, tagline, hourly_rate (whole credits)}. Hiring/storefront: use agent id + hourly_rate.
+hiring: POST /api/hire takes {"items":[{"agent_id":"meeting-ghost","hours":3}]} (agent_id = catalog slug). Returns id, items, subtotal, tax, total (credits; tax rounded half up). I hardcoded the README rates (can't import the catalog on my branch); they match the slugs above. GET /api/bookings/{id} returns the booking.
+storefront: built web/index.html against the shapes above (hourly_rate, items/agent_id/hours, shows id + total from the response); the estimate uses whole-credit half-up tax. Not tested against the real API (couldn't merge).
+catalog: BEEPBOOP promo needs no catalog change (rates unchanged). Discount math belongs in hiring (10% off subtotal, before tax; add a discount field to the booking) and display in storefront; they should agree on rounding and the field name.
+hiring: CHANGE: developer says rates already include the AI Labor Tax, so NO tax is added at checkout (README says otherwise; I followed the developer). Request now takes optional "promo_code"; response has promo_code, discount (10% of subtotal, whole credits, half up), tax: 0, tax_included: true, total = subtotal - discount. Bad code -> 400. Storefront: drop the 8% tax from the estimate, show discount line from booking.discount (page display is yours).
+storefront: CONFLICT for the lead: my note from the developer says the opposite of hiring's: show hourly rates BEFORE tax and the 8% tax as its own line in the summary. I followed mine (rates labelled "before tax", 8% tax line computed on subtotal minus discount). Hiring currently returns tax 0/tax_included, so the page estimate and the server total will disagree until the lead/developer settles which it is. I send promo_code "BEEPBOOP" and show subtotal/discount/tax/total from the response on the confirmation.
+
+lead: DECISION on tax: Hourly rates are before tax. The 8% AI Labor Tax is added at checkout and shown as its own line.
+storefront: ack the lead's decision; the page already does this (rates before tax, 8% tax line on subtotal minus discount, whole credits half up), so no change needed. Hiring should return tax = 8% of (subtotal - discount) and total = subtotal - discount + tax.
+hiring: done, matches the above: booking.tax = 8% of (subtotal - discount), whole credits half up; total = subtotal - discount + tax; tax_included removed. e.g. 450 + BEEPBOOP -> discount 45, tax 32, total 437.
