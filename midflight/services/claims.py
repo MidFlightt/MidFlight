@@ -74,9 +74,14 @@ MAX_REVIEW_RUNS = 3
 # How many times the reviewer is asked before the review counts as incomplete (UC-05 4a).
 MAX_REVIEWER_ATTEMPTS = 2
 
+# The claims the AI reviewer compares a new claim with.
+_COMPARED_STATES = ACTIVE_CLAIM_STATES - {ClaimState.NEEDS_REVISION}
+
 INTENT_NOTE = (
     "Midflight checked your declared intent against the plan and other claims, not your "
-    "code. Build against the contracts listed here; midflight/verify checks the code."
+    "code. Build against the contracts listed here; midflight/verify checks the code. "
+    "What you assume about another task is shown to that task's agent at its next "
+    "check-in; an approval doesn't mean they agreed to it."
 )
 
 
@@ -386,9 +391,10 @@ class ClaimService:
     ) -> list[Finding]:
         if self._reviewer is None:
             return []
-        # Only claims that still reserve work: a withdrawn or closed claim says nothing
-        # about what anyone is building now.
-        related = [o for o in others if o.id != claim.id and o.state in ACTIVE_CLAIM_STATES]
+        # Only claims that say what someone is building now. A withdrawn or closed claim
+        # doesn't, and neither does one waiting to be revised: its agent has been told to
+        # change it, so a conflict with it is a conflict with yesterday's intent (D29).
+        related = [o for o in others if o.id != claim.id and o.state in _COMPARED_STATES]
         request = ClaimReviewRequest(
             plan=plan, claim=claim, other_claims=related, rule_findings=rule_findings
         )
@@ -417,7 +423,8 @@ class ClaimService:
         """An escalation for the lead, plus the other claims it involves (UC-12).
 
         Nothing new if an escalation for this claim is already open. If one is open about
-        the same requirement, this claim joins it, so the lead decides one question once.
+        the same requirement, or already involves a claim this conflict cites, this claim
+        joins it, so the lead decides one question once.
         """
         conflicts = [
             f for f in findings if f.blocking and f.kind is FindingKind.REQUIREMENT_CONFLICT
@@ -430,8 +437,14 @@ class ClaimService:
         cited = {i for f in conflicts for i in f.affected_ids}
         involved = [claim, *(o for o in others if o.id in cited and o.id != claim.id)]
         requirements = {i for i in cited if plan.requirement(i)}
+        claim_ids = {c.id for c in involved}
         same_question = next(
-            (e for e in still_open if requirements & set(e.competing_requirement_ids)), None
+            (
+                e
+                for e in still_open
+                if requirements & set(e.competing_requirement_ids) or claim_ids & set(e.claim_ids)
+            ),
+            None,
         )
         if same_question is not None:
             joined = Escalation.model_validate(
