@@ -188,7 +188,7 @@ Task IDs: **S-** Somesh, **M-** Mithilesh, **F-** Frederik, **H-** hosted produc
 | H-5 | AWS: DynamoDB store, worker Lambda, SAM template, packaging | ✅ deployed October 9 ([infra/README.md](../infra/README.md#the-live-deployment)); a real Claude Code sign-in created a project on it |
 | S-6 | Plan-change directives (in the approval's own commit) | ✅ currency scenario: T1 and T2 get one directive each, T3 nothing |
 | S-7 | Escalations and `resolve_escalation` | ✅ tax conflict escalates; clarify, revise, and dismiss all audited |
-| S-5 | `BedrockReviewer` (Converse API with a forced tool, D21) | ✅ built and tested with a fake client. **Live call blocked:** Bedrock answers "Operation not allowed" for every model on this new account (see Human steps), so the deploy runs rules only |
+| S-5 | `BedrockReviewer` (Converse API with a forced tool, D21) | ✅ a real call through a teammate's account (Amazon Nova Pro, D7) returned a validated `requirement_conflict` for the tax case in 4.5 s. Our own account still can't call Bedrock (support case open) |
 | M-6 | GitHub webhook and the App client (httpx instead of githubkit) | ✅ tested against a fake GitHub; needs the App's webhook settings to run live |
 | S-10 | Verify rules, re-check before publishing, correction directive | ✅ false completion (`total` instead of `total_cents`) fails with evidence |
 | M-7 | Stale handling and the demo fault switch (`simulate_github_outage`) | ✅ directives held and approvals paused while stale, released on recovery |
