@@ -217,3 +217,39 @@ def test_a_conflict_citing_one_tasks_claims_is_a_note_not_an_escalation() -> Non
     assert services.store.list_escalations("demo") == []
     [finding] = services.store.get_claim(result.claim_id).findings
     assert finding.severity is FindingSeverity.INFO and "Not escalated" in finding.explanation
+
+
+class TaxVersusPlanReviewer:
+    """Every claim that isn't T1's gets a conflict with requirement R-1."""
+
+    def review_claim(self, request: ClaimReviewRequest) -> Any:
+        if request.claim.task_id == "T1":
+            return []
+        return [
+            {
+                "id": "x",
+                "kind": "requirement_conflict",
+                "severity": "blocking",
+                "source": "reviewer",
+                "affected_ids": [request.claim.id, "R-1"],
+                "explanation": "This claim contradicts requirement R-1.",
+            }
+        ]
+
+    def review_commit(self, request: object) -> Any:
+        return []
+
+
+def test_claims_in_conflict_with_the_same_requirement_share_one_escalation() -> None:
+    store = MemoryStore()
+    people = seed(store)
+    services = build_services(store, FixedClock(NOW), TaxVersusPlanReviewer())
+    t2 = services.claims.submit(people["p-t2"], submission("T2"))
+    t3 = services.claims.submit(people["p-t3"], submission("T3", requirement_ids=["R-1"]))
+    [escalation] = services.store.list_escalations("demo")
+    assert escalation.claim_ids == [t2.claim_id, t3.claim_id]
+    assert state(services, t3.claim_id) is ClaimState.HUMAN_REVIEW_REQUIRED
+    # One decision by the lead reaches both claims.
+    services.escalations.resolve(people["p-lead"], escalation.id, Resolution.REQUEST_REVISION, "x")
+    assert state(services, t2.claim_id) is ClaimState.NEEDS_REVISION
+    assert state(services, t3.claim_id) is ClaimState.NEEDS_REVISION
