@@ -194,11 +194,20 @@ def test_unlisted_task_consuming_the_contract_is_out_of_scope() -> None:
 
 def test_second_provider_of_the_same_contract_is_blocked() -> None:
     plan = make_plan(1)
-    first = t1_claim()
-    rogue = t1_claim(id="C-T1-rogue", agent_id="p-rogue")
-    finding = only(check_claim(rogue, plan, [first]), FindingKind.DUPLICATE_PROVIDER)
+    first = t1_claim(state=ClaimState.APPROVED)
+    second = t1_claim(id="C-T1-second")
+    finding = only(check_claim(second, plan, [first]), FindingKind.DUPLICATE_PROVIDER)
     assert finding.blocking
     assert first.id in finding.affected_ids
+
+
+def test_a_pending_rival_provider_does_not_block() -> None:
+    # The first approval wins; the race-safe save in S-3 stops a double approval.
+    first = t1_claim()
+    second = t1_claim(id="C-T1-second")
+    findings = check_claim(second, make_plan(1), [first])
+    assert FindingKind.DUPLICATE_PROVIDER not in kinds(findings)
+    assert not has_blocking(findings)
 
 
 def test_inv_14_shared_files_are_info_and_never_block() -> None:

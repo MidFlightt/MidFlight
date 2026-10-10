@@ -19,6 +19,7 @@ from collections.abc import Iterable, Sequence
 from midflight.domain.models import (
     EXCERPT_LIMIT,
     Claim,
+    ClaimState,
     Contract,
     Evidence,
     EvidenceKind,
@@ -176,10 +177,17 @@ def contract_fields(claim: Claim, plan: Plan) -> list[Finding]:
 
 
 def duplicate_provider(claim: Claim, others: Sequence[Claim]) -> list[Finding]:
+    """A contract has one provider, and the first approved claim wins.
+
+    Only approved rivals count. Two claims reviewed at the same moment can't both be
+    approved, because saving a verdict needs an unchanged coord_rev (INV-02): the
+    second review reruns, sees the first approval, and gets this finding.
+    """
     findings = []
+    approved = [o for o in others if o.state is ClaimState.APPROVED]
     for use in claim.provides:
         rivals = sorted(
-            o.id for o in others if any(p.contract_id == use.contract_id for p in o.provides)
+            o.id for o in approved if any(p.contract_id == use.contract_id for p in o.provides)
         )
         if rivals:
             findings.append(
@@ -192,8 +200,8 @@ def duplicate_provider(claim: Claim, others: Sequence[Claim]) -> list[Finding]:
                         _claim_evidence(claim, f"provides {use.contract_id}"),
                         *(_evidence(EvidenceKind.CLAIM, r, "also provides") for r in rivals),
                     ],
-                    explanation=f"{', '.join(rivals)} already provides {use.contract_id}. "
-                    "A contract has exactly one provider.",
+                    explanation=f"{', '.join(rivals)} is already approved to provide "
+                    f"{use.contract_id}. A contract has exactly one provider.",
                     correction="Withdraw one of the claims, or consume the contract instead.",
                 )
             )
