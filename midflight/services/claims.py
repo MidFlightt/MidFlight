@@ -48,6 +48,7 @@ from midflight.domain.models import (
 )
 from midflight.domain.rules import check_claim, has_blocking, stale_plan, unknown_references
 from midflight.domain.states import (
+    ACTIVE_CLAIM_STATES,
     CLAIM_TRANSITIONS,
     OPEN_DIRECTIVE_STATES,
     IllegalTransition,
@@ -385,7 +386,9 @@ class ClaimService:
     ) -> list[Finding]:
         if self._reviewer is None:
             return []
-        related = [o for o in others if o.id != claim.id]
+        # Only claims that still reserve work: a withdrawn or closed claim says nothing
+        # about what anyone is building now.
+        related = [o for o in others if o.id != claim.id and o.state in ACTIVE_CLAIM_STATES]
         request = ClaimReviewRequest(
             plan=plan, claim=claim, other_claims=related, rule_findings=rule_findings
         )
@@ -399,7 +402,7 @@ class ClaimService:
                 continue
             parsed = parse_reviewer_findings(raw, known, claim)
             if parsed is not None:
-                return parsed
+                return [_only_between_people(f, plan, claim, related) for f in parsed]
             reason = "the reply didn't match the findings schema or cited unknown ids"
         return [reviewer_unavailable(claim, reason)]
 
@@ -616,6 +619,29 @@ def review_subject(claim_id: str, revision: int) -> str:
 def parse_review_subject(subject_id: str) -> tuple[str, int]:
     claim_id, _, revision = subject_id.rpartition("/")
     return claim_id, int(revision)
+
+
+def _only_between_people(
+    finding: Finding, plan: Plan, claim: Claim, others: Sequence[Claim]
+) -> Finding:
+    """A requirement conflict needs two sides: claims of two different tasks, or a claim
+    and a plan requirement. One that cites only one task's claims isn't a disagreement
+    between people, so it's kept as a note instead of stopping the agent for the lead."""
+    if finding.kind is not FindingKind.REQUIREMENT_CONFLICT or not finding.blocking:
+        return finding
+    cited = set(finding.affected_ids)
+    tasks = {c.task_id for c in (claim, *others) if c.id in cited}
+    cites_requirement = any(plan.requirement(i) is not None for i in cited)
+    if len(tasks) >= 2 or cites_requirement:
+        return finding
+    return Finding.model_validate(
+        finding.model_dump()
+        | {
+            "severity": FindingSeverity.INFO,
+            "explanation": f"{finding.explanation} (Not escalated: it cites only one "
+            "task's claims, so it isn't a conflict between people.)",
+        }
+    )
 
 
 def _known_ids(plan: Plan, claim: Claim, others: Sequence[Claim]) -> set[str]:
