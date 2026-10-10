@@ -283,7 +283,11 @@ class DynamoStore:
 
     def find_participant_by_token_hash(self, token_hash: str) -> Participant | None:
         found = self._get(f"TOKEN#{token_hash}", "LOOKUP")
-        return self.get_participant(found["participant_id"]["S"]) if found else None
+        participant = self.get_participant(found["participant_id"]["S"]) if found else None
+        # The pointer for a replaced token stays behind; only the current token counts.
+        if participant is None or participant.token_hash != token_hash:
+            return None
+        return participant
 
     def list_participants(self, project_id: str) -> list[Participant]:
         return [Participant.model_validate_json(d) for d in self._query(project_id, "PARTICIPANT#")]

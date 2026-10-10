@@ -10,7 +10,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from midflight.adapters.runners import InlineRunner
@@ -26,6 +26,7 @@ from midflight.domain.models import (
     Role,
     Text,
 )
+from midflight.hooks.pre_push import SCRIPT as PRE_PUSH_HOOK
 from midflight.ports import Clock, GitHub, JobRunner, Reviewer, Store
 from midflight.services.check_in import CheckInService
 from midflight.services.claims import ClaimService, ClaimSubmission, parse_review_subject
@@ -270,6 +271,23 @@ def create_app(
     def check_in(pid: str, body: CheckInRequest, actor: Caller) -> dict[str, Any]:
         in_project(pid, actor)
         return check_in_json(services.check_ins.check_in(actor, body.task_id))
+
+    @app.post("/projects/{pid}/push-check")
+    def push_check(pid: str, body: CheckInRequest, actor: Caller) -> PlainTextResponse:
+        """For the pre-push hook: 200 if ready to push, 409 with the reasons if not."""
+        in_project(pid, actor)
+        reply = services.check_ins.check_in(actor, body.task_id)
+        if reply.ready_to_push:
+            return PlainTextResponse(f"Midflight: {reply.task.id} is ready to push.\n")
+        lines = [f"Midflight: {reply.task.id} isn't ready to push:"]
+        lines += [f"  - {blocker}" for blocker in reply.push_blockers]
+        lines += [f"  {d.id}: {d.requested_adjustment}" for d in reply.directives if d.blocking]
+        lines.append("Ask your agent to call check_in, deal with the above, and push again.")
+        return PlainTextResponse("\n".join(lines) + "\n", status_code=409)
+
+    @app.get("/hook/pre-push", include_in_schema=False)
+    def pre_push_hook() -> PlainTextResponse:
+        return PlainTextResponse(PRE_PUSH_HOOK)
 
     @app.post("/directives/{directive_id}/ack")
     def acknowledge(directive_id: str, body: AckRequest, actor: Caller) -> dict[str, Any]:

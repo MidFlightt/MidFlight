@@ -243,3 +243,12 @@ def test_plan_change_verification_and_fault_switch_work_on_this_store(store: Sto
     assert store.get_project(PROJECT).sync_state is SyncState.STALE
     services.sync.set_fault(lead, False)
     assert store.get_project(PROJECT).sync_state is SyncState.FRESH
+
+
+def test_a_replaced_token_stops_working(store: Store) -> None:
+    old = store.get_participant("p-t1")
+    new_hash = "f" * 64
+    replaced = old.model_copy(update={"token_hash": new_hash})
+    store.commit(Commit(project_id=PROJECT, idempotency_key="rotate", puts=[replaced]))
+    assert store.find_participant_by_token_hash(old.token_hash) is None
+    assert store.find_participant_by_token_hash(new_hash).id == "p-t1"
