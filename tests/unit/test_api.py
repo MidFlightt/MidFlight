@@ -266,8 +266,10 @@ def test_checking_in_on_another_agents_task_is_403(client: TestClient) -> None:
     assert response.status_code == 403
 
 
-def test_the_lead_uses_the_dashboard_not_check_in(client: TestClient) -> None:
-    assert client.post("/projects/demo/check-in", json={}, headers=LEAD).status_code == 403
+def test_a_lead_without_a_task_is_told_so(client: TestClient) -> None:
+    response = client.post("/projects/demo/check-in", json={}, headers=LEAD)
+    assert response.status_code == 400
+    assert "no task" in response.json()["detail"]
 
 
 # Directives (UC-07, UC-09, INV-09, INV-10) ---------------------------------------------

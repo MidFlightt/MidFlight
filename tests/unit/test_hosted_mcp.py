@@ -36,8 +36,8 @@ class Team:
         store = MemoryStore()
         clock = FixedClock(NOW)
         self.services = build_services(store, clock)
-        repos = FakeRepoAccess(installations={REPO: 4242}, admins={(REPO, "somesh")})
-        self.projects = ProjectService(store, clock, repos, self.services.plans)
+        self.repos = FakeRepoAccess(installations={REPO: 4242}, admins={(REPO, "somesh")})
+        self.projects = ProjectService(store, clock, self.repos, self.services.plans)
         self.users = {
             "somesh": self.projects.sign_in(GitHubAccount(101, "somesh")).id,
             "frederik": self.projects.sign_in(GitHubAccount(202, "frederik")).id,
@@ -206,3 +206,25 @@ async def test_creating_a_project_without_the_app_explains_how_to_install() -> N
     async with Client(team.server) as client:
         refused = await team.call(client, "somesh", "create_project", repository="acme/other")
     assert "isn't installed" in refused and "github.com/apps/" in refused
+
+
+async def test_two_teams_claims_never_collide() -> None:
+    team = Team()
+    team.repos.installations["acme/api"] = 7
+    team.repos.admins.add(("acme/api", "frederik"))
+    async with Client(team.server) as client:
+        for lead, repo, owner in (("somesh", REPO, "somesh"), ("frederik", "acme/api", "frederik")):
+            await team.call(client, lead, "create_project", repository=repo)
+            plan = plan_args()
+            plan["tasks"] = [t | {"owner": owner} for t in plan["tasks"]]
+            await team.call(client, lead, "propose_plan", **plan)
+            await team.call(client, lead, "approve_plan", version=1, reason="v1")
+            await team.call(client, lead, "submit_claim", **claim_args())
+    claims = [
+        c
+        for p in ("somesh", "frederik")
+        for c in team.services.store.list_claims(
+            team.projects.membership(team.projects.user(team.users[p])).project.id
+        )
+    ]
+    assert len({c.id for c in claims}) == 2, [c.id for c in claims]

@@ -176,8 +176,8 @@ def test_task_owned_by_another_agent_is_forbidden(env: Env) -> None:
         env.service.submit(env.agent("T3"), submission("T2"))
 
 
-def test_the_lead_does_not_submit_claims(env: Env) -> None:
-    with pytest.raises(PermissionDenied, match="only an agent"):
+def test_the_lead_can_only_claim_tasks_they_own(env: Env) -> None:
+    with pytest.raises(PermissionDenied, match="assigned to another"):
         env.service.submit(env.people["p-lead"], submission("T2"))
 
 

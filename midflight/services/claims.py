@@ -131,8 +131,10 @@ class ClaimService:
     ) -> SubmitResult:
         """Save a new claim or revision with its review job, then start the review."""
         correlation_id = correlation_id or new_correlation_id()
-        if actor.role is not Role.AGENT or not actor.active:
-            raise PermissionDenied("only an agent participant can submit claims (Q1)")
+        # Any active member may claim a task they own, the lead included: in a hosted
+        # project the lead is usually a developer too. Ownership is checked below.
+        if not actor.active:
+            raise PermissionDenied("you were removed from this project")
         project = self._project(actor.project_id)
         plan = self._current_plan(project)
 

@@ -44,7 +44,7 @@ class MemoryStore:
         self._jobs: dict[str, Job] = {}
         self._audit: list[AuditEvent] = []
         self._applied: dict[str, int] = {}
-        self._counters: dict[tuple[str, str], int] = defaultdict(int)
+        self._counters: dict[str, int] = defaultdict(int)
         self._users: dict[str, User] = {}
         self._auth: dict[tuple[str, str], tuple[dict[str, Any], float | None]] = {}
 
@@ -86,8 +86,9 @@ class MemoryStore:
 
     def next_id(self, project_id: str, prefix: str) -> str:
         with self._lock:
-            self._counters[(project_id, prefix)] += 1
-            return f"{prefix}-{self._counters[(project_id, prefix)]}"
+            # Numbered across all projects, so ids never collide between teams.
+            self._counters[prefix] += 1
+            return f"{prefix}-{self._counters[prefix]}"
 
     def _check(self, project_id: str, entity: Entity) -> None:
         """Refuse invalid data and writes that would rewrite history, before saving anything.

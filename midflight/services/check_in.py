@@ -20,7 +20,6 @@ from midflight.domain.models import (
     Participant,
     Plan,
     Requirement,
-    Role,
     SyncState,
     Task,
 )
@@ -58,8 +57,8 @@ class CheckInService:
         self._claims = claims
 
     def check_in(self, actor: Participant, task_id: str | None = None) -> CheckIn:
-        if actor.role is not Role.AGENT:
-            raise PermissionDenied("check_in is for agents; the lead uses the dashboard")
+        if not actor.active:
+            raise PermissionDenied("you were removed from this project")
         project = self._store.get_project(actor.project_id)
         if project is None:
             raise NotFound(f"no project {actor.project_id}")

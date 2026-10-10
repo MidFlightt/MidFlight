@@ -75,7 +75,11 @@ class Store(Protocol):
         ...
 
     def next_id(self, project_id: str, prefix: str) -> str:
-        """A project-unique, increasing id such as `D-3`. Never reused."""
+        """An increasing id such as `D-3`, unique across all projects. Never reused.
+
+        `project_id` is kept for context; ids are stored by themselves, so two teams
+        must never get the same `C-1`.
+        """
         ...
 
     def get_project(self, project_id: str) -> Project | None: ...
