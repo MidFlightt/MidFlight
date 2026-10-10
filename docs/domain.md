@@ -147,7 +147,10 @@ stateDiagram-v2
 ```
 
 `queued`, `delivered`, and `needs_clarification` are open: a blocking open directive
-refuses a push (UC-16). A superseded directive keeps any earlier answer as history.
+refuses a push (UC-16). A newer affected plan, lead revision decision, or verification
+correction supersedes these open directives. The replacement still blocks until answered;
+the claim must also be approved (with revision when requested). A superseded directive keeps any earlier
+answer as history.
 
 How a review decides (`midflight/domain/decide.py`, UC-05 step 5), in order:
 
@@ -332,7 +335,7 @@ your task touches, and name it after the ID, for example `test_inv_02_stale_revi
 | INV-02 | A verdict is saved only if the coordination revision is the one the review started from. Otherwise the review reruns. Two conflicting claims can never both be approved. | NFR-03, UC-05 6a |
 | INV-03 | Missing, truncated, or stale evidence is never `verified`. Unknown stays unknown. | FR-08, FR-09 |
 | INV-04 | Every claim, directive, and verification records the plan version it was made against. Results from an old plan version or an old head SHA can't become current. | FR-02, FR-09 |
-| INV-05 | At most one actionable plan-change directive per (plan version, task), and one correction directive per verification (D13). Reprocessing creates no duplicates; a newer plan supersedes the task's older `queued` or `delivered` directives. | FR-06, NFR-02 |
+| INV-05 | At most one actionable plan-change directive per (plan version, task), and one correction directive per verification (D13). Reprocessing creates no duplicates; a newer plan supersedes the task's older `queued`, `delivered`, or `needs_clarification` directives. | FR-06, NFR-02 |
 | INV-06 | A webhook with an invalid signature returns 401 and stores nothing. A repeated delivery id produces one logical outcome. | FR-08, NFR-02 |
 | INV-07 | Repository content, claims, diffs, findings, and directives are data. Nothing in them is executed or changes permissions. | NFR-08 |
 | INV-08 | Only the lead approves plans and resolves escalations. Agents get 403. Unauthenticated calls get 401. | FR-01, NFR-07 |

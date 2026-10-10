@@ -12,6 +12,9 @@ from midflight.adapters.memory_store import MemoryStore
 from midflight.api.app import Services, build_services
 from midflight.domain.models import (
     ClaimState,
+    Directive,
+    DirectiveResponse,
+    DirectiveSource,
     DirectiveState,
     EscalationState,
     FindingKind,
@@ -19,7 +22,7 @@ from midflight.domain.models import (
     Participant,
     Resolution,
 )
-from midflight.ports import ClaimReviewRequest
+from midflight.ports import ClaimReviewRequest, Commit
 from midflight.services.errors import PermissionDenied, StateConflict
 from midflight.services.plans import PlanDraft
 
@@ -253,3 +256,40 @@ def test_claims_in_conflict_with_the_same_requirement_share_one_escalation() -> 
     services.escalations.resolve(people["p-lead"], escalation.id, Resolution.REQUEST_REVISION, "x")
     assert state(services, t2.claim_id) is ClaimState.NEEDS_REVISION
     assert state(services, t3.claim_id) is ClaimState.NEEDS_REVISION
+
+
+def test_lead_replacement_clears_clarification_and_restores_readiness(team) -> None:
+    services, people = team
+    t1, _t2, eid = escalate(services, people)
+    actor = people["p-t1"]
+    old = Directive(
+        id="D-question",
+        source=DirectiveSource.PLAN_CHANGE,
+        project_id="demo",
+        task_id="T1",
+        recipient_id=actor.id,
+        plan_version=1,
+        requested_adjustment="Clarify the tax assumption",
+        reason="Tax question",
+        created_at=NOW,
+    )
+    services.store.commit(Commit(project_id="demo", idempotency_key="question", puts=[old]))
+    services.check_ins.check_in(actor, "T1")
+    services.directives.acknowledge(
+        actor, old.id, DirectiveResponse.NEEDS_CLARIFICATION, "Are totals tax-exclusive?"
+    )
+    services.escalations.resolve(
+        people["p-lead"], eid, Resolution.REQUEST_REVISION, "Totals exclude tax."
+    )
+    stored = services.store.get_directive(old.id)
+    assert stored.state is DirectiveState.SUPERSEDED
+    assert stored.response is DirectiveResponse.NEEDS_CLARIFICATION
+    [replacement] = services.check_ins.check_in(actor, "T1").directives
+    assert not services.check_ins.check_in(actor, "T1").ready_to_push
+    services.directives.acknowledge(actor, replacement.id, DirectiveResponse.ACKNOWLEDGED)
+    assert not services.check_ins.check_in(actor, "T1").ready_to_push
+    result = services.claims.submit(
+        actor, submission("T1", claim_id=t1, assumptions=["total_cents excludes tax"])
+    )
+    assert result.state is ClaimState.APPROVED
+    assert services.check_ins.check_in(actor, "T1").ready_to_push
