@@ -99,6 +99,7 @@ uv run pytest                              # all tests
 uv run pytest tests/unit/test_rules.py -k total_cents   # one test
 uv run ruff check .                        # lint
 uv run ruff format .                       # format
+uv run python tests/scenario_report.py     # trace every scenario into docs/pages/scenarios.html
 ```
 
 After M-2 and M-3 (local stack):
