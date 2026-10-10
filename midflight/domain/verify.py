@@ -39,7 +39,7 @@ from midflight.domain.models import (
 )
 
 # A branch may not change these: they decide whether the branch passes (NFR-10).
-PROTECTED_PREFIXES = ("tests/contract/", ".github/")
+PROTECTED_PREFIXES = ("tests/contract/", "contracts/", ".github/")
 
 # What the contract-test workflow uploads (see docs/domain.md, GitHub names).
 ARTIFACT_NAME = "contract-results"
@@ -51,17 +51,35 @@ def is_protected(path: str) -> bool:
 
 def parse_test_results(artifact: object, head_sha: str) -> list[TestResult] | None:
     """The results in a `contract-results` artifact, or None if it's missing, malformed,
-    or for another commit. Expected: `{"sha": "...", "results": [{"name", "passed",
-    "message"}]}`."""
-    if not isinstance(artifact, dict) or artifact.get("sha") != head_sha:
+    or for another commit. Two shapes are accepted:
+
+    - one result per test: `{"sha": "...", "results": [{"name", "passed", "message"}]}`
+    - a summary: `{"head_sha": "...", "passed": true, "failures": ["Provider: ..."]}`,
+      as the demo shop's trusted runner writes it
+    """
+    if not isinstance(artifact, dict):
         return None
-    results = artifact.get("results")
-    if not isinstance(results, list) or not results:
-        return None
-    try:
-        return [TestResult.model_validate(r) for r in results]
-    except ValueError:
-        return None
+    if artifact.get("sha") == head_sha:
+        results = artifact.get("results")
+        if not isinstance(results, list) or not results:
+            return None
+        try:
+            return [TestResult.model_validate(r) for r in results]
+        except ValueError:
+            return None
+    if artifact.get("head_sha") == head_sha and isinstance(artifact.get("passed"), bool):
+        failures = [str(f) for f in artifact.get("failures") or [] if str(f).strip()]
+        if artifact["passed"] and not failures:
+            return [TestResult(name="contract checks", passed=True)]
+        if not failures:
+            return [TestResult(name="contract checks", passed=False)]
+        return [
+            TestResult(
+                name=f.split(":", 1)[0].strip() or "contract check", passed=False, message=f[:500]
+            )
+            for f in failures
+        ]
+    return None
 
 
 def coverage(
