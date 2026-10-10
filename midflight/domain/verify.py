@@ -107,7 +107,10 @@ def check_commit(
     truncated: bool,
     contents: Mapping[str, str],
     tests: list[TestResult] | None,
+    owners: Mapping[str, str] | None = None,
 ) -> list[Finding]:
+    """What plain rules find in a push (D33). `owners` maps a file to the other task
+    whose claim lists it."""
     findings: list[Finding] = []
     short = head_sha[:7]
 
@@ -159,7 +162,7 @@ def check_commit(
             add(
                 FindingKind.TEST_FAILURE,
                 f"Contract test {test.name} failed on {short}.",
-                "Fix the code so the contract test passes; don't change the test.",
+                f"Fix the code so contract test {test.name} passes; don't change the test.",
                 [Evidence(kind=EvidenceKind.TEST, ref=test.name, excerpt=test.message[:500])],
             )
 
@@ -175,9 +178,25 @@ def check_commit(
         )
 
     if claim is not None:
-        findings += _missing_fields(verification_id, claim, plan, short, contents, len(findings))
+        if tests is None:
+            # Contract tests check the fields when they run. Without their results this
+            # is the only check that the promised fields are in the code.
+            findings += _missing_fields(
+                verification_id, claim, plan, short, contents, len(findings)
+            )
         declared = set(claim.files)
         undeclared = [p for p in changed_paths if p not in declared and not is_protected(p)]
+        foreign = [p for p in undeclared if p in (owners or {})]
+        undeclared = [p for p in undeclared if p not in foreign]
+        if foreign:
+            whose = ", ".join(f"{p} ({(owners or {})[p]})" for p in foreign[:8])
+            add(
+                FindingKind.UNDECLARED_CHANGE,
+                f"This push changes files that belong to another task: {whose}.",
+                "Undo those changes. If you need something there, say so in your claim's "
+                "assumptions and name that task.",
+                [Evidence(kind=EvidenceKind.DIFF, ref=p) for p in foreign[:5]],
+            )
         if undeclared:
             add(
                 FindingKind.UNDECLARED_CHANGE,

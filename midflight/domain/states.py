@@ -31,7 +31,10 @@ CLAIM_TRANSITIONS: Mapping[ClaimState | None, frozenset[ClaimState]] = {
     _C.PENDING: frozenset({_C.APPROVED, _C.NEEDS_REVISION, _C.HUMAN_REVIEW_REQUIRED, _C.WITHDRAWN}),
     _C.NEEDS_REVISION: frozenset({_C.PENDING, _C.WITHDRAWN}),
     _C.HUMAN_REVIEW_REQUIRED: frozenset({_C.PENDING, _C.NEEDS_REVISION, _C.WITHDRAWN}),
-    _C.APPROVED: frozenset({_C.PENDING, _C.HUMAN_REVIEW_REQUIRED, _C.CLOSED, _C.WITHDRAWN}),
+    # A decision about an approved claim sends it straight back for revision (D31).
+    _C.APPROVED: frozenset(
+        {_C.PENDING, _C.NEEDS_REVISION, _C.HUMAN_REVIEW_REQUIRED, _C.CLOSED, _C.WITHDRAWN}
+    ),
     _C.WITHDRAWN: frozenset(),
     _C.CLOSED: frozenset(),
 }

@@ -260,18 +260,40 @@ def test_a_conflict_the_second_look_confirms_still_blocks() -> None:
     assert finding["severity"] == "blocking"
 
 
-def test_a_failed_second_look_leaves_the_conflict_blocking() -> None:
+def test_a_finding_that_cannot_be_checked_twice_does_not_block() -> None:
+    # An unchecked flag doesn't stop people (D32).
     throttled = ClientError({"Error": {"Code": "ThrottlingException"}}, "Converse")
     for second in (throttled, {"unexpected": "shape"}):
         [finding] = review(TwoStepBedrock([conflict("C-1", "C-2")], second))
-        assert finding["severity"] == "blocking"
+        assert finding["severity"] == "info"
+        assert finding["explanation"].endswith("(Not checked a second time, so it doesn't block.)")
 
 
-def test_only_blocking_conflicts_get_a_second_look() -> None:
-    mismatch = conflict("C-1", "C-2") | {"kind": "semantic_mismatch"}
-    bedrock = TwoStepBedrock([mismatch])
-    assert review(bedrock) == [mismatch]
+def test_only_blocking_findings_get_a_second_look() -> None:
+    note = conflict("C-1", "C-2") | {"kind": "semantic_mismatch", "severity": "info"}
+    bedrock = TwoStepBedrock([note])
+    assert review(bedrock) == [note]
     assert len(bedrock.calls) == 1
+
+
+def test_the_second_look_says_who_decides_and_gives_the_answer() -> None:
+    # A technical question: the reviewer settles it, whatever the first pass called it.
+    technical = {
+        "contradiction": True,
+        "why": "one field, two meanings",
+        "decides": "reviewer",
+        "answer": "A booking's total never changes after cancelling.",
+    }
+    [finding] = review(TwoStepBedrock([conflict("C-1", "C-2")], technical))
+    assert (finding["kind"], finding["severity"]) == ("semantic_mismatch", "blocking")
+    assert finding["proposed_correction"] == "A booking's total never changes after cancelling."
+
+    # A product question: it goes to the lead, with the answer as a suggestion.
+    product = technical | {"decides": "lead", "answer": "Keep a 10% fee."}
+    mismatch = conflict("C-1", "C-2") | {"kind": "semantic_mismatch"}
+    [finding] = review(TwoStepBedrock([mismatch], product))
+    assert (finding["kind"], finding["severity"]) == ("requirement_conflict", "blocking")
+    assert finding["proposed_correction"] == "Keep a 10% fee."
 
 
 # The model often explains a conflict with one claim and cites other ids ------------------
