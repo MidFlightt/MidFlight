@@ -128,10 +128,10 @@ account's administrators can use it. The first command prints the role's ARN; de
 with it:
 
 ```bash
-sam deploy ... --parameter-overrides PublicUrl=<FunctionUrl without the slash> ReviewerModel=us.amazon.nova-pro-v1:0 ReviewerRoleArn=<that ARN>
+sam deploy ... --parameter-overrides PublicUrl=<FunctionUrl without the slash> ReviewerModel=us.amazon.nova-2-lite-v1:0 ReviewerRoleArn=<that ARN>
 ```
 
-The live deploy uses `us.amazon.nova-pro-v1:0` through the role
+The live deploy uses `us.amazon.nova-2-lite-v1:0` (chosen in `evals/results.md`) through the role
 `arn:aws:iam::825125930394:role/midflight-bedrock-reviewer` (October 9): that account
 hasn't submitted Anthropic's use-case form, so Claude isn't available there yet.
 
