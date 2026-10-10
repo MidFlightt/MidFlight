@@ -1,10 +1,11 @@
-"""Replay recorded escalations through the AI reviewer and count what it blocks.
+"""Replay recorded escalations through the AI reviewer and count what it does.
 
 Every escalation Midflight opened during the HireBot experiment is one labelled case:
 the claim under review, the plan, the other claims as they stood at that moment, and
 whether the conflict was real (the lead decided it) or a false alarm (the lead dismissed
-it, or the stated conflict isn't in the data). A good reviewer blocks the real ones and
-none of the false ones.
+it, or the stated conflict isn't in the data). A good reviewer stops the real ones, sends
+each to the right decider (the lead for a product question, itself for a technical
+one), and lets the false ones through.
 
     python evals/replay_escalations.py export   # rebuild the cases from the live table
     python evals/replay_escalations.py run      # replay them with the current reviewer
@@ -50,6 +51,10 @@ LABELS = {
     "E-12": ("false", "both claims said the same thing"),
     "E-13": ("false", "'gives the hours back' does not change a total"),
 }
+
+# Who should settle each real one (D31, D32). The tax cases are answered by the plan
+# (requirement R-2 says 8% tax), so the plan wins and no person is needed.
+DECIDER = {"E-3": "reviewer", "E-4": "reviewer", "E-8": "lead", "E-10": "reviewer"}
 
 
 # Export ----------------------------------------------------------------------------------
@@ -134,7 +139,7 @@ def run(second_look: bool, skip_awaiting: bool, repeat: int) -> None:
     print(f"model {settings.reviewer_model}; second look {'on' if second_look else 'off'}; ")
     print(f"claims awaiting revision {'skipped' if skip_awaiting else 'compared'}; ", end="")
     print(f"{repeat} review(s) per case\n")
-    blocked = {"real": 0, "false": 0}
+    tally = {"caught": 0, "right decider": 0, "real": 0, "to lead": 0, "revised": 0, "false": 0}
     started = time.monotonic()
     for case in cases:
         plan = Plan.model_validate(case["plan"])
@@ -145,26 +150,34 @@ def run(second_look: bool, skip_awaiting: bool, repeat: int) -> None:
             if not (skip_awaiting and o["awaiting_revision"])
         ]
         request = ClaimReviewRequest(plan=plan, claim=claim, other_claims=others, rule_findings=[])
-        stops = [_stops(reviewer, request) for _ in range(repeat)]
-        said = next((s for s in stops if s), None)
-        blocked[case["label"]] += sum(bool(s) for s in stops)
-        times = sum(bool(s) for s in stops)
-        right = times == (repeat if case["label"] == "real" else 0)
+        outcomes = [_outcome(reviewer, request) for _ in range(repeat)]
+        lead, own = outcomes.count("lead"), outcomes.count("reviewer")
+        if case["label"] == "real":
+            wanted = DECIDER[case["id"]]
+            tally["real"] += repeat
+            tally["caught"] += lead + own
+            tally["right decider"] += outcomes.count(wanted)
+            note = f"should go to: {wanted}"
+        else:
+            tally["false"] += repeat
+            tally["to lead"] += lead
+            tally["revised"] += own
+            note = "should pass"
         print(
-            f"{case['id']:>5}  {case['label']:<5}  blocked {times} of {repeat}"
-            f"{'' if right else '   <-- wrong'}"
+            f"{case['id']:>5}  {case['label']:<5}  lead {lead}  reviewer {own}  "
+            f"passes {repeat - lead - own}   ({note})"
         )
-        print(f"        {said[:150] if said else case['why']}")
-    reviews = {label: repeat * sum(c["label"] == label for c in cases) for label in blocked}
     print(
-        f"\nreal conflicts blocked: {blocked['real']} of {reviews['real']} reviews   "
-        f"false alarms blocked: {blocked['false']} of {reviews['false']} reviews   "
-        f"{(time.monotonic() - started) / (repeat * len(cases)):.1f}s per review"
+        f"\nreal questions: stopped {tally['caught']} of {tally['real']} reviews, "
+        f"{tally['right decider']} sent to the right decider"
+        f"\nfalse alarms: {tally['to lead']} of {tally['false']} reviews went to the lead, "
+        f"{tally['revised']} asked the agent to revise for nothing"
+        f"\n{(time.monotonic() - started) / (repeat * len(cases)):.1f}s per review"
     )
 
 
-def _stops(reviewer: BedrockReviewer, request: ClaimReviewRequest) -> str | None:
-    """The conflict that would stop the agent for the lead, or None if the claim passes."""
+def _outcome(reviewer: BedrockReviewer, request: ClaimReviewRequest) -> str:
+    """Who ends up settling it: the `lead`, the `reviewer`, or nobody (it `passes`)."""
     plan, claim, others = request.plan, request.claim, request.other_claims
     try:
         reply = reviewer.review_claim(request)
@@ -172,9 +185,14 @@ def _stops(reviewer: BedrockReviewer, request: ClaimReviewRequest) -> str | None
         reply = reviewer.review_claim(request)  # the service asks twice too
     findings = parse_reviewer_findings(reply, _known_ids(plan, claim, others), claim)
     # The same last step the service applies before a finding can stop anyone.
-    kept = [_only_between_people(f, plan, claim, others) for f in findings or []]
-    stops = [f for f in kept if f.blocking and f.kind.value == "requirement_conflict"]
-    return stops[0].explanation if stops else None
+    kinds = {
+        f.kind.value
+        for f in (_only_between_people(f, plan, claim, others) for f in findings or [])
+        if f.blocking
+    }
+    if "requirement_conflict" in kinds:
+        return "lead"
+    return "reviewer" if "semantic_mismatch" in kinds else "passes"
 
 
 def main() -> None:
