@@ -33,7 +33,7 @@ class DirectiveService:
             raise PermissionDenied(f"directive {directive_id} is for another agent")
         if directive.state is DirectiveState.SUPERSEDED:
             raise StateConflict(
-                f"directive {directive_id} was superseded by a newer plan (UC-09 1a)",
+                f"directive {directive_id} was replaced by a newer one (UC-09 1a)",
                 "Check in to get the current directive.",
             )
         try:
