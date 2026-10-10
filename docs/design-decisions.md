@@ -1,8 +1,11 @@
 # Open design decisions
 
-The project brief proposes Strands, Bedrock AgentCore, DynamoDB, and Lambda.
-The first local prototype uses Python and in-memory state. AWS architecture
-and model reasoning remain undecided.
+The [proposed system architecture](../systemarchitecture.md) expands the project
+brief into an AWS service layout, with a technology guide and workflow diagrams.
+The [draft requirements](../PROJECT_REQUIREMENTS.md) describe the intended MVP;
+the [extended reading guide](architecture-reading-guide.md) explains the tradeoffs.
+These documents are proposals for team review. The first local prototype uses
+Python and in-memory state; the cloud design and model reasoning are unimplemented.
 
 ## Confirmed: lightweight claims
 
@@ -22,6 +25,12 @@ in incompatible ways. Separate evidence gathering from permission to proceed.
 
 ## Subsequent decisions
 
+- Whether incomplete claims remain drafts until their dependencies and acceptance
+  criteria are sufficient for approval; the current prototype accepts broad claims.
+- One canonical demo change: adding currency or a subtotal/tax breakdown. The
+  requirements and workflow diagrams currently illustrate different changes.
+- The two coding-agent hosts, AWS account/region, model access, and whether the
+  submission requires AgentCore Runtime or a publicly hosted dashboard.
 - Shared plan format, revisioning, and ownership.
 - Claim lifecycle and atomic handling of simultaneous claims.
 - GitHub authentication, webhook verification, event deduplication, and permissions.

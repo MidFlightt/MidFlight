@@ -27,15 +27,41 @@ Conflicts between people's requirements are escalated to humans. Midflight does
 not choose a winner. A successful check supplies evidence of alignment; it does
 not replace correctness tests or guarantee a branch is safe to merge.
 
-## Planned AWS architecture
+## Proposed system architecture
 
-- Strands agent running on Bedrock AgentCore with a Bedrock model.
-- DynamoDB for plan and claim state.
-- Lambda for GitHub webhooks.
-- GitHub API for diffs and commit status checks: the external tool we do not build.
+The [system architecture](systemarchitecture.md) explains where each component
+runs, with diagrams for the service layout, claim review, and requirement changes.
+Each technology includes a short explanation and official documentation links.
 
-These are the team's proposed services. Runtime, API contracts, authentication,
-data model, and deployment details still need design decisions.
+- **Agents and lead:** local MCP adapters connect coding agents to the shared
+  backend; a Streamlit dashboard shows the lead plans, findings, and decisions.
+- **Backend:** Python, FastAPI, and Pydantic behind API Gateway and Lambda;
+  DynamoDB stores versioned plans, claims, directives, jobs, and audit history.
+- **Reviews:** durable jobs reach SQS workers through a job relay. Workers enforce
+  explicit rules and validate findings from a Strands reviewer hosted on AgentCore
+  Runtime using a Bedrock model.
+- **Evidence:** a GitHub App retrieves code and publishes `midflight/verify`;
+  GitHub Actions supplies trusted contract-test results for the reviewed commit.
+
+This is a proposed design for team review. The current prototype remains a local,
+in-memory declaration checker. See the [draft requirements](PROJECT_REQUIREMENTS.md)
+for scope and acceptance gates, and the [open decisions](docs/design-decisions.md)
+for choices to settle before implementation.
+
+## Read before building
+
+1. [Draft project requirements](PROJECT_REQUIREMENTS.md) — intended behavior,
+   MVP scope, reliability rules, and demonstration acceptance criteria.
+2. [Shared vocabulary and workflows](docs/flowchart.md) — ownership, agreements,
+   checkpoints, and the checkout example.
+3. [System architecture](systemarchitecture.md) — concise diagrams, technologies,
+   responsibilities, and official reading links.
+4. [Extended architecture and reading guide](docs/architecture-reading-guide.md)
+   — tradeoffs, concurrency, evidence handling, and a suggested learning order.
+
+The first proposed build milestone is two actual coding-agent sessions submitting
+incompatible claims, receiving an explained finding, and revising a claim through
+the review workflow. Plan-change propagation and GitHub verification follow.
 
 ## Failure paths and responsible AI
 
@@ -77,6 +103,9 @@ matches. None grants permission to proceed or proves semantic compatibility.
 Questions are printed for human inspection, not sent to coding agents.
 
 - [Team workflow](CONTRIBUTING.md)
+- [Draft project requirements](PROJECT_REQUIREMENTS.md)
+- [System architecture and technology references](systemarchitecture.md)
+- [Extended architecture and reading guide](docs/architecture-reading-guide.md)
 - [Claim template](docs/claim-template.md)
 - [Hackathon demo and acceptance criteria](docs/demo.md)
 - [Open design decisions](docs/design-decisions.md)
