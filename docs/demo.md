@@ -4,6 +4,8 @@
 > [storyboard draft](development-plan.md#demo-storyboard). The full scenario list
 > with expected results is [requirements §11](requirements.md#11-required-demonstration-and-evaluation),
 > traced to use cases in [use-cases.md](use-cases.md#demo-traceability).
+> An animated version can be generated with the Remotion prompt in
+> [video-prompt.md](video-prompt.md).
 
 Use the synthetic checkout project (`midflight-demo-shop`), two Claude Code sessions
 (T1 backend, T2 frontend), and a human integration lead. Demonstrate a coherent
