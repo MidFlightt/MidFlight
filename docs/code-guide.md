@@ -51,6 +51,7 @@ touches AWS or GitHub.
 | `rules.py` | The deterministic claim checks: unknown ids, old plan version, wrong contract field or type (`total` vs `total_cents`), scope, duplicate provider, shared files. |
 | `decide.py` | Findings in, verdict out: `approved`, `needs_revision`, `draft`, `human_review_required`, or held `pending`. |
 | `impact.py` | What changed between two plan versions, and which tasks that touches. |
+| `neighbours.py` | Which of the other agents' assumptions are about a given task, so check-in can pass them on (D27). |
 | `verify.py` | The checks on a pushed commit: missing evidence, failed contract tests, a contract field missing from the task's files, edits to protected test or CI files, undeclared files. |
 
 ### `midflight/services/`: what Midflight does
@@ -64,7 +65,7 @@ touches AWS or GitHub.
 | `escalations.py` | The lead's decision on a conflict between people's requirements: clarify the plan, request revisions, or dismiss. |
 | `verification.py` | The verification job: read the push from GitHub, run the checks, publish `midflight/verify`, and queue a correction directive or an escalation. |
 | `sync.py` | Stale and fresh GitHub data, and the demo fault switch. |
-| `check_in.py` | What an agent gets at a checkpoint: its task, requirements, contracts, claim verdict, directives, and whether it may push. |
+| `check_in.py` | What an agent gets at a checkpoint: its task, requirements, contracts, claim verdict, directives, what other tasks assume about it, open escalations, and whether it may push. |
 | `directives.py` | An agent's answer to a directive. |
 | `participants.py` | Tokens for scripts and the pre-push hook (stored as hashes); `issue_hook_token` for `hook_setup`. |
 | `audit.py`, `errors.py` | Building audit events; the errors services raise (each maps to an HTTP status). |
@@ -95,7 +96,7 @@ touches AWS or GitHub.
 | `dynamo_store.py` | The same store on DynamoDB: for AWS. The same tests run against both. |
 | `github.py` | Real GitHub: sign-in, "is the App installed / is this person an admin?", and everything verification reads and publishes. |
 | `fake_github.py` | Fake GitHub for tests and the dev login. |
-| `bedrock.py` | The AI reviewer on Amazon Bedrock. It proposes findings only. |
+| `bedrock.py` | The AI reviewer on Amazon Bedrock. It proposes findings only, and asks a second, narrower question before reporting a conflict between people as blocking (D29). |
 | `runners.py` | How background jobs run: now (`InlineRunner`), when a test says (`DeferredRunner`), or by the AWS worker (`StreamRunner`). |
 | `clock.py` | The real clock, and a frozen one for tests. |
 
@@ -228,6 +229,8 @@ To see journey 3 step by step for every demo scenario, open
 | `unit/test_plan_change.py` | A plan change reaches T1 and T2, not T3; supersede; held while stale |
 | `unit/test_escalations.py` | The tax conflict escalates; each resolution |
 | `unit/test_bedrock.py` | The Bedrock reviewer against a fake Bedrock |
+| `evals/replay_escalations.py` | Replays the experiment's recorded escalations through the AI reviewer and counts real conflicts blocked and false alarms blocked. Numbers in `evals/results.md`. |
+| `unit/test_experiment_fixes.py` | What the HireBot experiment changed: assumptions passed on, scoped blocks, fewer false alarms (D27 to D29) |
 | `unit/test_verification.py` | Pushes verified, failed, incomplete, escalated; the webhook; outages and the fault switch |
 | `unit/test_hook.py` | The pre-push hook: the real script, its token, the push check |
 | `integration/test_hosted_server_http.py` | The real server over HTTP: sign in like an AI client, then use the tools |

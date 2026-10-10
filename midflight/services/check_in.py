@@ -4,6 +4,10 @@ The reply carries the task's plan context (requirements and the contracts it pro
 or consumes), the agent's current claim verdict, and open directives. Directives still
 `queued` are marked `delivered` by being returned, unless GitHub data is stale, in
 which case they're held (INV-09). `ready_to_push` is what the pre-push hook checks.
+
+It also carries what the plan can't: what other tasks' claims assume about this one
+(D27), and the escalations the lead hasn't decided yet (D28). An agent sees the ones its
+claim is part of; the lead sees all of them.
 """
 
 from __future__ import annotations
@@ -17,12 +21,16 @@ from midflight.domain.models import (
     Contract,
     Directive,
     DirectiveState,
+    Escalation,
+    EscalationState,
     Participant,
     Plan,
     Requirement,
+    Role,
     SyncState,
     Task,
 )
+from midflight.domain.neighbours import NeighbourAssumption, assumptions_about
 from midflight.domain.states import (
     ACTIVE_CLAIM_STATES,
     OPEN_DIRECTIVE_STATES,
@@ -48,6 +56,9 @@ class CheckIn:
     stale_reason: str | None
     ready_to_push: bool
     push_blockers: Sequence[str]
+    assumed_by_others: Sequence[NeighbourAssumption] = ()
+    escalations: Sequence[Escalation] = ()
+    you_decide: bool = False  # the escalations are the lead's own to resolve
 
 
 class CheckInService:
@@ -118,9 +129,17 @@ class CheckInService:
             )
         )
 
-        claim = self._current_claim(actor, task.id)
+        claims = self._store.list_claims(project.id)
+        claim = _current_claim(claims, actor, task.id)
         verdict = self._claims.verdict(claim.id, claim.revision) if claim else None
         blockers = _push_blockers(claim, directives)
+        lead = actor.role is Role.LEAD
+        undecided = [
+            e
+            for e in self._store.list_escalations(project.id)
+            if e.state is EscalationState.OPEN
+            and (lead or (claim is not None and claim.id in e.claim_ids))
+        ]
         return CheckIn(
             plan_version=plan.version,
             task=task,
@@ -136,6 +155,9 @@ class CheckInService:
             stale_reason=project.sync_reason if stale else None,
             ready_to_push=not blockers,
             push_blockers=blockers,
+            assumed_by_others=assumptions_about(task, claim.files if claim else [], claims),
+            escalations=undecided,
+            you_decide=lead,
         )
 
     def _task(self, plan: Plan, actor: Participant, task_id: str | None) -> Task:
@@ -157,15 +179,12 @@ class CheckInService:
             )
         return task
 
-    def _current_claim(self, actor: Participant, task_id: str) -> Claim | None:
-        mine = [
-            c
-            for c in self._store.list_claims(actor.project_id)
-            if c.task_id == task_id and c.agent_id == actor.id
-        ]
-        active = [c for c in mine if c.state in ACTIVE_CLAIM_STATES]
-        pool = active or mine
-        return max(pool, key=lambda c: c.created_at) if pool else None
+
+def _current_claim(claims: Sequence[Claim], actor: Participant, task_id: str) -> Claim | None:
+    mine = [c for c in claims if c.task_id == task_id and c.agent_id == actor.id]
+    active = [c for c in mine if c.state in ACTIVE_CLAIM_STATES]
+    pool = active or mine
+    return max(pool, key=lambda c: c.created_at) if pool else None
 
 
 def _queued(directive: Directive) -> bool:

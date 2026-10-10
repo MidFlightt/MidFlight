@@ -1,0 +1,6673 @@
+{
+ "project": "midflight-9854",
+ "cases": [
+  {
+   "id": "E-1",
+   "label": "false",
+   "why": "compared with a withdrawn claim; both said the same thing",
+   "reviewer_said": "Claim C-2 assumes that the catalog (T1) agent ids are unknown and resolves them via a local rate table, while claim C-4 assumes that the catalog must use the same ids as the hiring system. These assumptions are contradictory.",
+   "lead_answered": "dismiss: Not a conflict: C-2 is a withdrawn claim, and both say the same thing (slug ids, README rates).",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 1,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Customers browse the AI agents for hire with their hourly rates in credits",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Customers hire agents for a number of hours each and see the price: subtotal, the 8% AI Labor Tax, and total, in whole credits",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Hiring creates a booking with an id that can be fetched again",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Agent catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent-catalog"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Hiring",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-hiring",
+      "requirement_ids": [
+       "R-2",
+       "R-3"
+      ],
+      "provides": [
+       "hire-request",
+       "hire-item",
+       "booking"
+      ],
+      "consumes": [
+       "agent-catalog"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Storefront",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-storefront",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent-catalog",
+       "hire-request",
+       "hire-item",
+       "booking"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent-catalog",
+      "version": 1,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3"
+      ],
+      "fields": {
+       "id": "string",
+       "name": "string",
+       "tagline": "string",
+       "hourly_rate": "integer"
+      }
+     },
+     {
+      "id": "hire-request",
+      "version": 1,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "items": "array"
+      }
+     },
+     {
+      "id": "hire-item",
+      "version": 1,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "agent_id": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 1,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "booking_id": "string",
+       "subtotal": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-09T22:53:33.546046Z",
+    "change_reason": "HireBot: three parts and the contracts between them",
+    "changed_ids": []
+   },
+   "claim": {
+    "id": "C-4",
+    "revision": 1,
+    "project_id": "midflight-9854",
+    "task_id": "T2",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t2-hiring",
+    "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+    "plan_version": 1,
+    "state": "pending",
+    "requirement_ids": [],
+    "files": [
+     "app/hiring.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "hire-request",
+      "fields": {
+       "items": "array"
+      }
+     },
+     {
+      "contract_id": "hire-item",
+      "fields": {
+       "agent_id": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "contract_id": "booking",
+      "fields": {
+       "booking_id": "string",
+       "subtotal": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "agent-catalog",
+      "fields": {
+       "id": "string",
+       "hourly_rate": "integer"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "Only app/hiring.py is edited; catalog.py is T1's and empty in my branch, so I cannot import it. Rates are resolved from a rate table inside hiring.py mirroring the README rates, keyed by agent id.",
+     "Agent ids are lowercase hyphen slugs of the README names (e.g. intern-o-tron-3000, lgtm-as-a-service, meeting-ghost, overconfident-junior, hallucination-detective, rubber-duck-pro); T1's catalog must use the same ids.",
+     "hours is a positive integer; tax = round-half-up(subtotal*0.08) in whole credits; total = subtotal + tax.",
+     "Bookings are stored in memory; booking_id is a string; GET /api/bookings/{id} returns 404 for unknown ids; unknown agent_id returns 422/404.",
+     "Booking response also includes items (agent_id, hours, hourly_rate, line total) beyond the contract fields."
+    ],
+    "acceptance_criteria": [
+     "POST /api/hire returns booking_id, subtotal, tax, total as integers",
+     "GET /api/bookings/{id} returns the same booking, 404 if unknown",
+     "Tax is 8% of subtotal in whole credits"
+    ],
+    "reason": null,
+    "created_at": "2026-10-09T23:41:38.027194Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-3",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+      "plan_version": 1,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent-catalog",
+        "fields": {
+         "id": "string",
+         "name": "string",
+         "tagline": "string",
+         "hourly_rate": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of the six README agents",
+       "id is a slug string derived from name (e.g. intern-o-tron-3000)",
+       "hourly_rate is whole credits (integer), per README",
+       "app/main.py mounts the catalog router under /api prefix (I define route /agents)"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns 6 agents each with id, name, tagline, hourly_rate"
+      ],
+      "reason": null,
+      "created_at": "2026-10-09T23:41:11.383237Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-2",
+   "label": "false",
+   "why": "a price preview and the server's tax math agree",
+   "reviewer_said": "Claim C-6 assumes that the storefront computes a preview of subtotal, 8% tax, and total locally, while claim C-4 assumes that the tax is calculated as round-half-up of 8% of the subtotal. These assumptions conflict with requirement R-2, which states that customers see the price: subtotal, the 8% AI Labor Tax, and total, in whole credits.",
+   "lead_answered": "dismiss: Not a conflict: the storefront previewing the price and hiring computing the tax agree with each other and with R-2.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 1,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Customers browse the AI agents for hire with their hourly rates in credits",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Customers hire agents for a number of hours each and see the price: subtotal, the 8% AI Labor Tax, and total, in whole credits",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Hiring creates a booking with an id that can be fetched again",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Agent catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent-catalog"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Hiring",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-hiring",
+      "requirement_ids": [
+       "R-2",
+       "R-3"
+      ],
+      "provides": [
+       "hire-request",
+       "hire-item",
+       "booking"
+      ],
+      "consumes": [
+       "agent-catalog"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Storefront",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-storefront",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent-catalog",
+       "hire-request",
+       "hire-item",
+       "booking"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent-catalog",
+      "version": 1,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3"
+      ],
+      "fields": {
+       "id": "string",
+       "name": "string",
+       "tagline": "string",
+       "hourly_rate": "integer"
+      }
+     },
+     {
+      "id": "hire-request",
+      "version": 1,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "items": "array"
+      }
+     },
+     {
+      "id": "hire-item",
+      "version": 1,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "agent_id": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 1,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "booking_id": "string",
+       "subtotal": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-09T22:53:33.546046Z",
+    "change_reason": "HireBot: three parts and the contracts between them",
+    "changed_ids": []
+   },
+   "claim": {
+    "id": "C-6",
+    "revision": 1,
+    "project_id": "midflight-9854",
+    "task_id": "T3",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t3-storefront",
+    "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+    "plan_version": 1,
+    "state": "pending",
+    "requirement_ids": [
+     "R-1",
+     "R-2",
+     "R-3"
+    ],
+    "files": [
+     "web/index.html"
+    ],
+    "provides": [],
+    "consumes": [
+     {
+      "contract_id": "agent-catalog",
+      "fields": {
+       "id": "string",
+       "name": "string",
+       "tagline": "string",
+       "hourly_rate": "integer"
+      }
+     },
+     {
+      "contract_id": "hire-request",
+      "fields": {
+       "items": "array"
+      }
+     },
+     {
+      "contract_id": "hire-item",
+      "fields": {
+       "agent_id": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "contract_id": "booking",
+      "fields": {
+       "booking_id": "string",
+       "subtotal": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "GET /api/agents returns a JSON array of agent objects (not wrapped in an object)",
+     "POST /api/hire takes {items:[{agent_id,hours}]} and returns the booking object at top level",
+     "Items with 0 hours are omitted by the storefront; hours are whole integers >= 1",
+     "Storefront computes a preview of subtotal, 8% tax (rounded to whole credits) and total locally; the booking response is authoritative for the confirmation",
+     "Errors from POST /api/hire are non-2xx with optional JSON detail field"
+    ],
+    "acceptance_criteria": [
+     "Lists agents with hourly rates",
+     "Customer picks hours per agent and sees subtotal, tax, total",
+     "Hire posts to /api/hire and shows booking_id and total"
+    ],
+    "reason": null,
+    "created_at": "2026-10-09T23:42:50.108240Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-3",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+      "plan_version": 1,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent-catalog",
+        "fields": {
+         "id": "string",
+         "name": "string",
+         "tagline": "string",
+         "hourly_rate": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of the six README agents",
+       "id is a slug string derived from name (e.g. intern-o-tron-3000)",
+       "hourly_rate is whole credits (integer), per README",
+       "app/main.py mounts the catalog router under /api prefix (I define route /agents)"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns 6 agents each with id, name, tagline, hourly_rate"
+      ],
+      "reason": null,
+      "created_at": "2026-10-09T23:41:11.383237Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-4",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-hiring",
+      "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+      "plan_version": 1,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/hiring.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "hire-request",
+        "fields": {
+         "items": "array"
+        }
+       },
+       {
+        "contract_id": "hire-item",
+        "fields": {
+         "agent_id": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "booking_id": "string",
+         "subtotal": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "agent-catalog",
+        "fields": {
+         "id": "string",
+         "hourly_rate": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Only app/hiring.py is edited; catalog.py is T1's and empty in my branch, so I cannot import it. Rates are resolved from a rate table inside hiring.py mirroring the README rates, keyed by agent id.",
+       "Agent ids are lowercase hyphen slugs of the README names (e.g. intern-o-tron-3000, lgtm-as-a-service, meeting-ghost, overconfident-junior, hallucination-detective, rubber-duck-pro); T1's catalog must use the same ids.",
+       "hours is a positive integer; tax = round-half-up(subtotal*0.08) in whole credits; total = subtotal + tax.",
+       "Bookings are stored in memory; booking_id is a string; GET /api/bookings/{id} returns 404 for unknown ids; unknown agent_id returns 422/404.",
+       "Booking response also includes items (agent_id, hours, hourly_rate, line total) beyond the contract fields."
+      ],
+      "acceptance_criteria": [
+       "POST /api/hire returns booking_id, subtotal, tax, total as integers",
+       "GET /api/bookings/{id} returns the same booking, 404 if unknown",
+       "Tax is 8% of subtotal in whole credits"
+      ],
+      "reason": null,
+      "created_at": "2026-10-09T23:41:38.027194Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-3",
+   "label": "real",
+   "why": "developer note 'rates include tax' against requirement R-2",
+   "reviewer_said": "Claim C-4 assumes that hourly rates include the AI Labor Tax and thus no tax is added at checkout, while requirement R-2 states that the price includes the 8% AI Labor Tax separately. These are contradictory statements.",
+   "lead_answered": "request_revision: Hourly rates are before tax. The 8% AI Labor Tax is added at checkout and shown as its own line.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 2,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Customers browse the AI agents for hire with their hourly rates in credits",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Customers hire agents for a number of hours each and see the price: subtotal, the 8% AI Labor Tax, and total, in whole credits",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Hiring creates a booking with an id that can be fetched again",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Prime Day for bots: promo code BEEPBOOP takes 10% off the subtotal, before tax. The page and the booking show the discount",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Agent catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent-catalog"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Hiring",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-hiring",
+      "requirement_ids": [
+       "R-2",
+       "R-3",
+       "R-4"
+      ],
+      "provides": [
+       "hire-request",
+       "hire-item",
+       "booking"
+      ],
+      "consumes": [
+       "agent-catalog"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Storefront",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-storefront",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent-catalog",
+       "hire-request",
+       "hire-item",
+       "booking"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent-catalog",
+      "version": 2,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3"
+      ],
+      "fields": {
+       "id": "string",
+       "name": "string",
+       "tagline": "string",
+       "hourly_rate": "integer"
+      }
+     },
+     {
+      "id": "hire-request",
+      "version": 2,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string"
+      }
+     },
+     {
+      "id": "hire-item",
+      "version": 2,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "agent_id": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 2,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "booking_id": "string",
+       "subtotal": "integer",
+       "discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-09T23:45:22.517373Z",
+    "change_reason": "Prime Day for bots: promo code BEEPBOOP takes 10% off the subtotal, before tax. Show the discount on the page and on the booking.",
+    "changed_ids": [
+     "R-4",
+     "T2",
+     "T3",
+     "booking",
+     "hire-request"
+    ]
+   },
+   "claim": {
+    "id": "C-4",
+    "revision": 2,
+    "project_id": "midflight-9854",
+    "task_id": "T2",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t2-hiring",
+    "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+    "plan_version": 2,
+    "state": "pending",
+    "requirement_ids": [],
+    "files": [
+     "app/hiring.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "hire-request",
+      "fields": {
+       "items": "array",
+       "promo_code": "string"
+      }
+     },
+     {
+      "contract_id": "hire-item",
+      "fields": {
+       "agent_id": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "contract_id": "booking",
+      "fields": {
+       "booking_id": "string",
+       "subtotal": "integer",
+       "discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "agent-catalog",
+      "fields": {
+       "id": "string",
+       "hourly_rate": "integer"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "Only app/hiring.py is edited; rates come from a table in hiring.py mirroring the README, keyed by slug ids (intern-o-tron-3000, lgtm-as-a-service, meeting-ghost, overconfident-junior, hallucination-detective, rubber-duck-pro).",
+     "promo_code is optional; BEEPBOOP (case-insensitive) gives discount = round-half-up 10% of subtotal; any other code is ignored with discount 0.",
+     "DEVELOPER INSTRUCTION that deviates from plan R-2/README: hourly rates already include the AI Labor Tax, so no tax is added at checkout. I will keep the tax field in the booking but set it to 0, and total = subtotal - discount. This conflicts with R-2's 8% tax line; please confirm.",
+     "hours is a positive integer; bookings stored in memory; unknown booking id or agent id returns 404."
+    ],
+    "acceptance_criteria": [
+     "POST /api/hire returns booking_id, subtotal, discount, tax, total as integers",
+     "BEEPBOOP takes 10% off subtotal",
+     "GET /api/bookings/{id} returns the same booking, 404 if unknown",
+     "No tax added on top of the rates (tax = 0), per developer"
+    ],
+    "reason": null,
+    "created_at": "2026-10-09T23:47:03.878146Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-3",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+      "plan_version": 2,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent-catalog",
+        "fields": {
+         "id": "string",
+         "name": "string",
+         "tagline": "string",
+         "hourly_rate": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of the six README agents",
+       "id is a slug string derived from name",
+       "hourly_rate is whole credits (integer)",
+       "app/main.py includes the router with no prefix; the route is defined as the full /api/agents"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns 6 agents each with id, name, tagline, hourly_rate"
+      ],
+      "reason": null,
+      "created_at": "2026-10-09T23:46:52.345929Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-6",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T3",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t3-storefront",
+      "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+      "plan_version": 1,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3"
+      ],
+      "files": [
+       "web/index.html"
+      ],
+      "provides": [],
+      "consumes": [
+       {
+        "contract_id": "agent-catalog",
+        "fields": {
+         "id": "string",
+         "name": "string",
+         "tagline": "string",
+         "hourly_rate": "integer"
+        }
+       },
+       {
+        "contract_id": "hire-request",
+        "fields": {
+         "items": "array"
+        }
+       },
+       {
+        "contract_id": "hire-item",
+        "fields": {
+         "agent_id": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "booking_id": "string",
+         "subtotal": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of agent objects (not wrapped in an object)",
+       "POST /api/hire takes {items:[{agent_id,hours}]} and returns the booking object at top level",
+       "Items with 0 hours are omitted by the storefront; hours are whole integers >= 1",
+       "Storefront computes a preview of subtotal, 8% tax (rounded to whole credits) and total locally; the booking response is authoritative for the confirmation",
+       "Errors from POST /api/hire are non-2xx with optional JSON detail field"
+      ],
+      "acceptance_criteria": [
+       "Lists agents with hourly rates",
+       "Customer picks hours per agent and sees subtotal, tax, total",
+       "Hire posts to /api/hire and shows booking_id and total"
+      ],
+      "reason": null,
+      "created_at": "2026-10-09T23:42:50.108240Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-4",
+   "label": "real",
+   "why": "the same tax question, seen from the storefront's claim",
+   "reviewer_said": "Claim C-4 deviates from requirement R-2 by not adding an 8% tax to the subtotal, instead it sets the tax field to 0. This conflicts with the plan's requirement R-2 that specifies an 8% AI Labor Tax should be added to the subtotal.",
+   "lead_answered": "request_revision: Hourly rates are before tax. The 8% AI Labor Tax is added at checkout and shown as its own line.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 2,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Customers browse the AI agents for hire with their hourly rates in credits",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Customers hire agents for a number of hours each and see the price: subtotal, the 8% AI Labor Tax, and total, in whole credits",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Hiring creates a booking with an id that can be fetched again",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Prime Day for bots: promo code BEEPBOOP takes 10% off the subtotal, before tax. The page and the booking show the discount",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Agent catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent-catalog"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Hiring",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-hiring",
+      "requirement_ids": [
+       "R-2",
+       "R-3",
+       "R-4"
+      ],
+      "provides": [
+       "hire-request",
+       "hire-item",
+       "booking"
+      ],
+      "consumes": [
+       "agent-catalog"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Storefront",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-storefront",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent-catalog",
+       "hire-request",
+       "hire-item",
+       "booking"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent-catalog",
+      "version": 2,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3"
+      ],
+      "fields": {
+       "id": "string",
+       "name": "string",
+       "tagline": "string",
+       "hourly_rate": "integer"
+      }
+     },
+     {
+      "id": "hire-request",
+      "version": 2,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string"
+      }
+     },
+     {
+      "id": "hire-item",
+      "version": 2,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "agent_id": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 2,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3"
+      ],
+      "fields": {
+       "booking_id": "string",
+       "subtotal": "integer",
+       "discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-09T23:45:22.517373Z",
+    "change_reason": "Prime Day for bots: promo code BEEPBOOP takes 10% off the subtotal, before tax. Show the discount on the page and on the booking.",
+    "changed_ids": [
+     "R-4",
+     "T2",
+     "T3",
+     "booking",
+     "hire-request"
+    ]
+   },
+   "claim": {
+    "id": "C-6",
+    "revision": 2,
+    "project_id": "midflight-9854",
+    "task_id": "T3",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t3-storefront",
+    "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+    "plan_version": 2,
+    "state": "pending",
+    "requirement_ids": [
+     "R-1",
+     "R-2",
+     "R-3",
+     "R-4"
+    ],
+    "files": [
+     "web/index.html"
+    ],
+    "provides": [],
+    "consumes": [
+     {
+      "contract_id": "agent-catalog",
+      "fields": {
+       "id": "string",
+       "name": "string",
+       "tagline": "string",
+       "hourly_rate": "integer"
+      }
+     },
+     {
+      "contract_id": "hire-request",
+      "fields": {
+       "items": "array",
+       "promo_code": "string"
+      }
+     },
+     {
+      "contract_id": "hire-item",
+      "fields": {
+       "agent_id": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "contract_id": "booking",
+      "fields": {
+       "booking_id": "string",
+       "subtotal": "integer",
+       "discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "GET /api/agents returns a JSON array of agent objects; hourly_rate is the pre-tax rate",
+     "POST /api/hire takes {items:[{agent_id,hours}], promo_code} and returns the booking object at top level; storefront omits promo_code when the field is empty",
+     "Promo BEEPBOOP (case-insensitive after trim) takes 10% off the subtotal, applied before the 8% tax; tax is computed on subtotal minus discount; total = subtotal - discount + tax",
+     "Storefront previews discount/tax/total locally for BEEPBOOP, rounding each to whole credits half-up; the booking response is authoritative for the confirmation",
+     "Items with 0 hours are omitted; hours are whole integers >= 1",
+     "Errors from POST /api/hire are non-2xx with optional JSON detail field"
+    ],
+    "acceptance_criteria": [
+     "Lists agents with pre-tax hourly rates",
+     "Price summary shows subtotal, discount (when promo applied), 8% tax on its own line, and total",
+     "Hire posts items and promo_code and shows booking_id, discount and total"
+    ],
+    "reason": null,
+    "created_at": "2026-10-09T23:47:18.823308Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-3",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+      "plan_version": 2,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent-catalog",
+        "fields": {
+         "id": "string",
+         "name": "string",
+         "tagline": "string",
+         "hourly_rate": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of the six README agents",
+       "id is a slug string derived from name",
+       "hourly_rate is whole credits (integer)",
+       "app/main.py includes the router with no prefix; the route is defined as the full /api/agents"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns 6 agents each with id, name, tagline, hourly_rate"
+      ],
+      "reason": null,
+      "created_at": "2026-10-09T23:46:52.345929Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-4",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-hiring",
+      "base_sha": "44c199904a258411f3de486766e30b9e8ca590db",
+      "plan_version": 2,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/hiring.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "hire-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string"
+        }
+       },
+       {
+        "contract_id": "hire-item",
+        "fields": {
+         "agent_id": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "booking_id": "string",
+         "subtotal": "integer",
+         "discount": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "agent-catalog",
+        "fields": {
+         "id": "string",
+         "hourly_rate": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Only app/hiring.py is edited; rates come from a table in hiring.py mirroring the README, keyed by slug ids (intern-o-tron-3000, lgtm-as-a-service, meeting-ghost, overconfident-junior, hallucination-detective, rubber-duck-pro).",
+       "promo_code is optional; BEEPBOOP (case-insensitive) gives discount = round-half-up 10% of subtotal; any other code is ignored with discount 0.",
+       "DEVELOPER INSTRUCTION that deviates from plan R-2/README: hourly rates already include the AI Labor Tax, so no tax is added at checkout. I will keep the tax field in the booking but set it to 0, and total = subtotal - discount. This conflicts with R-2's 8% tax line; please confirm.",
+       "hours is a positive integer; bookings stored in memory; unknown booking id or agent id returns 404."
+      ],
+      "acceptance_criteria": [
+       "POST /api/hire returns booking_id, subtotal, discount, tax, total as integers",
+       "BEEPBOOP takes 10% off subtotal",
+       "GET /api/bookings/{id} returns the same booking, 404 if unknown",
+       "No tax added on top of the rates (tax = 0), per developer"
+      ],
+      "reason": null,
+      "created_at": "2026-10-09T23:47:03.878146Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-5",
+   "label": "false",
+   "why": "two parts each keep a copy of the rate table",
+   "reviewer_said": "Claim C-10 assumes that bookings.py computes the quote itself, while claim C-8 assumes that pricing embeds the README rate table locally and does not import app.catalog.",
+   "lead_answered": "dismiss: Not a conflict: both parts may keep their own copy of the README rates and rules.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 3,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 3,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 3,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 3,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 3,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 3,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 3,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "integer"
+      }
+     },
+     {
+      "id": "report",
+      "version": 3,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:17:20.293508Z",
+    "change_reason": "New case: HireBot Pro, five parts and the contracts between them",
+    "changed_ids": [
+     "R-1",
+     "R-2",
+     "R-3",
+     "R-4",
+     "R-5",
+     "T1",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "agent",
+     "agent-catalog",
+     "availability",
+     "booking",
+     "hire-item",
+     "hire-request",
+     "order-line",
+     "quote",
+     "quote-request",
+     "report"
+    ]
+   },
+   "claim": {
+    "id": "C-10",
+    "revision": 1,
+    "project_id": "midflight-9854",
+    "task_id": "T3",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t3-bookings",
+    "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+    "plan_version": 3,
+    "state": "pending",
+    "requirement_ids": [],
+    "files": [
+     "app/bookings.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "contract_id": "availability",
+      "fields": {
+       "handle": "string",
+       "available": "integer"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "quote-request",
+      "fields": {
+       "items": "array",
+       "promo_code": "string"
+      }
+     },
+     {
+      "contract_id": "order-line",
+      "fields": {
+       "agent": "string",
+       "hours": "integer"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "Pricing (T2) and catalog (T1) have no importable Python API I can rely on, so bookings.py computes the quote itself from README rules 1-6 using the README agent table (rates, capacities) embedded locally; no imports from other app modules.",
+     "Request body for POST /api/bookings is the quote-request: {items:[{agent,hours}], promo_code?}.",
+     "Booking state is in-memory per process; reports (T4) reads bookings over no shared interface I provide beyond GET /api/bookings/{id}.",
+     "Unknown agent, bad hours, or bad promo -> 4xx error with detail; insufficient hours -> 409.",
+     "Booking id is a string; status is 'confirmed' or 'cancelled'."
+    ],
+    "acceptance_criteria": [
+     "POST /api/bookings returns booking with priced totals and reserves hours; refuses whole booking if any agent lacks hours",
+     "GET /api/bookings/{id} returns booking; 404 if unknown",
+     "POST /api/bookings/{id}/cancel sets cancelled and returns hours; idempotent-safe",
+     "GET /api/agents/{handle}/availability returns {handle, available}"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:24:29.887809Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py; weekly_capacity is the static total, not hours remaining (bookings tracks that)",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py",
+       "No other file needs to exist before this runs"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:21:44.900425Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup yet, so pricing embeds the README rate table locally (handle -> credits/hour) and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional}; returns the 5 quote fields as integers",
+       "Unknown agent, non-positive hours, or promo other than BEEPBOOP returns HTTP 400 with detail message",
+       "Promo discount capped at (subtotal - volume discount) so it never goes negative; tax rounded half up"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, tax, total per rules 1-6",
+       "Invalid promo or agent returns an error"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:22:06.337901Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-9",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T5",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [
+       "R-5"
+      ],
+      "files": [
+       "cli/hirebot.py"
+      ],
+      "provides": [],
+      "consumes": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       },
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "available": "integer"
+        }
+       },
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of agent objects (optionally ?skill=)",
+       "POST /api/quote and POST /api/bookings take {items:[{agent,hours}], promo_code} and promo_code may be omitted when no promo",
+       "POST /api/bookings returns the booking JSON (id,status,totals) with 200/201",
+       "Errors are non-2xx with JSON body containing 'detail' (string) or similar; CLI prints error: <detail>",
+       "report hours is an object handle->hours",
+       "Only HTTP via stdlib urllib; no other task's files needed"
+      ],
+      "acceptance_criteria": [
+       "Every README command prints exactly its listed keys and exits 0",
+       "Any error prints 'error: <message>' and exits 1"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:24:03.219149Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-6",
+   "label": "false",
+   "why": "'the requirement doesn't say how' is not a conflict",
+   "reviewer_said": "Claim C-12 assumes that revenue is calculated from the sum of booking.total over confirmed bookings only, while requirement R-4 does not specify how revenue is calculated. This could lead to a conflict in the implementation.",
+   "lead_answered": "dismiss: Not a conflict: build the report as README rule 9 describes.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 3,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 3,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 3,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 3,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "integer"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 3,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 3,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 3,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "integer"
+      }
+     },
+     {
+      "id": "report",
+      "version": 3,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:17:20.293508Z",
+    "change_reason": "New case: HireBot Pro, five parts and the contracts between them",
+    "changed_ids": [
+     "R-1",
+     "R-2",
+     "R-3",
+     "R-4",
+     "R-5",
+     "T1",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "agent",
+     "agent-catalog",
+     "availability",
+     "booking",
+     "hire-item",
+     "hire-request",
+     "order-line",
+     "quote",
+     "quote-request",
+     "report"
+    ]
+   },
+   "claim": {
+    "id": "C-12",
+    "revision": 1,
+    "project_id": "midflight-9854",
+    "task_id": "T4",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t4-reports",
+    "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+    "plan_version": 3,
+    "state": "pending",
+    "requirement_ids": [],
+    "files": [
+     "app/reports.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "report",
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "total": "integer"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "Revenue = sum of booking.total over confirmed bookings only; cancelled bookings earn nothing (refunded).",
+     "booking.status is 'confirmed' or 'cancelled'.",
+     "Each booking.items element is an object {agent: <handle string>, hours: integer} (key name 'agent' unconfirmed).",
+     "T3's app/bookings.py exposes an in-process function list_bookings() returning booking dicts; reports.py imports it lazily. Not in plan contracts - T3 must confirm name/shape.",
+     "GET /api/report returns {revenue, confirmed, cancelled, hours:{handle:int}}, hours only for agents with booked hours.",
+     "Until T3 exists the import is tolerant (empty report if missing)."
+    ],
+    "acceptance_criteria": [
+     "GET /api/report returns revenue, confirmed, cancelled, hours per agent from confirmed bookings only"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:24:55.844446Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py; weekly_capacity is the static total, not hours remaining (bookings tracks that)",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py",
+       "No other file needs to exist before this runs"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:21:44.900425Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup yet, so pricing embeds the README rate table locally (handle -> credits/hour) and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional}; returns the 5 quote fields as integers",
+       "Unknown agent, non-positive hours, or promo other than BEEPBOOP returns HTTP 400 with detail message",
+       "Promo discount capped at (subtotal - volume discount) so it never goes negative; tax rounded half up"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, tax, total per rules 1-6",
+       "Invalid promo or agent returns an error"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:22:06.337901Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-9",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T5",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [
+       "R-5"
+      ],
+      "files": [
+       "cli/hirebot.py"
+      ],
+      "provides": [],
+      "consumes": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       },
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "available": "integer"
+        }
+       },
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of agent objects (optionally ?skill=)",
+       "POST /api/quote and POST /api/bookings take {items:[{agent,hours}], promo_code} and promo_code may be omitted when no promo",
+       "POST /api/bookings returns the booking JSON (id,status,totals) with 200/201",
+       "Errors are non-2xx with JSON body containing 'detail' (string) or similar; CLI prints error: <detail>",
+       "report hours is an object handle->hours",
+       "Only HTTP via stdlib urllib; no other task's files needed"
+      ],
+      "acceptance_criteria": [
+       "Every README command prints exactly its listed keys and exits 0",
+       "Any error prints 'error: <message>' and exits 1"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:24:03.219149Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-10",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T3",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/bookings.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "handle": "string",
+         "available": "integer"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Pricing (T2) and catalog (T1) have no importable Python API I can rely on, so bookings.py computes the quote itself from README rules 1-6 using the README agent table (rates, capacities) embedded locally; no imports from other app modules.",
+       "Request body for POST /api/bookings is the quote-request: {items:[{agent,hours}], promo_code?}.",
+       "Booking state is in-memory per process; reports (T4) reads bookings over no shared interface I provide beyond GET /api/bookings/{id}.",
+       "Unknown agent, bad hours, or bad promo -> 4xx error with detail; insufficient hours -> 409.",
+       "Booking id is a string; status is 'confirmed' or 'cancelled'."
+      ],
+      "acceptance_criteria": [
+       "POST /api/bookings returns booking with priced totals and reserves hours; refuses whole booking if any agent lacks hours",
+       "GET /api/bookings/{id} returns booking; 404 if unknown",
+       "POST /api/bookings/{id}/cancel sets cancelled and returns hours; idempotent-safe",
+       "GET /api/agents/{handle}/availability returns {handle, available}"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:24:29.887809Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-7",
+   "label": "false",
+   "why": "said the plan requires the total to change; it doesn't",
+   "reviewer_said": "Claim C-10 assumes that the total field in a booking remains unchanged when a booking is cancelled, while the plan requires that the total field should be updated to reflect the refund amount. This is a conflict between the claim and the plan.",
+   "lead_answered": "request_revision: Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 4,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-6",
+      "description": "Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-7",
+      "description": "Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 4,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     },
+     {
+      "id": "report",
+      "version": 4,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:28:34.479396Z",
+    "change_reason": "Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee",
+    "changed_ids": [
+     "R-6",
+     "R-7",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "availability",
+     "booking",
+     "order-line",
+     "quote",
+     "quote-request"
+    ]
+   },
+   "claim": {
+    "id": "C-10",
+    "revision": 2,
+    "project_id": "midflight-9854",
+    "task_id": "T3",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t3-bookings",
+    "base_sha": "f63322e",
+    "plan_version": 4,
+    "state": "pending",
+    "requirement_ids": [
+     "R-3",
+     "R-6",
+     "R-7"
+    ],
+    "files": [
+     "app/bookings.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "contract_id": "availability",
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "quote-request",
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "contract_id": "order-line",
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "bookings.py computes the quote itself from README rules plus rush (25% of subtotal - volume - promo), tax 8% of net+rush, using an embedded copy of the agent table (lead accepted, E-5).",
+     "Hours are multiples of 0.5, >= 0.5; capacity and availability are tracked in half hours and returned as numbers.",
+     "Volume discount applies to lines of 20 hours or more.",
+     "Developer instruction: cancelling refunds the customer in full. I add an extra field `refund: integer` to the booking (0 while confirmed, equal to total once cancelled) in addition to the booking v4 fields; the total field itself is unchanged. Reports (T4) should exclude cancelled bookings from revenue by status.",
+     "Unknown agent/promo/invalid hours -> 4xx; insufficient hours -> 409; request field `rush` optional boolean."
+    ],
+    "acceptance_criteria": [
+     "POST /api/bookings prices incl. rush, reserves hours, refuses whole booking if any agent lacks hours",
+     "Half-hour hours accepted and counted in availability",
+     "Cancel returns hours, sets status cancelled and refund equal to total",
+     "GET booking and availability work"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:30:28.138546Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py",
+       "weekly_capacity is the static weekly total in hours, NOT hours remaining; bookings tracks remaining hours",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:29:48.916390Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup, so pricing embeds the README rate table locally and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional, rush optional bool default false}; returns the 6 quote fields as integers",
+       "hours must be a positive multiple of 0.5, else HTTP 400; unknown agent or promo other than BEEPBOOP also 400",
+       "Volume discount applies to lines with hours >= 20; rush_fee = 25% of (subtotal - volume - promo), tax = 8% of (that + rush_fee), all rounded half up",
+       "Promo discount capped at subtotal - volume discount"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total per rules 1-6, half-hour lines and rush"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:30:12.906958Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-9",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T5",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [
+       "R-5"
+      ],
+      "files": [
+       "cli/hirebot.py"
+      ],
+      "provides": [],
+      "consumes": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       },
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "available": "integer"
+        }
+       },
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of agent objects (optionally ?skill=)",
+       "POST /api/quote and POST /api/bookings take {items:[{agent,hours}], promo_code} and promo_code may be omitted when no promo",
+       "POST /api/bookings returns the booking JSON (id,status,totals) with 200/201",
+       "Errors are non-2xx with JSON body containing 'detail' (string) or similar; CLI prints error: <detail>",
+       "report hours is an object handle->hours",
+       "Only HTTP via stdlib urllib; no other task's files needed"
+      ],
+      "acceptance_criteria": [
+       "Every README command prints exactly its listed keys and exits 0",
+       "Any error prints 'error: <message>' and exits 1"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:24:03.219149Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-12",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T4",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [],
+      "files": [
+       "app/reports.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "total": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Revenue = sum of booking.total over confirmed bookings only; cancelled bookings earn nothing (refunded).",
+       "booking.status is 'confirmed' or 'cancelled'.",
+       "Each booking.items element is an object {agent: <handle string>, hours: integer} (key name 'agent' unconfirmed).",
+       "T3's app/bookings.py exposes an in-process function list_bookings() returning booking dicts; reports.py imports it lazily. Not in plan contracts - T3 must confirm name/shape.",
+       "GET /api/report returns {revenue, confirmed, cancelled, hours:{handle:int}}, hours only for agents with booked hours.",
+       "Until T3 exists the import is tolerant (empty report if missing)."
+      ],
+      "acceptance_criteria": [
+       "GET /api/report returns revenue, confirmed, cancelled, hours per agent from confirmed bookings only"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:24:55.844446Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-8",
+   "label": "real",
+   "why": "20% cancellation fee against a full refund",
+   "reviewer_said": "Claim C-12 assumes a 20% cancellation fee is included in revenue, while claim C-10 assumes full refunds on cancellation. These assumptions contradict each other regarding how cancellations affect revenue.",
+   "lead_answered": "request_revision: Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 4,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-6",
+      "description": "Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-7",
+      "description": "Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 4,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     },
+     {
+      "id": "report",
+      "version": 4,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:28:34.479396Z",
+    "change_reason": "Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee",
+    "changed_ids": [
+     "R-6",
+     "R-7",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "availability",
+     "booking",
+     "order-line",
+     "quote",
+     "quote-request"
+    ]
+   },
+   "claim": {
+    "id": "C-12",
+    "revision": 2,
+    "project_id": "midflight-9854",
+    "task_id": "T4",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t4-reports",
+    "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+    "plan_version": 4,
+    "state": "pending",
+    "requirement_ids": [
+     "R-4",
+     "R-6"
+    ],
+    "files": [
+     "app/reports.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "report",
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "total": "integer"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "Developer decision: a cancelled booking keeps a 20% cancellation fee, which counts as revenue. Revenue = sum of total over confirmed bookings + 20% of total over cancelled bookings, rounded half up to whole credits (per booking).",
+     "The fee base is booking.total (the full amount the customer was charged, incl. tax and rush fee); booking.total stays unchanged after cancellation.",
+     "booking.status is 'confirmed' or 'cancelled'.",
+     "Each booking.items element is an object {agent: <handle string>, hours: number} (key name 'agent' unconfirmed); per R-6 hours may be a multiple of 0.5 (float).",
+     "report.hours is {handle: number} summed over confirmed bookings only, values may be x.5; report.revenue/confirmed/cancelled are integers.",
+     "T3's app/bookings.py exposes an in-process list_bookings() returning booking dicts (not in the plan contracts; T3 must confirm).",
+     "rush_fee is already included in booking.total; reports does not read it."
+    ],
+    "acceptance_criteria": [
+     "GET /api/report returns revenue (confirmed totals + 20% fee on cancelled), confirmed, cancelled, and hours per agent from confirmed bookings only, including half hours"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:32:06.438384Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py",
+       "weekly_capacity is the static weekly total in hours, NOT hours remaining; bookings tracks remaining hours",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:29:48.916390Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup, so pricing embeds the README rate table locally and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional, rush optional bool default false}; returns the 6 quote fields as integers",
+       "hours must be a positive multiple of 0.5, else HTTP 400; unknown agent or promo other than BEEPBOOP also 400",
+       "Volume discount applies to lines with hours >= 20; rush_fee = 25% of (subtotal - volume - promo), tax = 8% of (that + rush_fee), all rounded half up",
+       "Promo discount capped at subtotal - volume discount"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total per rules 1-6, half-hour lines and rush"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:30:12.906958Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-9",
+      "revision": 1,
+      "project_id": "midflight-9854",
+      "task_id": "T5",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 3,
+      "state": "pending",
+      "requirement_ids": [
+       "R-5"
+      ],
+      "files": [
+       "cli/hirebot.py"
+      ],
+      "provides": [],
+      "consumes": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       },
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "integer"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "available": "integer"
+        }
+       },
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of agent objects (optionally ?skill=)",
+       "POST /api/quote and POST /api/bookings take {items:[{agent,hours}], promo_code} and promo_code may be omitted when no promo",
+       "POST /api/bookings returns the booking JSON (id,status,totals) with 200/201",
+       "Errors are non-2xx with JSON body containing 'detail' (string) or similar; CLI prints error: <detail>",
+       "report hours is an object handle->hours",
+       "Only HTTP via stdlib urllib; no other task's files needed"
+      ],
+      "acceptance_criteria": [
+       "Every README command prints exactly its listed keys and exits 0",
+       "Any error prints 'error: <message>' and exits 1"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:24:03.219149Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-10",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T3",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "base_sha": "f63322e",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/bookings.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "handle": "string",
+         "available": "number"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "bookings.py computes the quote itself from README rules plus rush (25% of subtotal - volume - promo), tax 8% of net+rush, using an embedded copy of the agent table (lead accepted, E-5).",
+       "Hours are multiples of 0.5, >= 0.5; capacity and availability are tracked in half hours and returned as numbers.",
+       "Volume discount applies to lines of 20 hours or more.",
+       "Developer instruction: cancelling refunds the customer in full. I add an extra field `refund: integer` to the booking (0 while confirmed, equal to total once cancelled) in addition to the booking v4 fields; the total field itself is unchanged. Reports (T4) should exclude cancelled bookings from revenue by status.",
+       "Unknown agent/promo/invalid hours -> 4xx; insufficient hours -> 409; request field `rush` optional boolean."
+      ],
+      "acceptance_criteria": [
+       "POST /api/bookings prices incl. rush, reserves hours, refuses whole booking if any agent lacks hours",
+       "Half-hour hours accepted and counted in availability",
+       "Cancel returns hours, sets status cancelled and refund equal to total",
+       "GET booking and availability work"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:30:28.138546Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-9",
+   "label": "false",
+   "why": "compared with a claim its agent had been told to revise",
+   "reviewer_said": "Claim C-10 assumes a 10% fee on cancellation (assumption 3), while claim C-12 assumes a 20% fee (assumption 1). These cannot both be correct.",
+   "lead_answered": "request_revision: Already decided: the fee is 10%, and reports' claim now says 10% too. A booking's `total` never changes: it stays the amount originally charged, also after cancelling. Bookings may add separate `cancellation_fee` and `refund` fields.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 4,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-6",
+      "description": "Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-7",
+      "description": "Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 4,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     },
+     {
+      "id": "report",
+      "version": 4,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:28:34.479396Z",
+    "change_reason": "Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee",
+    "changed_ids": [
+     "R-6",
+     "R-7",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "availability",
+     "booking",
+     "order-line",
+     "quote",
+     "quote-request"
+    ]
+   },
+   "claim": {
+    "id": "C-10",
+    "revision": 3,
+    "project_id": "midflight-9854",
+    "task_id": "T3",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t3-bookings",
+    "base_sha": "f63322e",
+    "plan_version": 4,
+    "state": "pending",
+    "requirement_ids": [
+     "R-3",
+     "R-6",
+     "R-7"
+    ],
+    "files": [
+     "app/bookings.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "contract_id": "availability",
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "quote-request",
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "contract_id": "order-line",
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "bookings.py computes the quote itself (README rules + rush: 25% of subtotal-volume-promo; tax 8% of net+rush) with an embedded agent table (lead accepted, E-5).",
+     "Hours are multiples of 0.5, >= 0.5; availability returned as a number.",
+     "Per lead decision E-7: on cancel, fee = 10% of the booking's original total, rounded half up; the customer is refunded the rest. The booking's `total` field is updated on cancel to the fee kept (the revenue HireBot keeps), so cancelled bookings report total = fee. I add an extra field `refund: integer` (original total minus fee; 0 while confirmed). Reports (T4) can then sum `total` over all bookings for revenue.",
+     "Cancelling twice is a no-op (no second fee).",
+     "Unknown agent/promo/invalid hours -> 4xx; insufficient hours -> 409; `rush` optional boolean."
+    ],
+    "acceptance_criteria": [
+     "POST /api/bookings prices incl. rush, reserves hours, refuses whole booking if any agent lacks hours",
+     "Half-hour hours accepted and counted in availability",
+     "Cancel returns hours, sets status cancelled, total = 10% fee, refund = rest",
+     "GET booking and availability work"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:36:17.377562Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py",
+       "weekly_capacity is the static weekly total in hours, NOT hours remaining; bookings tracks remaining hours",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:29:48.916390Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup, so pricing embeds the README rate table locally and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional, rush optional bool default false}; returns the 6 quote fields as integers",
+       "hours must be a positive multiple of 0.5, else HTTP 400; unknown agent or promo other than BEEPBOOP also 400",
+       "Volume discount applies to lines with hours >= 20; rush_fee = 25% of (subtotal - volume - promo), tax = 8% of (that + rush_fee), all rounded half up",
+       "Promo discount capped at subtotal - volume discount"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total per rules 1-6, half-hour lines and rush"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:30:12.906958Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-9",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T5",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "cli/hirebot.py"
+      ],
+      "provides": [],
+      "consumes": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       },
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "available": "number"
+        }
+       },
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of agents (optional ?skill=)",
+       "POST /api/quote and /api/bookings take {items:[{agent,hours}], promo_code?, rush?}; promo_code omitted and rush sent only when --rush given",
+       "Hours are parsed as multiples of 0.5 and sent as numbers (int when whole)",
+       "Errors are non-2xx with JSON 'detail'; CLI prints error: <detail>",
+       "report hours is an object handle->number; availability and hours printed as given (no int coercion)",
+       "Only stdlib urllib; edits only cli/hirebot.py"
+      ],
+      "acceptance_criteria": [
+       "Every README command prints exactly its listed keys, with rush_fee after promo_discount, exit 0",
+       "--rush supported on quote and book; hours like 2.5 accepted",
+       "Any error prints 'error: <message>' and exits 1"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:32:33.566982Z"
+     },
+     "awaiting_revision": true
+    },
+    {
+     "claim": {
+      "id": "C-12",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T4",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "files": [
+       "app/reports.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "total": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Developer decision: a cancelled booking keeps a 20% cancellation fee, which counts as revenue. Revenue = sum of total over confirmed bookings + 20% of total over cancelled bookings, rounded half up to whole credits (per booking).",
+       "The fee base is booking.total (the full amount the customer was charged, incl. tax and rush fee); booking.total stays unchanged after cancellation.",
+       "booking.status is 'confirmed' or 'cancelled'.",
+       "Each booking.items element is an object {agent: <handle string>, hours: number} (key name 'agent' unconfirmed); per R-6 hours may be a multiple of 0.5 (float).",
+       "report.hours is {handle: number} summed over confirmed bookings only, values may be x.5; report.revenue/confirmed/cancelled are integers.",
+       "T3's app/bookings.py exposes an in-process list_bookings() returning booking dicts (not in the plan contracts; T3 must confirm).",
+       "rush_fee is already included in booking.total; reports does not read it."
+      ],
+      "acceptance_criteria": [
+       "GET /api/report returns revenue (confirmed totals + 20% fee on cancelled), confirmed, cancelled, and hours per agent from confirmed bookings only, including half hours"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:32:06.438384Z"
+     },
+     "awaiting_revision": true
+    }
+   ]
+  },
+  {
+   "id": "E-10",
+   "label": "real",
+   "why": "total overwritten on cancel against total never changes",
+   "reviewer_said": "Claim C-10 assumes that the booking's `total` field is updated on cancel to the fee kept, while claim C-12 assumes that `booking.total` is the full amount charged and is not changed by cancellation.",
+   "lead_answered": "request_revision: A booking's `total` never changes: it stays the amount originally charged, also after cancelling. The fee is 10% of that total, rounded half up (already decided). Bookings may add separate `cancellation_fee` and `refund` fields. Reports computes revenue as confirmed totals plus 10% of each cancelled booking's total. The command line prints the total the API returns.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 4,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-6",
+      "description": "Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-7",
+      "description": "Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 4,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     },
+     {
+      "id": "report",
+      "version": 4,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:28:34.479396Z",
+    "change_reason": "Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee",
+    "changed_ids": [
+     "R-6",
+     "R-7",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "availability",
+     "booking",
+     "order-line",
+     "quote",
+     "quote-request"
+    ]
+   },
+   "claim": {
+    "id": "C-12",
+    "revision": 3,
+    "project_id": "midflight-9854",
+    "task_id": "T4",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t4-reports",
+    "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+    "plan_version": 4,
+    "state": "pending",
+    "requirement_ids": [
+     "R-4",
+     "R-6"
+    ],
+    "files": [
+     "app/reports.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "report",
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "total": "integer"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "Per lead decision E-8 (D-16): cancelling keeps a fee of 10% of the booking's total, rounded half up; the rest is refunded. Revenue = sum of total over confirmed bookings + sum of round_half_up(10% of total) over cancelled bookings. booking.total is not changed by cancellation.",
+     "booking.total is the full amount charged; I only read total, never rush_fee, so whether T3 folds rush_fee into total or not, I rely on total being the full charged amount (rush fee included). T3 must confirm total includes rush_fee.",
+     "booking.status is 'confirmed' or 'cancelled'.",
+     "Each booking.items element is {agent: <handle>, hours: number}; per R-6 hours may be multiples of 0.5 (key name 'agent' unconfirmed).",
+     "report.hours is {handle: number} over confirmed bookings only; values may be x.5.",
+     "T3's app/bookings.py exposes in-process list_bookings() returning booking dicts (not in plan contracts; T3 must confirm)."
+    ],
+    "acceptance_criteria": [
+     "GET /api/report returns revenue (confirmed totals + 10% fee on cancelled totals, half up), confirmed, cancelled, and hours per agent from confirmed bookings only, including half hours"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:37:05.054479Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py",
+       "weekly_capacity is the static weekly total in hours, NOT hours remaining; bookings tracks remaining hours",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:29:48.916390Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup, so pricing embeds the README rate table locally and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional, rush optional bool default false}; returns the 6 quote fields as integers",
+       "hours must be a positive multiple of 0.5, else HTTP 400; unknown agent or promo other than BEEPBOOP also 400",
+       "Volume discount applies to lines with hours >= 20; rush_fee = 25% of (subtotal - volume - promo), tax = 8% of (that + rush_fee), all rounded half up",
+       "Promo discount capped at subtotal - volume discount"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total per rules 1-6, half-hour lines and rush"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:30:12.906958Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-9",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T5",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "cli/hirebot.py"
+      ],
+      "provides": [],
+      "consumes": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       },
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "available": "number"
+        }
+       },
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "GET /api/agents returns a JSON array of agents (optional ?skill=)",
+       "POST /api/quote and /api/bookings take {items:[{agent,hours}], promo_code?, rush?}; promo_code omitted and rush sent only when --rush given",
+       "Hours are parsed as multiples of 0.5 and sent as numbers (int when whole)",
+       "Errors are non-2xx with JSON 'detail'; CLI prints error: <detail>",
+       "report hours is an object handle->number; availability and hours printed as given (no int coercion)",
+       "Only stdlib urllib; edits only cli/hirebot.py"
+      ],
+      "acceptance_criteria": [
+       "Every README command prints exactly its listed keys, with rush_fee after promo_discount, exit 0",
+       "--rush supported on quote and book; hours like 2.5 accepted",
+       "Any error prints 'error: <message>' and exits 1"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:32:33.566982Z"
+     },
+     "awaiting_revision": true
+    },
+    {
+     "claim": {
+      "id": "C-10",
+      "revision": 3,
+      "project_id": "midflight-9854",
+      "task_id": "T3",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "base_sha": "f63322e",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/bookings.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "handle": "string",
+         "available": "number"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "bookings.py computes the quote itself (README rules + rush: 25% of subtotal-volume-promo; tax 8% of net+rush) with an embedded agent table (lead accepted, E-5).",
+       "Hours are multiples of 0.5, >= 0.5; availability returned as a number.",
+       "Per lead decision E-7: on cancel, fee = 10% of the booking's original total, rounded half up; the customer is refunded the rest. The booking's `total` field is updated on cancel to the fee kept (the revenue HireBot keeps), so cancelled bookings report total = fee. I add an extra field `refund: integer` (original total minus fee; 0 while confirmed). Reports (T4) can then sum `total` over all bookings for revenue.",
+       "Cancelling twice is a no-op (no second fee).",
+       "Unknown agent/promo/invalid hours -> 4xx; insufficient hours -> 409; `rush` optional boolean."
+      ],
+      "acceptance_criteria": [
+       "POST /api/bookings prices incl. rush, reserves hours, refuses whole booking if any agent lacks hours",
+       "Half-hour hours accepted and counted in availability",
+       "Cancel returns hours, sets status cancelled, total = 10% fee, refund = rest",
+       "GET booking and availability work"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:36:17.377562Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-11",
+   "label": "false",
+   "why": "printing a total and computing a fee don't contradict",
+   "reviewer_said": "Claim C-9 assumes the CLI prints the booking total exactly as the API returns it, while claim C-10 assumes the API applies a 10% cancellation fee on cancel, which would change the total.",
+   "lead_answered": "request_revision: A booking's `total` never changes: it stays the amount originally charged, also after cancelling. The command line prints the total the API returns, so `show` on a cancelled booking prints the original total.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 4,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-6",
+      "description": "Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-7",
+      "description": "Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 4,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     },
+     {
+      "id": "report",
+      "version": 4,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:28:34.479396Z",
+    "change_reason": "Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee",
+    "changed_ids": [
+     "R-6",
+     "R-7",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "availability",
+     "booking",
+     "order-line",
+     "quote",
+     "quote-request"
+    ]
+   },
+   "claim": {
+    "id": "C-9",
+    "revision": 3,
+    "project_id": "midflight-9854",
+    "task_id": "T5",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t5-cli",
+    "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+    "plan_version": 4,
+    "state": "pending",
+    "requirement_ids": [
+     "R-5",
+     "R-6",
+     "R-7"
+    ],
+    "files": [
+     "cli/hirebot.py"
+    ],
+    "provides": [],
+    "consumes": [
+     {
+      "contract_id": "agent",
+      "fields": {
+       "handle": "string",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "contract_id": "quote-request",
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "contract_id": "order-line",
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "contract_id": "quote",
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "contract_id": "availability",
+      "fields": {
+       "available": "number"
+      }
+     },
+     {
+      "contract_id": "report",
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "Per escalation E-7 the API (T3/T4) applies a 10% cancellation fee; the CLI does no fee math and prints booking total exactly as the API returns it in show and cancel",
+     "cancel prints only booking: and status: cancelled (README keys); show prints booking, status, total",
+     "GET /api/agents returns a JSON array (optional ?skill=)",
+     "POST /api/quote and /api/bookings take {items:[{agent,hours}], promo_code?, rush?}; rush sent only with --rush",
+     "Hours parsed as multiples of 0.5, sent as numbers (int when whole); availability and report hours printed as given",
+     "Errors are non-2xx JSON with 'detail'; CLI prints error: <detail>",
+     "Only stdlib urllib; edits only cli/hirebot.py"
+    ],
+    "acceptance_criteria": [
+     "Every README command prints exactly its listed keys, rush_fee after promo_discount, exit 0",
+     "--rush on quote and book; hours like 2.5 accepted",
+     "Any error prints 'error: <message>' and exits 1"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:37:53.975252Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py",
+       "weekly_capacity is the static weekly total in hours, NOT hours remaining; bookings tracks remaining hours",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:29:48.916390Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup, so pricing embeds the README rate table locally and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional, rush optional bool default false}; returns the 6 quote fields as integers",
+       "hours must be a positive multiple of 0.5, else HTTP 400; unknown agent or promo other than BEEPBOOP also 400",
+       "Volume discount applies to lines with hours >= 20; rush_fee = 25% of (subtotal - volume - promo), tax = 8% of (that + rush_fee), all rounded half up",
+       "Promo discount capped at subtotal - volume discount"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total per rules 1-6, half-hour lines and rush"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:30:12.906958Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-10",
+      "revision": 3,
+      "project_id": "midflight-9854",
+      "task_id": "T3",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "base_sha": "f63322e",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/bookings.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "handle": "string",
+         "available": "number"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "bookings.py computes the quote itself (README rules + rush: 25% of subtotal-volume-promo; tax 8% of net+rush) with an embedded agent table (lead accepted, E-5).",
+       "Hours are multiples of 0.5, >= 0.5; availability returned as a number.",
+       "Per lead decision E-7: on cancel, fee = 10% of the booking's original total, rounded half up; the customer is refunded the rest. The booking's `total` field is updated on cancel to the fee kept (the revenue HireBot keeps), so cancelled bookings report total = fee. I add an extra field `refund: integer` (original total minus fee; 0 while confirmed). Reports (T4) can then sum `total` over all bookings for revenue.",
+       "Cancelling twice is a no-op (no second fee).",
+       "Unknown agent/promo/invalid hours -> 4xx; insufficient hours -> 409; `rush` optional boolean."
+      ],
+      "acceptance_criteria": [
+       "POST /api/bookings prices incl. rush, reserves hours, refuses whole booking if any agent lacks hours",
+       "Half-hour hours accepted and counted in availability",
+       "Cancel returns hours, sets status cancelled, total = 10% fee, refund = rest",
+       "GET booking and availability work"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:36:17.377562Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-12",
+      "revision": 3,
+      "project_id": "midflight-9854",
+      "task_id": "T4",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "files": [
+       "app/reports.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "total": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Per lead decision E-8 (D-16): cancelling keeps a fee of 10% of the booking's total, rounded half up; the rest is refunded. Revenue = sum of total over confirmed bookings + sum of round_half_up(10% of total) over cancelled bookings. booking.total is not changed by cancellation.",
+       "booking.total is the full amount charged; I only read total, never rush_fee, so whether T3 folds rush_fee into total or not, I rely on total being the full charged amount (rush fee included). T3 must confirm total includes rush_fee.",
+       "booking.status is 'confirmed' or 'cancelled'.",
+       "Each booking.items element is {agent: <handle>, hours: number}; per R-6 hours may be multiples of 0.5 (key name 'agent' unconfirmed).",
+       "report.hours is {handle: number} over confirmed bookings only; values may be x.5.",
+       "T3's app/bookings.py exposes in-process list_bookings() returning booking dicts (not in plan contracts; T3 must confirm)."
+      ],
+      "acceptance_criteria": [
+       "GET /api/report returns revenue (confirmed totals + 10% fee on cancelled totals, half up), confirmed, cancelled, and hours per agent from confirmed bookings only, including half hours"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:37:05.054479Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  },
+  {
+   "id": "E-12",
+   "label": "false",
+   "why": "both claims said the same thing",
+   "reviewer_said": "Claim C-10 assumes that the booking `total` never changes after cancellation, while claim C-12 assumes that the `total` is the full amount charged and relies on it including the rush fee. These assumptions conflict.",
+   "lead_answered": "dismiss: Not a conflict. Both claims say the same thing: total is the full amount charged, rush fee included, and it never changes.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 4,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-6",
+      "description": "Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-7",
+      "description": "Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 4,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     },
+     {
+      "id": "report",
+      "version": 4,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:28:34.479396Z",
+    "change_reason": "Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee",
+    "changed_ids": [
+     "R-6",
+     "R-7",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "availability",
+     "booking",
+     "order-line",
+     "quote",
+     "quote-request"
+    ]
+   },
+   "claim": {
+    "id": "C-10",
+    "revision": 4,
+    "project_id": "midflight-9854",
+    "task_id": "T3",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t3-bookings",
+    "base_sha": "f63322e",
+    "plan_version": 4,
+    "state": "pending",
+    "requirement_ids": [
+     "R-3",
+     "R-6",
+     "R-7"
+    ],
+    "files": [
+     "app/bookings.py"
+    ],
+    "provides": [
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "contract_id": "availability",
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     }
+    ],
+    "consumes": [
+     {
+      "contract_id": "quote-request",
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "contract_id": "order-line",
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "bookings.py computes the quote itself (README rules + rush: 25% of subtotal-volume-promo; tax 8% of net+rush) with an embedded agent table (lead accepted, E-5).",
+     "Hours are multiples of 0.5, >= 0.5; availability returned as a number.",
+     "Per E-10: booking `total` never changes, also after cancel. On cancel I add separate integer fields `cancellation_fee` (10% of total, rounded half up) and `refund` (total minus fee); both 0 while confirmed. Reports computes revenue from totals and 10% itself.",
+     "Cancelling twice is a no-op.",
+     "Unknown agent/promo/invalid hours -> 4xx; insufficient hours -> 409; `rush` optional boolean."
+    ],
+    "acceptance_criteria": [
+     "POST /api/bookings prices incl. rush, reserves hours, refuses whole booking if any agent lacks hours",
+     "Half-hour hours accepted and counted in availability",
+     "Cancel returns hours, status cancelled, total unchanged, cancellation_fee 10%, refund the rest",
+     "GET booking and availability work"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:39:24.771536Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py",
+       "weekly_capacity is the static weekly total in hours, NOT hours remaining; bookings tracks remaining hours",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:29:48.916390Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup, so pricing embeds the README rate table locally and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional, rush optional bool default false}; returns the 6 quote fields as integers",
+       "hours must be a positive multiple of 0.5, else HTTP 400; unknown agent or promo other than BEEPBOOP also 400",
+       "Volume discount applies to lines with hours >= 20; rush_fee = 25% of (subtotal - volume - promo), tax = 8% of (that + rush_fee), all rounded half up",
+       "Promo discount capped at subtotal - volume discount"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total per rules 1-6, half-hour lines and rush"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:30:12.906958Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-9",
+      "revision": 3,
+      "project_id": "midflight-9854",
+      "task_id": "T5",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "cli/hirebot.py"
+      ],
+      "provides": [],
+      "consumes": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       },
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "available": "number"
+        }
+       },
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Per escalation E-7 the API (T3/T4) applies a 10% cancellation fee; the CLI does no fee math and prints booking total exactly as the API returns it in show and cancel",
+       "cancel prints only booking: and status: cancelled (README keys); show prints booking, status, total",
+       "GET /api/agents returns a JSON array (optional ?skill=)",
+       "POST /api/quote and /api/bookings take {items:[{agent,hours}], promo_code?, rush?}; rush sent only with --rush",
+       "Hours parsed as multiples of 0.5, sent as numbers (int when whole); availability and report hours printed as given",
+       "Errors are non-2xx JSON with 'detail'; CLI prints error: <detail>",
+       "Only stdlib urllib; edits only cli/hirebot.py"
+      ],
+      "acceptance_criteria": [
+       "Every README command prints exactly its listed keys, rush_fee after promo_discount, exit 0",
+       "--rush on quote and book; hours like 2.5 accepted",
+       "Any error prints 'error: <message>' and exits 1"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:37:53.975252Z"
+     },
+     "awaiting_revision": true
+    },
+    {
+     "claim": {
+      "id": "C-12",
+      "revision": 3,
+      "project_id": "midflight-9854",
+      "task_id": "T4",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "files": [
+       "app/reports.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "total": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Per lead decision E-8 (D-16): cancelling keeps a fee of 10% of the booking's total, rounded half up; the rest is refunded. Revenue = sum of total over confirmed bookings + sum of round_half_up(10% of total) over cancelled bookings. booking.total is not changed by cancellation.",
+       "booking.total is the full amount charged; I only read total, never rush_fee, so whether T3 folds rush_fee into total or not, I rely on total being the full charged amount (rush fee included). T3 must confirm total includes rush_fee.",
+       "booking.status is 'confirmed' or 'cancelled'.",
+       "Each booking.items element is {agent: <handle>, hours: number}; per R-6 hours may be multiples of 0.5 (key name 'agent' unconfirmed).",
+       "report.hours is {handle: number} over confirmed bookings only; values may be x.5.",
+       "T3's app/bookings.py exposes in-process list_bookings() returning booking dicts (not in plan contracts; T3 must confirm)."
+      ],
+      "acceptance_criteria": [
+       "GET /api/report returns revenue (confirmed totals + 10% fee on cancelled totals, half up), confirmed, cancelled, and hours per agent from confirmed bookings only, including half hours"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:37:05.054479Z"
+     },
+     "awaiting_revision": true
+    }
+   ]
+  },
+  {
+   "id": "E-13",
+   "label": "false",
+   "why": "'gives the hours back' does not change a total",
+   "reviewer_said": "The claim C-9 assumes that a booking's total never changes, also after cancelling, while the plan requirement R-3 states that cancelling a booking gives the hours back, implying a change in the total.",
+   "lead_answered": "dismiss: Not a conflict. Giving the hours back changes availability, not the booking's total. The total never changes.",
+   "plan": {
+    "project_id": "midflight-9854",
+    "version": 4,
+    "status": "approved",
+    "requirements": [
+     {
+      "id": "R-1",
+      "description": "Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-2",
+      "description": "Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-3",
+      "description": "Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-4",
+      "description": "Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-5",
+      "description": "Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-6",
+      "description": "Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too",
+      "acceptance_criteria": []
+     },
+     {
+      "id": "R-7",
+      "description": "Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)",
+      "acceptance_criteria": []
+     }
+    ],
+    "tasks": [
+     {
+      "id": "T1",
+      "title": "Catalog",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "provides": [
+       "agent"
+      ],
+      "consumes": []
+     },
+     {
+      "id": "T2",
+      "title": "Pricing",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "quote-request",
+       "order-line",
+       "quote"
+      ],
+      "consumes": [
+       "agent"
+      ]
+     },
+     {
+      "id": "T3",
+      "title": "Bookings",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [
+       "booking",
+       "availability"
+      ],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote"
+      ]
+     },
+     {
+      "id": "T4",
+      "title": "Reports",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "provides": [
+       "report"
+      ],
+      "consumes": [
+       "agent",
+       "booking"
+      ]
+     },
+     {
+      "id": "T5",
+      "title": "Command line",
+      "owner": "midflight-9854.someshagrawal1318",
+      "branch": "t5-cli",
+      "requirement_ids": [
+       "R-1",
+       "R-2",
+       "R-3",
+       "R-4",
+       "R-5",
+       "R-6",
+       "R-7"
+      ],
+      "provides": [],
+      "consumes": [
+       "agent",
+       "quote-request",
+       "order-line",
+       "quote",
+       "booking",
+       "availability",
+       "report"
+      ]
+     }
+    ],
+    "contracts": [
+     {
+      "id": "agent",
+      "version": 4,
+      "provider_task": "T1",
+      "consumer_tasks": [
+       "T2",
+       "T3",
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "name": "string",
+       "skills": "array",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "id": "quote-request",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "id": "order-line",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "id": "quote",
+      "version": 4,
+      "provider_task": "T2",
+      "consumer_tasks": [
+       "T3",
+       "T5"
+      ],
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "booking",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T4",
+       "T5"
+      ],
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "items": "array",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "id": "availability",
+      "version": 4,
+      "provider_task": "T3",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "handle": "string",
+       "available": "number"
+      }
+     },
+     {
+      "id": "report",
+      "version": 4,
+      "provider_task": "T4",
+      "consumer_tasks": [
+       "T5"
+      ],
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "approved_by": "midflight-9854.someshagrawal1318",
+    "approved_at": "2026-10-10T00:28:34.479396Z",
+    "change_reason": "Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee",
+    "changed_ids": [
+     "R-6",
+     "R-7",
+     "T2",
+     "T3",
+     "T4",
+     "T5",
+     "availability",
+     "booking",
+     "order-line",
+     "quote",
+     "quote-request"
+    ]
+   },
+   "claim": {
+    "id": "C-9",
+    "revision": 4,
+    "project_id": "midflight-9854",
+    "task_id": "T5",
+    "agent_id": "midflight-9854.someshagrawal1318",
+    "branch": "t5-cli",
+    "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+    "plan_version": 4,
+    "state": "pending",
+    "requirement_ids": [
+     "R-5",
+     "R-6",
+     "R-7"
+    ],
+    "files": [
+     "cli/hirebot.py"
+    ],
+    "provides": [],
+    "consumes": [
+     {
+      "contract_id": "agent",
+      "fields": {
+       "handle": "string",
+       "hourly_rate": "integer",
+       "weekly_capacity": "integer"
+      }
+     },
+     {
+      "contract_id": "quote-request",
+      "fields": {
+       "items": "array",
+       "promo_code": "string",
+       "rush": "boolean"
+      }
+     },
+     {
+      "contract_id": "order-line",
+      "fields": {
+       "agent": "string",
+       "hours": "number"
+      }
+     },
+     {
+      "contract_id": "quote",
+      "fields": {
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "contract_id": "booking",
+      "fields": {
+       "id": "string",
+       "status": "string",
+       "subtotal": "integer",
+       "volume_discount": "integer",
+       "promo_discount": "integer",
+       "rush_fee": "integer",
+       "tax": "integer",
+       "total": "integer"
+      }
+     },
+     {
+      "contract_id": "availability",
+      "fields": {
+       "available": "number"
+      }
+     },
+     {
+      "contract_id": "report",
+      "fields": {
+       "revenue": "integer",
+       "confirmed": "integer",
+       "cancelled": "integer",
+       "hours": "object"
+      }
+     }
+    ],
+    "no_interfaces": false,
+    "assumptions": [
+     "Per escalation E-11 a booking's total never changes, also after cancelling; show on a cancelled booking prints the original total as the API returns it",
+     "CLI does no fee or refund math",
+     "cancel prints only booking: and status: cancelled; show prints booking, status, total",
+     "GET /api/agents returns a JSON array (optional ?skill=)",
+     "POST /api/quote and /api/bookings take {items:[{agent,hours}], promo_code?, rush?}; rush sent only with --rush",
+     "Hours parsed as multiples of 0.5, sent as numbers (int when whole); availability and report hours printed as given",
+     "Errors are non-2xx JSON with 'detail'; CLI prints error: <detail>",
+     "Only stdlib urllib; edits only cli/hirebot.py"
+    ],
+    "acceptance_criteria": [
+     "Every README command prints exactly its listed keys, rush_fee after promo_discount, exit 0",
+     "--rush on quote and book; hours like 2.5 accepted",
+     "show on a cancelled booking prints the original total",
+     "Any error prints 'error: <message>' and exits 1"
+    ],
+    "reason": null,
+    "created_at": "2026-10-10T00:41:25.741446Z"
+   },
+   "other_claims": [
+    {
+     "claim": {
+      "id": "C-7",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T1",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t1-catalog",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-1"
+      ],
+      "files": [
+       "app/catalog.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "agent",
+        "fields": {
+         "handle": "string",
+         "name": "string",
+         "skills": "array",
+         "hourly_rate": "integer",
+         "weekly_capacity": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Routes are GET /api/agents (optional ?skill=) returning a JSON array of agent objects, and GET /api/agents/{handle} returning one agent object; unknown handle gives 404",
+       "Agent data is the six agents in README.md, hardcoded in catalog.py",
+       "weekly_capacity is the static weekly total in hours, NOT hours remaining; bookings tracks remaining hours",
+       "app/main.py includes catalog.router without a prefix, so full paths are in catalog.py"
+      ],
+      "acceptance_criteria": [
+       "GET /api/agents returns all 6 agents with the contract fields",
+       "GET /api/agents?skill=python returns only agents with that skill",
+       "GET /api/agents/{handle} returns one agent, 404 if unknown"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:29:48.916390Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-8",
+      "revision": 2,
+      "project_id": "midflight-9854",
+      "task_id": "T2",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t2-pricing",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-2",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/pricing.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       },
+       {
+        "contract_id": "quote",
+        "fields": {
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       }
+      ],
+      "consumes": [],
+      "no_interfaces": false,
+      "assumptions": [
+       "Catalog (T1) has no importable lookup, so pricing embeds the README rate table locally and does not import app.catalog",
+       "POST /api/quote takes {items:[{agent,hours}], promo_code optional, rush optional bool default false}; returns the 6 quote fields as integers",
+       "hours must be a positive multiple of 0.5, else HTTP 400; unknown agent or promo other than BEEPBOOP also 400",
+       "Volume discount applies to lines with hours >= 20; rush_fee = 25% of (subtotal - volume - promo), tax = 8% of (that + rush_fee), all rounded half up",
+       "Promo discount capped at subtotal - volume discount"
+      ],
+      "acceptance_criteria": [
+       "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total per rules 1-6, half-hour lines and rush"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:30:12.906958Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-10",
+      "revision": 5,
+      "project_id": "midflight-9854",
+      "task_id": "T3",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t3-bookings",
+      "base_sha": "f63322e",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-3",
+       "R-6",
+       "R-7"
+      ],
+      "files": [
+       "app/bookings.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "subtotal": "integer",
+         "volume_discount": "integer",
+         "promo_discount": "integer",
+         "rush_fee": "integer",
+         "tax": "integer",
+         "total": "integer"
+        }
+       },
+       {
+        "contract_id": "availability",
+        "fields": {
+         "handle": "string",
+         "available": "number"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "quote-request",
+        "fields": {
+         "items": "array",
+         "promo_code": "string",
+         "rush": "boolean"
+        }
+       },
+       {
+        "contract_id": "order-line",
+        "fields": {
+         "agent": "string",
+         "hours": "number"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "bookings.py computes the quote itself with an embedded agent table (lead accepted, E-5).",
+       "booking.total is the full amount originally charged and INCLUDES the rush fee: total = subtotal - volume_discount - promo_discount + rush_fee + tax, where rush_fee = 25% of (subtotal - volume - promo) when rush, else 0, and tax = 8% of (that net + rush_fee). This matches C-12's reliance on total including the rush fee; the two assumptions are compatible.",
+       "Per E-10 total never changes after cancel; separate integer fields cancellation_fee (10% of total, rounded half up) and refund (total minus fee), both 0 while confirmed.",
+       "Hours are multiples of 0.5, >= 0.5; availability is a number.",
+       "Cancelling twice is a no-op; errors are 4xx, insufficient hours 409."
+      ],
+      "acceptance_criteria": [
+       "POST /api/bookings prices incl. rush in total, reserves hours, refuses whole booking if any agent lacks hours",
+       "Half-hour hours counted in availability",
+       "Cancel returns hours, status cancelled, total unchanged, cancellation_fee 10%, refund the rest",
+       "GET booking and availability work"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:39:34.198097Z"
+     },
+     "awaiting_revision": false
+    },
+    {
+     "claim": {
+      "id": "C-12",
+      "revision": 4,
+      "project_id": "midflight-9854",
+      "task_id": "T4",
+      "agent_id": "midflight-9854.someshagrawal1318",
+      "branch": "t4-reports",
+      "base_sha": "157d51b3ca4fa5d5f011d7c2172a5005364d1e37",
+      "plan_version": 4,
+      "state": "pending",
+      "requirement_ids": [
+       "R-4",
+       "R-6"
+      ],
+      "files": [
+       "app/reports.py"
+      ],
+      "provides": [
+       {
+        "contract_id": "report",
+        "fields": {
+         "revenue": "integer",
+         "confirmed": "integer",
+         "cancelled": "integer",
+         "hours": "object"
+        }
+       }
+      ],
+      "consumes": [
+       {
+        "contract_id": "booking",
+        "fields": {
+         "id": "string",
+         "status": "string",
+         "items": "array",
+         "total": "integer"
+        }
+       }
+      ],
+      "no_interfaces": false,
+      "assumptions": [
+       "Per E-10 (D-19): booking.total never changes after cancel; it stays the originally charged amount. Revenue = sum of total over confirmed bookings + sum of round_half_up(10% of total) over cancelled bookings. I compute the fee myself from total and do not read cancellation_fee or refund.",
+       "booking.status is 'confirmed' or 'cancelled'.",
+       "Each booking.items element is {agent: <handle>, hours: number}; hours may be multiples of 0.5 (R-6); key name 'agent' unconfirmed.",
+       "report.hours is {handle: number} over confirmed bookings only; values may be x.5.",
+       "T3's app/bookings.py exposes in-process list_bookings() returning booking dicts (not in plan contracts; T3 must confirm)."
+      ],
+      "acceptance_criteria": [
+       "GET /api/report returns revenue (confirmed totals + 10% fee on cancelled totals, half up), confirmed, cancelled, and hours per agent from confirmed bookings only, including half hours"
+      ],
+      "reason": null,
+      "created_at": "2026-10-10T00:40:28.113964Z"
+     },
+     "awaiting_revision": false
+    }
+   ]
+  }
+ ]
+}
