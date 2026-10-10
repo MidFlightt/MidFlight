@@ -35,17 +35,16 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from midflight import demo
 from midflight.adapters.clock import SystemClock
-from midflight.adapters.dynamo_store import DynamoStore
 from midflight.adapters.fake_github import AnyRepoAccess
 from midflight.adapters.github import GitHubAppRepoAccess, GitHubAppSignIn
-from midflight.adapters.memory_store import MemoryStore
 from midflight.adapters.runners import StreamRunner
 from midflight.api.app import Services, build_services, create_app
 from midflight.api.oauth import MidflightOAuth, add_sign_in_routes
 from midflight.config import Settings, load_dotenv
 from midflight.mcp.hosted import build_hosted_server
-from midflight.ports import Clock, GitHubSignIn, RepoAccess, Store
+from midflight.ports import Clock, GitHubSignIn, RepoAccess, Reviewer, Store
 from midflight.services.projects import ProjectService
+from midflight.wiring import reviewer_for, store_for
 
 
 @dataclass(frozen=True)
@@ -63,15 +62,17 @@ def create_server(
     clock: Clock | None = None,
     repos: RepoAccess | None = None,
     github_sign_in: GitHubSignIn | None = None,
+    reviewer: Reviewer | None = None,
 ) -> Server:
     """Build the whole server. Tests pass their own store, clock, and GitHub fakes."""
-    store = store or _store(settings)
+    store = store or store_for(settings)
     clock = clock or SystemClock()
     repos = repos or _repo_access(settings)
     github_sign_in = github_sign_in or _github_sign_in(settings)
+    reviewer = reviewer or reviewer_for(settings)
 
     runner = StreamRunner() if settings.table_name else None
-    services = build_services(store, clock, runner=runner)
+    services = build_services(store, clock, reviewer, runner)
     projects = ProjectService(store, clock, repos, services.plans)
     oauth = MidflightOAuth(store, projects, settings.public_url, github_sign_in, settings.dev_login)
 
@@ -100,12 +101,6 @@ def create_server(
     app = create_app(services, lifespan=lifespan)
     app.mount("/", mcp_app)  # the REST routes match first; everything else is MCP and sign-in
     return Server(app, services, projects, oauth)
-
-
-def _store(settings: Settings) -> Store:
-    if settings.table_name:
-        return DynamoStore(settings.table_name)
-    return MemoryStore()
 
 
 def _repo_access(settings: Settings) -> RepoAccess:
