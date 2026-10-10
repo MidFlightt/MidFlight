@@ -5,8 +5,12 @@ runner. `run_review` is the job handler: rules first, then the AI reviewer, then
 pure decision, saved only if the project's coord_rev hasn't moved since the review
 read it (INV-02). If it moved, the review reruns from a fresh read.
 
-A conflict between people's requirements opens an escalation for the lead in the same
-commit (UC-12); `midflight.services.escalations` resolves it (UC-13).
+A product question two people answer differently opens an escalation for the lead in
+the same commit (UC-12); `midflight.services.escalations` resolves it (UC-13). A
+technical question between two claims is settled by the AI reviewer on the spot and
+recorded as a decision the lead can overturn (D31). An assumption about another task that
+the other task saw and didn't object to is recorded as agreed (D30). See
+`midflight.services.decisions`.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from pydantic import ValidationError
 
 from midflight.domain.decide import decide_claim
 from midflight.domain.models import (
+    EXCERPT_LIMIT,
     Claim,
     ClaimState,
     Contract,
@@ -47,6 +52,7 @@ from midflight.domain.models import (
     Text,
     Version,
 )
+from midflight.domain.neighbours import assumptions_about
 from midflight.domain.rules import check_claim, has_blocking, stale_plan, unknown_references
 from midflight.domain.states import (
     ACTIVE_CLAIM_STATES,
@@ -67,6 +73,13 @@ from midflight.ports import (
     Store,
 )
 from midflight.services.audit import audit_event, new_correlation_id
+from midflight.services.decisions import (
+    MIDFLIGHT,
+    as_requirements,
+    decisions_in_force,
+    is_agreement,
+    revision_requests,
+)
 from midflight.services.errors import InvalidRequest, NotFound, PermissionDenied, StateConflict
 from midflight.services.review import parse_reviewer_findings, reviewer_unavailable
 
@@ -321,9 +334,20 @@ class ClaimService:
                 return
             plan = self._current_plan(project)
             others = self._store.list_claims(project.id)
+            escalations = self._store.list_escalations(project.id)
             findings = check_claim(claim, plan, others)
             if claim.is_complete and not has_blocking(findings):
-                findings += self._reviewer_findings(claim, plan, others, findings)
+                # The reviewer reads what has been decided as part of the plan. An agreement
+                # this claim proposed itself is its own statement, not a rule for it.
+                decided = [
+                    d
+                    for d in decisions_in_force(escalations, others)
+                    if not (is_agreement(d) and d.claim_ids[0] == claim.id)
+                ]
+                known = plan.model_copy(
+                    update={"requirements": [*plan.requirements, *as_requirements(decided)]}
+                )
+                findings += self._reviewer_findings(claim, known, others, findings)
                 findings = self._set_aside_dismissed(project, claim, findings)
             target = decide_claim(claim, findings, stale=project.sync_state is SyncState.STALE)
             if target is not claim.state:
@@ -331,11 +355,13 @@ class ClaimService:
             reviewed = Claim.model_validate(
                 claim.model_dump() | {"state": target, "findings": findings}
             )
-            escalated = (
-                self._escalation(project, plan, claim, findings, others)
-                if target is ClaimState.HUMAN_REVIEW_REQUIRED
-                else []
-            )
+            escalated: list[Entity] = []
+            if target is ClaimState.HUMAN_REVIEW_REQUIRED:
+                escalated = self._escalation(project, plan, claim, findings, others)
+            elif target is ClaimState.NEEDS_REVISION:
+                escalated = self._settled(project, plan, claim, findings, others)
+            elif target is ClaimState.APPROVED:
+                escalated = self._agreed(project, plan, claim, others, escalations)
             incomplete = any(f.kind is FindingKind.REVIEWER_UNAVAILABLE for f in findings)
             done = job.model_copy(
                 update={
@@ -448,6 +474,9 @@ class ClaimService:
             None,
         )
         explanation = " ".join(f.explanation for f in conflicts)
+        suggested = " ".join(f.proposed_correction or "" for f in conflicts).strip()
+        if suggested:
+            explanation += f" Suggested answer: {suggested}"
         evidence = [*(e for f in conflicts for e in f.evidence), *_what_they_assume(involved)]
         # The other side's claims wait for the lead too (D14).
         waiting = ClaimState.HUMAN_REVIEW_REQUIRED
@@ -483,6 +512,105 @@ class ClaimService:
             created_at=self._clock.now(),
         )
         return [escalation, *moved]
+
+    def _settled(
+        self,
+        project: Project,
+        plan: Plan,
+        claim: Claim,
+        findings: Sequence[Finding],
+        others: Sequence[Claim],
+    ) -> list[Entity]:
+        """Record a technical question the AI reviewer settled between this claim and
+        other tasks' claims, and send those claims back for revision too (D31).
+
+        Nothing to record when the finding is only about this claim and the plan: its
+        agent revises, and that is all.
+        """
+        mismatches = [
+            f
+            for f in findings
+            if f.blocking and f.kind is FindingKind.SEMANTIC_MISMATCH and f.proposed_correction
+        ]
+        named = {i for f in mismatches for i in _named_ids(f, others)}
+        other_side = [
+            o
+            for o in others
+            if o.id in named and o.task_id != claim.task_id and o.state in _COMPARED_STATES
+        ]
+        if not other_side:
+            return []
+        now = self._clock.now()
+        decision = " ".join(f.proposed_correction or "" for f in mismatches).strip()
+        escalation = Escalation(
+            id=self._store.next_id(project.id, "E"),
+            project_id=project.id,
+            competing_requirement_ids=sorted(i for i in named if plan.requirement(i)),
+            claim_ids=[claim.id, *(o.id for o in other_side)],
+            finding_ids=[f.id for f in mismatches],
+            evidence=_what_they_assume([claim, *other_side]),
+            explanation=" ".join(f.explanation for f in mismatches),
+            state=EscalationState.RESOLVED,
+            resolution=Resolution.REQUEST_REVISION,
+            resolved_by=MIDFLIGHT,
+            reason=decision,
+            resolved_at=now,
+            created_at=now,
+        )
+        requests = revision_requests(
+            self._store, self._clock, escalation, other_side, plan.version, decision, MIDFLIGHT
+        )
+        return [escalation, *requests]
+
+    def _agreed(
+        self,
+        project: Project,
+        plan: Plan,
+        claim: Claim,
+        others: Sequence[Claim],
+        escalations: Sequence[Escalation],
+    ) -> list[Entity]:
+        """Record what other tasks assume about this one, now that its agent has seen
+        each assumption at a check-in and had a claim approved without objecting (D30)."""
+        task = plan.task(claim.task_id)
+        agent = self._store.get_participant(claim.agent_id)
+        seen = agent.last_check_in_at if agent else None
+        if task is None or seen is None or seen > claim.created_at:
+            return []
+        latest = {o.id: o for o in others}
+        recorded = {(e.claim_ids[0], e.evidence[0].excerpt) for e in escalations if e.evidence}
+        now = self._clock.now()
+        agreed: list[Entity] = []
+        for assumed in assumptions_about(task, claim.files, others, by_title=False):
+            proposer = latest[assumed.claim_id]
+            # The whole assumption: what is shown at check-in may have been shortened.
+            text = next(a for a in proposer.assumptions if a.startswith(assumed.text))
+            if proposer.created_at > seen or (proposer.id, text[:EXCERPT_LIMIT]) in recorded:
+                continue
+            agreed.append(
+                Escalation(
+                    id=self._store.next_id(project.id, "E"),
+                    project_id=project.id,
+                    claim_ids=[proposer.id, claim.id],
+                    evidence=[
+                        Evidence(
+                            kind=EvidenceKind.CLAIM,
+                            ref=f"{proposer.id} rev {proposer.revision} ({proposer.task_id})",
+                            excerpt=text[:EXCERPT_LIMIT],
+                        )
+                    ],
+                    explanation=f"{proposer.task_id} stated this about {task.id} ({task.title}). "
+                    f"{task.id}'s agent saw it at a check-in, and its next claim was approved "
+                    "without objecting.",
+                    state=EscalationState.RESOLVED,
+                    resolution=Resolution.CLARIFY_PLAN,
+                    resolved_by=MIDFLIGHT,
+                    reason=text,
+                    resolved_at=now,
+                    created_at=now,
+                )
+            )
+        return agreed
 
     def _set_aside_dismissed(
         self, project: Project, claim: Claim, findings: list[Finding]

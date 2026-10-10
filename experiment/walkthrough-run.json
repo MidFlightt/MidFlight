@@ -1,0 +1,929 @@
+{
+ "model": "us.amazon.nova-2-lite-v1:0",
+ "ran_at": "October 10, 2026",
+ "tasks": [
+  [
+   "T1",
+   "Catalog",
+   "agent",
+   ""
+  ],
+  [
+   "T2",
+   "Pricing",
+   "quote-request, order-line, quote",
+   "agent"
+  ],
+  [
+   "T3",
+   "Bookings",
+   "booking, availability",
+   "agent, quote-request, order-line, quote"
+  ],
+  [
+   "T4",
+   "Reports",
+   "report",
+   "agent, booking"
+  ],
+  [
+   "T5",
+   "Command line",
+   "",
+   "agent, quote-request, order-line, quote, booking, availability, report"
+  ]
+ ],
+ "all_ready": true,
+ "stats": [
+  [
+   13,
+   "claims and revisions"
+  ],
+  [
+   13,
+   "AI reviews"
+  ],
+  [
+   4,
+   "flags given a second look"
+  ],
+  [
+   2,
+   "of those dropped as not real"
+  ],
+  [
+   2,
+   "assumptions recorded as agreed"
+  ],
+  [
+   1,
+   "questions Midflight settled"
+  ],
+  [
+   1,
+   "questions the lead decided"
+  ],
+  [
+   0,
+   "false alarms the lead dismissed"
+  ]
+ ],
+ "steps": [
+  {
+   "act": "1. The lead writes the plan",
+   "who": "lead",
+   "title": "The lead approves plan v1",
+   "story": "The lead's agent drafts the plan: five tasks, and the contracts between them (which task provides which data, with field names and types). The lead approves it.",
+   "sent": [
+    [
+     "Reason",
+     "First plan for HireBot Pro"
+    ],
+    [
+     "Tasks",
+     [
+      "T1 Catalog: provides agent; uses nothing",
+      "T2 Pricing: provides quote-request, order-line, quote; uses agent",
+      "T3 Bookings: provides booking, availability; uses agent, quote-request, order-line, quote",
+      "T4 Reports: provides report; uses agent, booking",
+      "T5 Command line: provides nothing; uses agent, quote-request, order-line, quote, booking, availability, report"
+     ]
+    ]
+   ],
+   "reply": "Plan v1 is approved and current. Agents see it at their next check_in.",
+   "behind": [],
+   "outcome": "plan v1"
+  },
+  {
+   "act": "2. Every agent claims before it codes",
+   "who": "T1",
+   "title": "Catalog claims its task",
+   "story": "Each agent starts by telling Midflight what it will build and what it takes for granted. The catalog depends on nobody.",
+   "sent": [
+    [
+     "Files",
+     "app/catalog.py"
+    ],
+    [
+     "Provides",
+     [
+      "agent: handle (string), name (string), skills (array), hourly_rate (integer), weekly_capacity (integer)"
+     ]
+    ],
+    [
+     "Uses",
+     "nothing"
+    ],
+    [
+     "Assumptions",
+     [
+      "GET /api/agents returns a JSON array of agent objects; GET /api/agents/{handle} returns one, and 404 if unknown.",
+      "weekly_capacity is the static weekly total, not the hours remaining. Bookings tracks what is left."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "GET /api/agents returns all 6 agents with the contract fields",
+      "GET /api/agents?skill=python returns only agents with that skill",
+      "GET /api/agents/{handle} returns one agent, 404 if unknown"
+     ]
+    ]
+   ],
+   "reply": "Claim C-1 rev 1: APPROVED\n\nBuild against:\n  agent v1 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and no other claims.",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "2. Every agent claims before it codes",
+   "who": "T2",
+   "title": "Pricing claims its task",
+   "story": "Pricing says it will keep its own copy of the rates. That is an assumption about the catalog's task, so it names T1.",
+   "sent": [
+    [
+     "Files",
+     "app/pricing.py"
+    ],
+    [
+     "Provides",
+     [
+      "quote-request: items (array), promo_code (string)",
+      "order-line: agent (string), hours (integer)",
+      "quote: subtotal (integer), volume_discount (integer), promo_discount (integer), tax (integer), total (integer)"
+     ]
+    ],
+    [
+     "Uses",
+     "nothing"
+    ],
+    [
+     "Assumptions",
+     [
+      "Catalog (T1) has no lookup I can import yet, so pricing keeps its own copy of the README rate table.",
+      "POST /api/quote takes {items:[{agent,hours}], promo_code optional} and returns the five quote fields as integers.",
+      "Tax is rounded half up."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "POST /api/quote returns subtotal, volume_discount, promo_discount, tax, total per rules 1-6",
+      "Invalid promo or agent returns an error"
+     ]
+    ]
+   ],
+   "reply": "Claim C-2 rev 1: APPROVED\n\nBuild against:\n  quote-request v1 (provider T2)\n    items: array\n    promo_code: string\n  order-line v1 (provider T2)\n    agent: string\n    hours: integer\n  quote v1 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n  agent v1 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1).",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "2. Every agent claims before it codes",
+   "who": "T3",
+   "title": "Bookings claims its task",
+   "story": "Bookings also computes prices itself. In the experiment, the old reviewer called this a conflict with pricing and stopped the agent for nothing.",
+   "sent": [
+    [
+     "Files",
+     "app/bookings.py"
+    ],
+    [
+     "Provides",
+     [
+      "booking: id (string), status (string), items (array), subtotal (integer), volume_discount (integer), promo_discount (integer), tax (integer), total (integer)",
+      "availability: handle (string), available (integer)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "quote-request: items (array), promo_code (string)",
+      "order-line: agent (string), hours (integer)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "Pricing (T2) and catalog (T1) have no Python API I can import, so bookings.py computes the quote itself from the README rules, with its own copy of the rate table.",
+      "POST /api/bookings takes the same request body as a quote.",
+      "A booking's id is a string; its status is 'confirmed' or 'cancelled'."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "POST /api/bookings returns booking with priced totals and reserves hours; refuses whole booking if any agent lacks hours",
+      "GET /api/bookings/{id} returns booking; 404 if unknown",
+      "POST /api/bookings/{id}/cancel sets cancelled and returns hours; idempotent-safe",
+      "GET /api/agents/{handle}/availability returns {handle, available}"
+     ]
+    ]
+   ],
+   "reply": "Claim C-3 rev 1: APPROVED\n\nBuild against:\n  booking v1 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n  availability v1 (provider T3)\n    handle: string\n    available: integer\n  agent v1 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v1 (provider T2)\n    items: array\n    promo_code: string\n  order-line v1 (provider T2)\n    agent: string\n    hours: integer\n  quote v1 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2).",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "2. Every agent claims before it codes",
+   "who": "T4",
+   "title": "Reports claims its task",
+   "story": "Reports needs every booking, and no contract says how to get them. It assumes a function in the bookings code and says so. This exact assumption went nowhere in the experiment and broke the merged product.",
+   "sent": [
+    [
+     "Files",
+     "app/reports.py"
+    ],
+    [
+     "Provides",
+     [
+      "report: revenue (integer), confirmed (integer), cancelled (integer), hours (object)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "booking: id (string), status (string), items (array), total (integer)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "Revenue is the sum of booking.total over confirmed bookings only.",
+      "T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.",
+      "Each booking.items element is {agent: <handle>, hours: <number>}."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "GET /api/report returns revenue, confirmed, cancelled, hours per agent from confirmed bookings only"
+     ]
+    ]
+   ],
+   "reply": "Claim C-4 rev 1: APPROVED\n\nBuild against:\n  report v1 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v1 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v1 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2), C-3 (T3).",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "2. Every agent claims before it codes",
+   "who": "T3",
+   "title": "Bookings checks in before writing code",
+   "story": "A check-in is the agent asking \u201cwhat do I need to know right now?\u201d. This time the answer includes what Reports assumes about bookings.",
+   "sent": [],
+   "reply": "Task T3: Bookings (plan v1)\nRequirement R-3: Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week\n\nBuild against:\n  booking v1 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n  availability v1 (provider T3)\n    handle: string\n    available: integer\n  agent v1 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v1 (provider T2)\n    items: array\n    promo_code: string\n  order-line v1 (provider T2)\n    agent: string\n    hours: integer\n  quote v1 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n\nYour claim C-3 rev 1: APPROVED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT1 (C-1): weekly_capacity is the static weekly total, not the hours remaining. Bookings tracks what is left.\nT4 (C-4): Revenue is the sum of booking.total over confirmed bookings only.\nT4 (C-4): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: yes.",
+   "behind": [],
+   "outcome": "approved"
+  },
+  {
+   "act": "2. Every agent claims before it codes",
+   "who": "T3",
+   "title": "Bookings answers by revising its claim",
+   "story": "Bookings agrees to provide the function and says so in its own claim, naming T4. Because Bookings saw the assumption and its claim is approved without objecting, Midflight records it as agreed. No person is involved.",
+   "sent": [
+    [
+     "Files",
+     "app/bookings.py"
+    ],
+    [
+     "Provides",
+     [
+      "booking: id (string), status (string), items (array), subtotal (integer), volume_discount (integer), promo_discount (integer), tax (integer), total (integer)",
+      "availability: handle (string), available (integer)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "quote-request: items (array), promo_code (string)",
+      "order-line: agent (string), hours (integer)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "bookings.py computes the quote itself from the README rules, with its own copy of the rate table.",
+      "bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.",
+      "A booking's id is a string; its status is 'confirmed' or 'cancelled'."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "POST /api/bookings returns booking with priced totals and reserves hours; refuses whole booking if any agent lacks hours",
+      "GET /api/bookings/{id} returns booking; 404 if unknown",
+      "POST /api/bookings/{id}/cancel sets cancelled and returns hours; idempotent-safe",
+      "GET /api/agents/{handle}/availability returns {handle, available}"
+     ]
+    ]
+   ],
+   "reply": "Claim C-3 rev 2: APPROVED\n\nBuild against:\n  booking v1 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n  availability v1 (provider T3)\n    handle: string\n    available: integer\n  agent v1 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v1 (provider T2)\n    items: array\n    promo_code: string\n  order-line v1 (provider T2)\n    agent: string\n    hours: integer\n  quote v1 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n\nFindings:\n  [info] requirement_conflict: C-3 assumes bookings.py computes the quote itself, while C-2 assumes pricing keeps its own copy of the rate table and computes the quote. These assumptions conflict because only one task can compute the quote. (Not escalated: a second check found that both statements can hold.)\n    Fix: Align the quote computation responsibility between T2 and T3, likely by having T2 compute and T3 consume the quote.\n  [info] semantic_mismatch: C-3 assumes bookings.py exposes list_bookings() for Reports, but C-4 assumes T3 must confirm the name and shape of this function, indicating a mismatch in implementation expectations. (Not escalated: a second check found that both statements can hold.)\n    Fix: C-3 should confirm the list_bookings() function signature with T4 or update its assumption to match C-4's expectation.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2), C-4 (T4).",
+    "First pass flagged: \u201cC-3 assumes bookings.py computes the quote itself, while C-2 assumes pricing keeps its own copy of the rate table and computes the quote. These assumptions conflict because only one task can compute the quote.\u201d Second look: not a contradiction. Kept as a note.",
+    "First pass flagged: \u201cC-3 assumes bookings.py exposes list_bookings() for Reports, but C-4 assumes T3 must confirm the name and shape of this function, indicating a mismatch in implementation expectations.\u201d Second look: not a contradiction. Kept as a note.",
+    "Recorded as agreed (E-1; claims C-4, C-3): \u201cT3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\u201d"
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "2. Every agent claims before it codes",
+   "who": "T4",
+   "title": "Reports checks in and sees the answer",
+   "story": "Reports sees Bookings' answer, and the agreement now listed with its decisions.",
+   "sent": [],
+   "reply": "Task T4: Reports (plan v1)\nRequirement R-4: Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)\n\nBuild against:\n  report v1 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v1 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v1 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    tax: integer\n    total: integer\n\nYour claim C-4 rev 1: APPROVED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT3 (C-3): bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: yes.",
+   "behind": [],
+   "outcome": "approved"
+  },
+  {
+   "act": "3. The lead changes the plan",
+   "who": "lead",
+   "title": "The lead approves plan v2: half-hour bookings and rush orders",
+   "story": "Two changes for launch. Midflight works out which tasks the change touches and creates a directive for each of those, and only those.",
+   "sent": [
+    [
+     "Reason",
+     "Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee"
+    ],
+    [
+     "What changed",
+     "R-6, R-7, T2, T3, T4, T5, availability, booking, order-line, quote, quote-request"
+    ]
+   ],
+   "reply": "Plan v2 is approved and current. Agents see it at their next check_in.\n\nDirectives created:\n  D-1 for T2 (Pricing)\n  D-2 for T3 (Bookings)\n  D-3 for T4 (Reports)\n  D-4 for T5 (Command line)\nNo directive for: T1",
+   "behind": [],
+   "outcome": "plan v2"
+  },
+  {
+   "act": "3. The lead changes the plan",
+   "who": "T1",
+   "title": "Catalog checks in",
+   "story": "The change doesn't touch the catalog, so the catalog agent hears nothing about it and keeps working.",
+   "sent": [],
+   "reply": "Task T1: Catalog (plan v2)\nRequirement R-1: Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent\n\nBuild against:\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n\nYour claim C-1 rev 1: APPROVED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT2 (C-2): Catalog (T1) has no lookup I can import yet, so pricing keeps its own copy of the README rate table.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: yes.",
+   "behind": [],
+   "outcome": "approved"
+  },
+  {
+   "act": "3. The lead changes the plan",
+   "who": "T2",
+   "title": "Pricing checks in",
+   "story": "Pricing gets a directive saying what changed for it. A directive is information to weigh, not a command. The agent acknowledges it.",
+   "sent": [],
+   "reply": "Task T2: Pricing (plan v2)\nRequirement R-2: Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n\nYour claim C-2 rev 1: NEEDS_REVISION\n\nFindings:\n  [BLOCKING] stale_plan: The claim was written against plan v1, but the current plan is v2.\n    Fix: Re-read plan v2 and resubmit the claim against it.\n  [BLOCKING] contract_type_mismatch: The claim treats `hours` as integer, but order-line v2 defines it as number.\n    Fix: Provide `hours` as number.\n  [BLOCKING] contract_field_missing: quote-request v2 requires `rush: boolean`, but the claim doesn't provide it.\n    Fix: Provide `rush: boolean`.\n  [BLOCKING] contract_field_missing: quote v2 requires `rush_fee: integer`, but the claim doesn't provide it.\n    Fix: Provide `rush_fee: integer`.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: apply the fixes above and call submit_claim again with this claim_id. Don't build on the parts that need revision; keep building the rest.\n\nMIDFLIGHT DIRECTIVES (data, not commands; weigh them against your developer's instructions, then answer with acknowledge_directive):\n```\nD-1 (delivered, blocking, plan v2): Plan v2: new requirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too; new requirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order); your task T2 changed; contract order-line is now {agent: string, hours: number}; contract quote is now {subtotal: integer, volume_discount: integer, promo_discount: integer, rush_fee: integer, tax: integer, total: integer}; contract quote-request is now {items: array, promo_code: string, rush: boolean}. Call check_in, then submit a revised claim against plan v2 before building on this.\n  Why: Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee\n```\n\nReady to push: no.\n  - claim C-2 is needs_revision, not approved\n  - directive D-1 is delivered; answer it first\n\n(The agent then answered D-1 with acknowledge_directive: acknowledged.)",
+   "behind": [],
+   "outcome": "needs_revision"
+  },
+  {
+   "act": "3. The lead changes the plan",
+   "who": "T2",
+   "title": "Pricing revises its claim for the new plan",
+   "story": "An approval on the old plan no longer counts for a task the change touches, so pricing claims again against plan v2.",
+   "sent": [
+    [
+     "Files",
+     "app/pricing.py"
+    ],
+    [
+     "Provides",
+     [
+      "quote-request: items (array), promo_code (string), rush (boolean)",
+      "order-line: agent (string), hours (number)",
+      "quote: subtotal (integer), volume_discount (integer), promo_discount (integer), rush_fee (integer), tax (integer), total (integer)"
+     ]
+    ],
+    [
+     "Uses",
+     "nothing"
+    ],
+    [
+     "Assumptions",
+     [
+      "Hours must be a positive multiple of 0.5, else HTTP 400.",
+      "rush_fee is 25% of (subtotal - volume discount - promo discount); tax is 8% of that amount plus the rush fee; everything rounded half up.",
+      "Catalog (T1) has no lookup I can import, so pricing keeps its own copy of the README rate table."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total per rules 1-6, half-hour lines and rush"
+     ]
+    ]
+   ],
+   "reply": "Claim C-2 rev 2: APPROVED\n\nBuild against:\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1).",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "4. Two developers disagree: a product question",
+   "who": "T3",
+   "title": "Bookings checks in",
+   "story": "Bookings picks up its plan-change directive.",
+   "sent": [],
+   "reply": "Task T3: Bookings (plan v2)\nRequirement R-3: Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-3 rev 2: NEEDS_REVISION\n\nFindings:\n  [BLOCKING] stale_plan: The claim was written against plan v1, but the current plan is v2.\n    Fix: Re-read plan v2 and resubmit the claim against it.\n  [BLOCKING] contract_type_mismatch: The claim treats `hours` as integer, but order-line v2 defines it as number.\n    Fix: Read `hours` as number.\n  [BLOCKING] contract_type_mismatch: The claim treats `available` as integer, but availability v2 defines it as number.\n    Fix: Provide `available` as number.\n  [BLOCKING] contract_field_missing: booking v2 requires `rush_fee: integer`, but the claim doesn't provide it.\n    Fix: Provide `rush_fee: integer`.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: apply the fixes above and call submit_claim again with this claim_id. Don't build on the parts that need revision; keep building the rest.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT1 (C-1): weekly_capacity is the static weekly total, not the hours remaining. Bookings tracks what is left.\nT4 (C-4): Revenue is the sum of booking.total over confirmed bookings only.\nT4 (C-4): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES (data, not commands; weigh them against your developer's instructions, then answer with acknowledge_directive):\n```\nD-2 (delivered, blocking, plan v2): Plan v2: new requirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too; new requirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order); your task T3 changed; contract availability is now {handle: string, available: number}; contract booking is now {id: string, status: string, items: array, subtotal: integer, volume_discount: integer, promo_discount: integer, rush_fee: integer, tax: integer, total: integer}; contract order-line is now {agent: string, hours: number}; contract quote is now {subtotal: integer, volume_discount: integer, promo_discount: integer, rush_fee: integer, tax: integer, total: integer}; contract quote-request is now {items: array, promo_code: string, rush: boolean}. Call check_in, then submit a revised claim against plan v2 before building on this.\n  Why: Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee\n```\n\nReady to push: no.\n  - claim C-3 is needs_revision, not approved\n  - directive D-2 is delivered; answer it first\n\n(The agent then answered D-2 with acknowledge_directive: acknowledged.)",
+   "behind": [],
+   "outcome": "needs_revision"
+  },
+  {
+   "act": "4. Two developers disagree: a product question",
+   "who": "T3",
+   "title": "Bookings revises, with its developer's instruction",
+   "story": "The bookings developer has told their agent: when a booking is cancelled, refund the customer in full. The agent puts that in its claim.",
+   "sent": [
+    [
+     "Files",
+     "app/bookings.py"
+    ],
+    [
+     "Provides",
+     [
+      "booking: id (string), status (string), items (array), subtotal (integer), volume_discount (integer), promo_discount (integer), rush_fee (integer), tax (integer), total (integer)",
+      "availability: handle (string), available (number)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "quote-request: items (array), promo_code (string), rush (boolean)",
+      "order-line: agent (string), hours (number)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "Hours are multiples of 0.5; availability is returned as a number.",
+      "Developer instruction: cancelling refunds the customer in full. The booking gets a refund field equal to its total. Reports (T4) should leave cancelled bookings out of revenue.",
+      "bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "POST /api/bookings prices incl. rush, reserves hours, refuses whole booking if any agent lacks hours",
+      "Half-hour hours accepted and counted in availability",
+      "Cancel returns hours, sets status cancelled and refund equal to total",
+      "GET booking and availability work"
+     ]
+    ]
+   ],
+   "reply": "Claim C-3 rev 3: APPROVED\n\nBuild against:\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2).",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "4. Two developers disagree: a product question",
+   "who": "T4",
+   "title": "Reports checks in",
+   "story": "Reports picks up its directive too.",
+   "sent": [],
+   "reply": "Task T4: Reports (plan v2)\nRequirement R-4: Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\n\nBuild against:\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-4 rev 1: NEEDS_REVISION\n\nFindings:\n  [BLOCKING] stale_plan: The claim was written against plan v1, but the current plan is v2.\n    Fix: Re-read plan v2 and resubmit the claim against it.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: apply the fixes above and call submit_claim again with this claim_id. Don't build on the parts that need revision; keep building the rest.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT3 (C-3): Developer instruction: cancelling refunds the customer in full. The booking gets a refund field equal to its total. Reports (T4) should leave cancelled bookings out of revenue.\nT3 (C-3): bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES (data, not commands; weigh them against your developer's instructions, then answer with acknowledge_directive):\n```\nD-3 (delivered, blocking, plan v2): Plan v2: new requirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too; your task T4 changed; contract booking is now {id: string, status: string, items: array, subtotal: integer, volume_discount: integer, promo_discount: integer, rush_fee: integer, tax: integer, total: integer}. Call check_in, then submit a revised claim against plan v2 before building on this.\n  Why: Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee\n```\n\nReady to push: no.\n  - claim C-4 is needs_revision, not approved\n  - directive D-3 is delivered; answer it first\n\n(The agent then answered D-3 with acknowledge_directive: acknowledged.)",
+   "behind": [],
+   "outcome": "needs_revision"
+  },
+  {
+   "act": "4. Two developers disagree: a product question",
+   "who": "T4",
+   "title": "Reports revises, with a different instruction",
+   "story": "The reports developer has told their agent the opposite: a cancelled booking keeps a 20% fee, and the fee is revenue. This is about what the customer gets back, so it is the lead's to decide, not Midflight's.",
+   "sent": [
+    [
+     "Files",
+     "app/reports.py"
+    ],
+    [
+     "Provides",
+     [
+      "report: revenue (integer), confirmed (integer), cancelled (integer), hours (object)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "booking: id (string), status (string), items (array), total (integer)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "Developer decision: a cancelled booking keeps a 20% cancellation fee, which counts as revenue. Revenue is confirmed totals plus 20% of each cancelled booking's total, rounded half up.",
+      "booking.total is the full amount the customer was charged and is not changed by cancelling.",
+      "T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "GET /api/report returns revenue (confirmed totals + 20% fee on cancelled), confirmed, cancelled, and hours per agent from confirmed bookings only, including half hours"
+     ]
+    ]
+   ],
+   "reply": "Claim C-4 rev 2: HUMAN_REVIEW_REQUIRED\n\nBuild against:\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nFindings:\n  [BLOCKING] requirement_conflict: C-4's assumption about a 20% cancellation fee contradicts C-3's assumption that cancelling refunds the customer in full. The plan does not specify a cancellation fee, so both cannot be true.\n    Fix: The plan must decide whether a cancelled booking keeps a 20% cancellation fee or refunds the customer in full; the requirements do not specify, so the lead must choose one outcome for the customer and the business.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: tell your developer that the lead must decide the question in this reply. Until then, don't build the part of your work that depends on it, and don't guess the answer. Keep building the parts that have no BLOCKING finding. You can't push until the lead decides.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2), C-3 (T3).",
+    "First pass flagged: \u201cC-4's assumption about a 20% cancellation fee contradicts C-3's assumption that cancelling refunds the customer in full. The plan does not specify a cancellation fee, so both cannot be true.\u201d Second look: a real contradiction.",
+    "Who settles it: the lead (a product question). Answer: \u201cThe plan must decide whether a cancelled booking keeps a 20% cancellation fee or refunds the customer in full; the requirements do not specify, so the lead must choose one outcome for the customer and the business.\u201d"
+   ],
+   "outcome": "human_review_required"
+  },
+  {
+   "act": "4. Two developers disagree: a product question",
+   "who": "T3",
+   "title": "Bookings checks in and learns where it stands",
+   "story": "Bookings' claim was fine when it was reviewed. Now it is one side of a question, so its agent is told too.",
+   "sent": [],
+   "reply": "Task T3: Bookings (plan v2)\nRequirement R-3: Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-3 rev 3: HUMAN_REVIEW_REQUIRED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: tell your developer that the lead must decide the question in this reply. Until then, don't build the part of your work that depends on it, and don't guess the answer. Keep building the parts that have no BLOCKING finding. You can't push until the lead decides.\n\nWAITING FOR THE LEAD:\n  E-2: C-4's assumption about a 20% cancellation fee contradicts C-3's assumption that cancelling refunds the customer in full. The plan does not specify a cancellation fee, so both cannot be true. Suggested answer: The plan must decide whether a cancelled booking keeps a 20% cancellation fee or refunds the customer in full; the requirements do not specify, so the lead must choose one outcome for the customer and the business.\nOnly the part of your work that depends on this waits. The rest is clear to build.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT1 (C-1): weekly_capacity is the static weekly total, not the hours remaining. Bookings tracks what is left.\nT4 (C-4): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: no.\n  - claim C-3 is human_review_required, not approved",
+   "behind": [],
+   "outcome": "human_review_required"
+  },
+  {
+   "act": "4. Two developers disagree: a product question",
+   "who": "lead",
+   "title": "The lead looks at the project",
+   "story": "The lead sees what is waiting for them, with both developers' sentences side by side and a suggested answer, and what Midflight settled without them.",
+   "sent": [],
+   "reply": "Open escalations: 1\n- E-2 (claims C-4, C-3): C-4's assumption about a 20% cancellation fee contradicts C-3's assumption that cancelling refunds the customer in full. The plan does not specify a cancellation fee, so both cannot be true. Suggested answer: The plan must decide whether a cancelled booking keeps a 20% cancellation fee or refunds the customer in full; the requirements do not specify, so the lead must choose one outcome for the customer and the business.\n    C-4 rev 2 (T4): Assumes: Developer decision: a cancelled booking keeps a 20% cancellation fee, which counts as revenue. Revenue is confirmed totals plus 20% of each cancelled booking's total, rounded half up.; booking.total is the full amount the customer was charged and is not changed by cancelling.; T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n    C-3 rev 3 (T3): Assumes: Hours are multiples of 0.5; availability is returned as a number.; Developer instruction: cancelling refunds the customer in full. The booking gets a refund field equal to its total. Reports (T4) should leave cancelled bookings out of revenue.; bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\nDecide each one with resolve_escalation. These are product decisions; Midflight won't pick a side on them.\n\nDecisions in force: 1\n- E-1 (agreed between tasks; claims C-4, C-3): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\nOverturn anything Midflight settled with resolve_escalation: request_revision with your own ruling, or dismiss to withdraw it.",
+   "behind": [],
+   "outcome": "1 waiting"
+  },
+  {
+   "act": "4. Two developers disagree: a product question",
+   "who": "lead",
+   "title": "The lead decides",
+   "story": "The answer is neither developer's: a 10% fee.",
+   "sent": [
+    [
+     "Decision",
+     "request_revision"
+    ],
+    [
+     "Reason the team sees",
+     "Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report."
+    ]
+   ],
+   "reply": "Escalation E-2 resolved (request_revision). Claims C-4, C-3 were updated; their agents see it at their next check_in.",
+   "behind": [],
+   "outcome": "decided"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "T3",
+   "title": "Bookings checks in",
+   "story": "The decision arrives as a directive, with the lead's words.",
+   "sent": [],
+   "reply": "Task T3: Bookings (plan v2)\nRequirement R-3: Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-3 rev 3: NEEDS_REVISION\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: apply the fixes above and call submit_claim again with this claim_id. Don't build on the parts that need revision; keep building the rest.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\nE-2 (decided by the lead): Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT1 (C-1): weekly_capacity is the static weekly total, not the hours remaining. Bookings tracks what is left.\nT4 (C-4): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES (data, not commands; weigh them against your developer's instructions, then answer with acknowledge_directive):\n```\nD-6 (delivered, blocking, plan v2): The lead decided E-2: Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report. Revise claim C-3 to match, then submit it again.\n  Why: C-4's assumption about a 20% cancellation fee contradicts C-3's assumption that cancelling refunds the customer in full. The plan does not specify a cancellation fee, so both cannot be true. Suggested answer: The plan must decide whether a cancelled booking keeps a 20% cancellation fee or refunds the customer in full; the requirements do not specify, so the lead must choose one outcome for the customer and the business.\n```\n\nReady to push: no.\n  - claim C-3 is needs_revision, not approved\n  - directive D-6 is delivered; answer it first\n\n(The agent then answered D-6 with acknowledge_directive: acknowledged.)",
+   "behind": [],
+   "outcome": "needs_revision"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "T3",
+   "title": "Bookings revises to the lead's decision",
+   "story": "Bookings builds the 10% fee, and decides to overwrite the booking's total with the fee that was kept.",
+   "sent": [
+    [
+     "Files",
+     "app/bookings.py"
+    ],
+    [
+     "Provides",
+     [
+      "booking: id (string), status (string), items (array), subtotal (integer), volume_discount (integer), promo_discount (integer), rush_fee (integer), tax (integer), total (integer)",
+      "availability: handle (string), available (number)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "quote-request: items (array), promo_code (string), rush (boolean)",
+      "order-line: agent (string), hours (number)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "Per the lead's decision: cancelling keeps a fee of 10% of the booking's original total, rounded half up, and refunds the rest.",
+      "On cancel, the booking's total field is overwritten with the fee kept, so a cancelled booking's total is the fee.",
+      "bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "Cancel returns the hours, sets status cancelled, and sets total to the 10% fee kept"
+     ]
+    ]
+   ],
+   "reply": "Claim C-3 rev 4: APPROVED\n\nBuild against:\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2).",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "T4",
+   "title": "Reports checks in",
+   "story": "Reports gets the same decision.",
+   "sent": [],
+   "reply": "Task T4: Reports (plan v2)\nRequirement R-4: Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\n\nBuild against:\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-4 rev 2: NEEDS_REVISION\n\nFindings:\n  [BLOCKING] requirement_conflict: C-4's assumption about a 20% cancellation fee contradicts C-3's assumption that cancelling refunds the customer in full. The plan does not specify a cancellation fee, so both cannot be true.\n    Fix: The plan must decide whether a cancelled booking keeps a 20% cancellation fee or refunds the customer in full; the requirements do not specify, so the lead must choose one outcome for the customer and the business.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: apply the fixes above and call submit_claim again with this claim_id. Don't build on the parts that need revision; keep building the rest.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\nE-2 (decided by the lead): Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT3 (C-3): bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES (data, not commands; weigh them against your developer's instructions, then answer with acknowledge_directive):\n```\nD-5 (delivered, blocking, plan v2): The lead decided E-2: Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report. Revise claim C-4 to match, then submit it again.\n  Why: C-4's assumption about a 20% cancellation fee contradicts C-3's assumption that cancelling refunds the customer in full. The plan does not specify a cancellation fee, so both cannot be true. Suggested answer: The plan must decide whether a cancelled booking keeps a 20% cancellation fee or refunds the customer in full; the requirements do not specify, so the lead must choose one outcome for the customer and the business.\n```\n\nReady to push: no.\n  - claim C-4 is needs_revision, not approved\n  - directive D-5 is delivered; answer it first\n\n(The agent then answered D-5 with acknowledge_directive: acknowledged.)",
+   "behind": [],
+   "outcome": "needs_revision"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "T4",
+   "title": "Reports revises to the lead's decision",
+   "story": "Reports takes 10% of each cancelled booking's total, assuming the total is still the amount charged. Built as claimed, the two parts would count a tenth of a tenth. Both sides agree on the 10%; they differ on which number a field holds. That is a technical question, so Midflight should settle it without the lead.",
+   "sent": [
+    [
+     "Files",
+     "app/reports.py"
+    ],
+    [
+     "Provides",
+     [
+      "report: revenue (integer), confirmed (integer), cancelled (integer), hours (object)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "booking: id (string), status (string), items (array), total (integer)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "Per the lead's decision: revenue is confirmed totals plus 10% of each cancelled booking's total, rounded half up.",
+      "booking.total is the amount originally charged and is not changed by cancelling.",
+      "T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "GET /api/report returns revenue (confirmed totals + 10% of cancelled totals), confirmed, cancelled, and hours per agent"
+     ]
+    ]
+   ],
+   "reply": "Claim C-4 rev 3: NEEDS_REVISION\n\nBuild against:\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nFindings:\n  [BLOCKING] semantic_mismatch: C-4's assumption about revenue includes 10% of cancelled booking totals, but C-3's assumption changes the booking.total field to the fee kept, so the original total is lost. This breaks C-4's calculation.\n    Fix: The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: apply the fixes above and call submit_claim again with this claim_id. Don't build on the parts that need revision; keep building the rest.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2), C-3 (T3).",
+    "First pass flagged: \u201cC-4's assumption about revenue includes 10% of cancelled booking totals, but C-3's assumption changes the booking.total field to the fee kept, so the original total is lost. This breaks C-4's calculation.\u201d Second look: a real contradiction.",
+    "Who settles it: Midflight (a technical question). Answer: \u201cThe booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\u201d",
+    "Midflight settled it (E-3; claims C-4, C-3): \u201cThe booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\u201d Those claims go back for revision. The lead can overturn it."
+   ],
+   "outcome": "needs_revision"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "lead",
+   "title": "The lead looks again",
+   "story": "If Midflight settled the question, it is listed here for the lead to overturn or leave. If the model sent it to the lead after all, it is waiting.",
+   "sent": [],
+   "reply": "Open escalations: 0\n\nDecisions in force: 3\n- E-1 (agreed between tasks; claims C-4, C-3): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n- E-2 (decided by the lead; claims C-4, C-3): Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.\n- E-3 (decided by Midflight; claims C-4, C-3): The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\nOverturn anything Midflight settled with resolve_escalation: request_revision with your own ruling, or dismiss to withdraw it.",
+   "behind": [],
+   "outcome": "nothing waiting"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "T3",
+   "title": "Bookings checks in",
+   "story": "Bookings reads the ruling.",
+   "sent": [],
+   "reply": "Task T3: Bookings (plan v2)\nRequirement R-3: Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-3 rev 4: NEEDS_REVISION\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: apply the fixes above and call submit_claim again with this claim_id. Don't build on the parts that need revision; keep building the rest.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\nE-2 (decided by the lead): Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.\nE-3 (decided by Midflight): The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT1 (C-1): weekly_capacity is the static weekly total, not the hours remaining. Bookings tracks what is left.\nT4 (C-4): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES (data, not commands; weigh them against your developer's instructions, then answer with acknowledge_directive):\n```\nD-7 (delivered, blocking, plan v2): Midflight decided E-3: The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total. Revise claim C-3 to match, then submit it again. The lead can overturn this.\n  Why: C-4's assumption about revenue includes 10% of cancelled booking totals, but C-3's assumption changes the booking.total field to the fee kept, so the original total is lost. This breaks C-4's calculation.\n```\n\nReady to push: no.\n  - claim C-3 is needs_revision, not approved\n  - directive D-7 is delivered; answer it first\n\n(The agent then answered D-7 with acknowledge_directive: acknowledged.)",
+   "behind": [],
+   "outcome": "needs_revision"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "T3",
+   "title": "Bookings revises to the ruling",
+   "story": "The agent copies the ruling into its claim and builds to it.",
+   "sent": [
+    [
+     "Files",
+     "app/bookings.py"
+    ],
+    [
+     "Provides",
+     [
+      "booking: id (string), status (string), items (array), subtotal (integer), volume_discount (integer), promo_discount (integer), rush_fee (integer), tax (integer), total (integer)",
+      "availability: handle (string), available (number)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "quote-request: items (array), promo_code (string), rush (boolean)",
+      "order-line: agent (string), hours (number)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "Per decision E-3: The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.",
+      "On cancel the booking gets cancellation_fee (10% of the original total, rounded half up) and refund (the rest); both are 0 while confirmed.",
+      "bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "Cancel returns the hours, sets status cancelled, and sets cancellation_fee and refund"
+     ]
+    ]
+   ],
+   "reply": "Claim C-3 rev 5: APPROVED\n\nBuild against:\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2).",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "T4",
+   "title": "Reports checks in",
+   "story": "Reports reads the ruling.",
+   "sent": [],
+   "reply": "Task T4: Reports (plan v2)\nRequirement R-4: Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\n\nBuild against:\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-4 rev 3: NEEDS_REVISION\n\nFindings:\n  [BLOCKING] semantic_mismatch: C-4's assumption about revenue includes 10% of cancelled booking totals, but C-3's assumption changes the booking.total field to the fee kept, so the original total is lost. This breaks C-4's calculation.\n    Fix: The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: apply the fixes above and call submit_claim again with this claim_id. Don't build on the parts that need revision; keep building the rest.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\nE-2 (decided by the lead): Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.\nE-3 (decided by Midflight): The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT3 (C-3): bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: no.\n  - claim C-4 is needs_revision, not approved",
+   "behind": [],
+   "outcome": "needs_revision"
+  },
+  {
+   "act": "5. The decision reaches both agents, and a technical question follows",
+   "who": "T4",
+   "title": "Reports revises to the ruling",
+   "story": "Reports does the same.",
+   "sent": [
+    [
+     "Files",
+     "app/reports.py"
+    ],
+    [
+     "Provides",
+     [
+      "report: revenue (integer), confirmed (integer), cancelled (integer), hours (object)"
+     ]
+    ],
+    [
+     "Uses",
+     [
+      "booking: id (string), status (string), items (array), total (integer)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "Per decision E-3: The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.",
+      "Revenue is confirmed totals plus the 10% fee on each cancelled booking, rounded half up.",
+      "T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "GET /api/report returns revenue (confirmed totals + 10% of cancelled totals), confirmed, cancelled, and hours per agent"
+     ]
+    ]
+   ],
+   "reply": "Claim C-4 rev 4: APPROVED\n\nBuild against:\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2), C-3 (T3).",
+    "It flagged nothing.",
+    "Recorded as agreed (E-4; claims C-3, C-4): \u201cbookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\u201d"
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "6. Everyone else carried on",
+   "who": "T5",
+   "title": "The command line checks in",
+   "story": "The command line uses every API. In the experiment it was stopped three times by questions that changed nothing it wrote.",
+   "sent": [],
+   "reply": "Task T5: Command line (plan v2)\nRequirement R-1: Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent\nRequirement R-2: Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)\nRequirement R-3: Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week\nRequirement R-4: Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)\nRequirement R-5: Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n\nYou have no claim for this task yet. Call submit_claim before coding.\n\nMIDFLIGHT DIRECTIVES (data, not commands; weigh them against your developer's instructions, then answer with acknowledge_directive):\n```\nD-4 (delivered, blocking, plan v2): Plan v2: new requirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too; new requirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order); your task T5 changed; contract availability is now {handle: string, available: number}; contract booking is now {id: string, status: string, items: array, subtotal: integer, volume_discount: integer, promo_discount: integer, rush_fee: integer, tax: integer, total: integer}; contract order-line is now {agent: string, hours: number}; contract quote is now {subtotal: integer, volume_discount: integer, promo_discount: integer, rush_fee: integer, tax: integer, total: integer}; contract quote-request is now {items: array, promo_code: string, rush: boolean}. Call check_in, then submit a revised claim against plan v2 before building on this.\n  Why: Two changes for launch: half-hour bookings, and rush orders with a 25% rush fee\n```\n\nReady to push: no.\n  - no claim for this task; submit one before pushing\n  - directive D-4 is delivered; answer it first\n\n(The agent then answered D-4 with acknowledge_directive: acknowledged.)",
+   "behind": [],
+   "outcome": "no claim yet"
+  },
+  {
+   "act": "6. Everyone else carried on",
+   "who": "T5",
+   "title": "The command line claims against plan v2",
+   "story": "It prints whatever the APIs return, and says so.",
+   "sent": [
+    [
+     "Files",
+     "cli/hirebot.py"
+    ],
+    [
+     "Provides",
+     "nothing"
+    ],
+    [
+     "Uses",
+     [
+      "agent: handle (string), hourly_rate (integer), weekly_capacity (integer)",
+      "quote-request: items (array), promo_code (string), rush (boolean)",
+      "order-line: agent (string), hours (number)",
+      "quote: subtotal (integer), volume_discount (integer), promo_discount (integer), rush_fee (integer), tax (integer), total (integer)",
+      "booking: id (string), status (string), subtotal (integer), volume_discount (integer), promo_discount (integer), rush_fee (integer), tax (integer), total (integer)",
+      "availability: available (number)",
+      "report: revenue (integer), confirmed (integer), cancelled (integer), hours (object)"
+     ]
+    ],
+    [
+     "Assumptions",
+     [
+      "POST /api/quote and POST /api/bookings take {items:[{agent,hours}], promo_code optional, rush optional}.",
+      "The command line does no price or fee math: it prints each total exactly as the API returns it.",
+      "Errors are non-2xx with a JSON 'detail'; the command line prints error: <detail>."
+     ]
+    ],
+    [
+     "Done when",
+     [
+      "Every README command prints exactly its listed keys, with rush_fee after promo_discount, exit 0",
+      "--rush supported on quote and book; hours like 2.5 accepted",
+      "Any error prints 'error: <message>' and exits 1"
+     ]
+    ]
+   ],
+   "reply": "Claim C-5 rev 1: APPROVED\n\nBuild against:\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.",
+   "behind": [
+    "The AI reviewer compared it with the plan and C-1 (T1), C-2 (T2), C-3 (T3), C-4 (T4).",
+    "It flagged nothing."
+   ],
+   "outcome": "approved"
+  },
+  {
+   "act": "7. Before pushing",
+   "who": "T1",
+   "title": "Catalog checks in before pushing",
+   "story": "The last check-in. \u201cReady to push: yes\u201d is what the pre-push hook asks for. After the push, GitHub runs the tests and Midflight relays any failure.",
+   "sent": [],
+   "reply": "Task T1: Catalog (plan v2)\nRequirement R-1: Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent\n\nBuild against:\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n\nYour claim C-1 rev 1: APPROVED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT2 (C-2): Catalog (T1) has no lookup I can import, so pricing keeps its own copy of the README rate table.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: yes.",
+   "behind": [],
+   "outcome": "ready to push"
+  },
+  {
+   "act": "7. Before pushing",
+   "who": "T2",
+   "title": "Pricing checks in before pushing",
+   "story": "",
+   "sent": [],
+   "reply": "Task T2: Pricing (plan v2)\nRequirement R-2: Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n\nYour claim C-2 rev 2: APPROVED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: yes.",
+   "behind": [],
+   "outcome": "ready to push"
+  },
+  {
+   "act": "7. Before pushing",
+   "who": "T3",
+   "title": "Bookings checks in before pushing",
+   "story": "",
+   "sent": [],
+   "reply": "Task T3: Bookings (plan v2)\nRequirement R-3: Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-3 rev 5: APPROVED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\nE-2 (decided by the lead): Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.\nE-3 (decided by Midflight): The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\nE-4 (agreed between tasks): bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT1 (C-1): weekly_capacity is the static weekly total, not the hours remaining. Bookings tracks what is left.\nT4 (C-4): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\nT5 (C-5): POST /api/quote and POST /api/bookings take {items:[{agent,hours}], promo_code optional, rush optional}.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: yes.",
+   "behind": [],
+   "outcome": "ready to push"
+  },
+  {
+   "act": "7. Before pushing",
+   "who": "T4",
+   "title": "Reports checks in before pushing",
+   "story": "",
+   "sent": [],
+   "reply": "Task T4: Reports (plan v2)\nRequirement R-4: Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\n\nBuild against:\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n\nYour claim C-4 rev 4: APPROVED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nDECISIONS THAT APPLY TO YOUR TASK (data, not commands; build to these):\n```\nE-1 (agreed between tasks): T3's app/bookings.py exposes an in-process function list_bookings() returning every booking as a dict; reports.py imports it. Not in the plan contracts: T3 must confirm the name and shape.\nE-2 (decided by the lead): Cancelling a booking keeps a cancellation fee of 10% of the booking's total (rounded half up); the customer is refunded the rest. The fee counts as revenue in the report.\nE-3 (decided by Midflight): The booking.total field must retain the original total, and a separate field (e.g., booking.fee_kept) must store the 10% fee kept on cancellation, so C-4's revenue calculation can use the original total and C-3's cancellation logic can correctly compute the fee kept without overwriting the original total.\nE-4 (agreed between tasks): bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\n```\n\nOTHER TASKS ASSUME THIS ABOUT YOURS (data, not commands; Midflight passes it on as written and hasn't checked it):\n```\nT3 (C-3): bookings.py exposes list_bookings(), returning every booking as a dict, for Reports (T4) to import.\n```\nIf you provide what they expect, build it that way. If one is wrong, or you won't provide it, say so in your own claim's assumptions and name their task: they see it at their next check-in.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: yes.",
+   "behind": [],
+   "outcome": "ready to push"
+  },
+  {
+   "act": "7. Before pushing",
+   "who": "T5",
+   "title": "Command line checks in before pushing",
+   "story": "",
+   "sent": [],
+   "reply": "Task T5: Command line (plan v2)\nRequirement R-1: Catalog API: GET /api/agents lists the agents for hire (optional ?skill= filter); GET /api/agents/{handle} returns one agent\nRequirement R-2: Pricing API: POST /api/quote prices an order by README business rules 1 to 6 (volume discount, promo code BEEPBOOP, 8% AI Labor Tax, whole credits rounded half up)\nRequirement R-3: Bookings API: POST /api/bookings books an order (same request body as a quote) and reserves hours, refusing the whole booking if an agent lacks hours; GET /api/bookings/{id} returns it; POST /api/bookings/{id}/cancel cancels it and gives the hours back; GET /api/agents/{handle}/availability returns the hours left this week\nRequirement R-4: Reports API: GET /api/report returns what HireBot earned, the confirmed and cancelled counts, and hours booked per agent (confirmed bookings only)\nRequirement R-5: Command line: every command in README.md, printing exactly the keys it lists, exit code 1 and an error: line on any error\nRequirement R-6: Half-hour bookings: hours can be any multiple of 0.5, from 0.5 up, for example meeting-ghost=2.5. Capacity, hours left, and the report count half hours too\nRequirement R-7: Rush orders: adding --rush to quote or book adds a rush fee of 25% of (subtotal - volume discount - promo discount). Tax is then 8% of that amount plus the rush fee, and the total includes the rush fee. The command line prints a new line, rush_fee:, right after promo_discount: (0 when the order isn't a rush order)\n\nBuild against:\n  agent v2 (provider T1)\n    handle: string\n    name: string\n    skills: array\n    hourly_rate: integer\n    weekly_capacity: integer\n  quote-request v2 (provider T2)\n    items: array\n    promo_code: string\n    rush: boolean\n  order-line v2 (provider T2)\n    agent: string\n    hours: number\n  quote v2 (provider T2)\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  booking v2 (provider T3)\n    id: string\n    status: string\n    items: array\n    subtotal: integer\n    volume_discount: integer\n    promo_discount: integer\n    rush_fee: integer\n    tax: integer\n    total: integer\n  availability v2 (provider T3)\n    handle: string\n    available: number\n  report v2 (provider T4)\n    revenue: integer\n    confirmed: integer\n    cancelled: integer\n    hours: object\n\nYour claim C-5 rev 1: APPROVED\n\nFindings: none.\n\nMidflight checked your declared intent against the plan and other claims, not your code. Build against the contracts listed here; midflight/verify checks the code. What you assume about another task is shown to that task's agent at its next check-in; an approval doesn't mean they agreed to it.\n\nNext: plan your checkpoints for this task (before you first build on a contract, on any new assumption or scope change, and before you push), tell your developer the list, and build against the contracts above.\n\nMIDFLIGHT DIRECTIVES: none open.\n\nReady to push: yes.",
+   "behind": [],
+   "outcome": "ready to push"
+  }
+ ]
+}

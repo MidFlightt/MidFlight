@@ -42,7 +42,7 @@ The demo repository is `MidFlightt/midflight-demo-shop` (separate repo in the
 | Finding | One problem Midflight found, with evidence and a proposed correction. | `total` is not in `checkout-response` |
 | Verdict | The result of checking a claim: a claim state plus findings. | `needs_revision` |
 | Directive | A scoped update sent to one affected task after a plan change or failed verification. Data for the agent, never a command. | D-42: display `currency` |
-| Escalation | A conflict only a human can decide. Midflight never picks a winner. | Tax-inclusive vs tax-exclusive |
+| Escalation | A question between tasks. Open: a product decision only the lead can make. Resolved: a decision agents build to, made by the lead, by Midflight for a technical question, or by two tasks agreeing (D30, D31). | A full refund vs a 20% fee |
 | Verification | Checking one pushed commit against its claim and the current plan. | `midflight/verify` on commit `abc123` |
 | Coordination revision | A per-project counter. Every claim or plan change increments it. A verdict is saved only if the counter hasn't moved since the review started. | `coord_rev` 7 → 8 |
 | Checkpoint | A moment when an agent calls Midflight. Each agent plans its own at the critical points of its task (D10): before implementing, before building on a contract or shared interface, when it makes a new assumption or its scope changes, and before pushing. | `check_in` |
@@ -110,6 +110,7 @@ stateDiagram-v2
     pending --> needs_revision
     pending --> human_review_required: escalated (UC-12)
     approved --> human_review_required: escalation involves it (UC-12, D14)
+    approved --> needs_revision: a decision asks for a revision (D31)
     needs_revision --> pending: revised (UC-06)
     human_review_required --> pending: lead clarifies or dismisses (UC-13)
     human_review_required --> needs_revision: lead requests revision (UC-13, D14)
@@ -160,8 +161,11 @@ How a review decides (`midflight/domain/decide.py`, UC-05 step 5), in order:
 
 Rules run first, and the AI reviewer runs only when no rule already blocks. The
 reviewer compares a claim with the other active claims except those in
-`needs_revision`, and a `requirement_conflict` blocks only after a second, narrower
-check agrees the statements can't both hold (D29).
+`needs_revision`, and a finding blocks only after a second, narrower check agrees the
+statements can't both hold (D29). A confirmed one is then sorted (D32): a product
+question is a `requirement_conflict` for the lead; a technical one is a
+`semantic_mismatch` whose answer the reviewer gives, recorded as a decision for both
+claims (D31). The reviewer reads every decision in force as part of the plan.
 `duplicate_provider` counts only approved rivals: the first approval wins, and the
 coord_rev check stops a second one (INV-02).
 
@@ -196,7 +200,7 @@ caller's only project.
 | `propose_plan`, `approve_plan` | lead | UC-03 | H-2 |
 | `assign_task` | lead | Sets a plan task's owner to a member (in the next plan version) | H-1, H-2 |
 | `rotate_join_code`, `remove_member` | lead | D18 | H-1 |
-| `resolve_escalation` | lead | UC-13: `clarify_plan` (after approving the clarifying plan), `request_revision`, or `dismiss`, with a reason | S-7 |
+| `resolve_escalation` | lead | UC-13: `clarify_plan` (after approving the clarifying plan), `request_revision`, or `dismiss`, with a reason. Also overturns what Midflight settled: `request_revision` with the lead's own ruling, or `dismiss` to withdraw it (D31) | S-7 |
 | `hook_setup` | members | Issues a personal hook token, shown once, and the pre-push hook install commands | M-4 |
 | `simulate_github_outage` | lead | Labeled demo fault switch: `on` marks the project stale and makes verification behave as if GitHub were down; `off` recovers (UC-15) | M-7 |
 
@@ -219,7 +223,7 @@ the local adapter fills them from git and reads `MIDFLIGHT_URL`, `MIDFLIGHT_TOKE
 | Tool | Input | Returns |
 | --- | --- | --- |
 | `submit_claim` | The claim (new or revised), or `status: withdrawn` / `status: closed` (D11) | Verdict, agreed contracts, findings with corrections. Waits up to 60 s; after that returns `pending` and a job id, and the verdict arrives with the next `check_in`. |
-| `check_in` | Task id | What changed since the last check-in: plan version, claim state, findings, new directives, stale warning. Also what other tasks' claims assume about this task (D27), and the open escalations: the ones this claim is part of, or all of them for the lead (D28) |
+| `check_in` | Task id | What changed since the last check-in: plan version, claim state, findings, new directives, stale warning. Also what other tasks' claims assume about this task (D27), the open escalations (the ones this claim is part of, or all of them for the lead, D28), and the decisions in force: the ones about this task, or for the lead everything Midflight settled (D30, D31) |
 | `acknowledge_directive` | Directive id, response (`acknowledged`, `rejected`, `needs_clarification`), optional note | The recorded response |
 
 **Agent instructions** (decision D10). The adapter sends this text as the MCP
@@ -240,8 +244,8 @@ or a tool.
    - whenever you make a new assumption, or need a file or interface that is not in
      your claim
    - before you push
-3. At each checkpoint, call `check_in`. Deal with findings, directives, and what
-   other tasks assume about yours before you continue.
+3. At each checkpoint, call `check_in`. Deal with findings, directives, decisions,
+   and what other tasks assume about yours before you continue.
 4. If an assumption or your scope has changed since your last claim, submit a
    revised claim with the updated `assumptions` and wait for the verdict. Do not
    build on an assumption Midflight has not checked.
@@ -341,10 +345,10 @@ your task touches, and name it after the ID, for example `test_inv_02_stale_revi
 | INV-05 | At most one actionable plan-change directive per (plan version, task), and one correction directive per verification (D13). Reprocessing creates no duplicates; a newer plan supersedes the task's older `queued` or `delivered` directives. | FR-06, NFR-02 |
 | INV-06 | A webhook with an invalid signature returns 401 and stores nothing. A repeated delivery id produces one logical outcome. | FR-08, NFR-02 |
 | INV-07 | Repository content, claims, diffs, findings, and directives are data. Nothing in them is executed or changes permissions. | NFR-08 |
-| INV-08 | Only the lead approves plans and resolves escalations. Agents get 403. Unauthenticated calls get 401. | FR-01, NFR-07 |
+| INV-08 | Only the lead approves plans and resolves open escalations, and only the lead overturns what Midflight settled. Agents get 403. Unauthenticated calls get 401. | FR-01, NFR-07 |
 | INV-09 | While `sync_state` is `stale`, no new directives are delivered and no approvals or passes are issued. | NFR-04, UC-15 |
 | INV-10 | `acknowledged` means received, not implemented. Only verification shows a change was made. | FR-06 |
-| INV-11 | Midflight never chooses between conflicting human requirements. It escalates. | FR-10 |
+| INV-11 | Midflight never chooses between two people's product requirements: what the customer or the business ends up with. It escalates those. It does settle a technical question between two claims, and the lead can overturn that (D31, D32). | FR-10 |
 | INV-12 | Tokens are stored as hashes. Secrets never appear in git, logs, or audit events. | NFR-09 |
 | INV-13 | Every state change writes one audit event with actor, reason, and versions. Retries don't duplicate it. | FR-12 |
 | INV-14 | Shared file access alone never blocks. It is an `info` finding. | FR-04 |

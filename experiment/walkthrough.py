@@ -1,6 +1,7 @@
 """One simulated run of the whole Midflight workflow, written to docs/pages/walkthrough.html.
 
-    uv run python experiment/walkthrough.py
+    uv run python experiment/walkthrough.py            # run it and write the page
+    uv run python experiment/walkthrough.py --render   # rebuild the page from the saved run
 
 Five agents and a lead build HireBot Pro (experiment/cases/hirebot-pro). Each step shows
 what an agent told Midflight and the exact text Midflight sent back. It runs the real
@@ -8,7 +9,7 @@ service code in memory, with the real AI reviewer on Amazon Bedrock, so it needs
 settings as the service (MIDFLIGHT_REVIEWER_MODEL, MIDFLIGHT_REVIEWER_ROLE_ARN) and AWS
 credentials. The plan and the claims are the ones from the experiment's Midflight run,
 shortened. Nothing here is scripted on Midflight's side: the replies are whatever the
-code and the model produced on this run.
+code and the model produced on that run, which is saved in walkthrough-run.json.
 """
 
 from __future__ import annotations
@@ -17,7 +18,6 @@ import html
 import json
 import re
 import sys
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,6 +30,7 @@ from midflight.api.views import check_in_json, verdict_json
 from midflight.config import Settings
 from midflight.domain.models import (
     DirectiveResponse,
+    Escalation,
     EscalationState,
     Participant,
     Project,
@@ -39,11 +40,13 @@ from midflight.domain.models import (
 from midflight.mcp.replies import check_in_text, directives_block, verdict_text
 from midflight.ports import ClaimReviewRequest, Commit
 from midflight.services.claims import ClaimSubmission
+from midflight.services.decisions import MIDFLIGHT, decided_by, decisions_in_force, is_agreement
 from midflight.services.plans import PlanDraft
 
-REPO = Path(__file__).resolve().parents[1]
-RECORDED = REPO / "evals" / "escalations" / "hirebot.json"
-OUT = REPO / "docs" / "pages" / "walkthrough.html"
+HERE = Path(__file__).resolve().parent
+RECORDED = HERE.parent / "evals" / "escalations" / "hirebot.json"
+SAVED = HERE / "walkthrough-run.json"
+OUT = HERE.parent / "docs" / "pages" / "walkthrough.html"
 PROJECT = "hirebot"
 
 TASKS = {"T1": "Catalog", "T2": "Pricing", "T3": "Bookings", "T4": "Reports", "T5": "Command line"}
@@ -67,52 +70,87 @@ TOTAL_DECISION = (
     "computes the fee as 10% of total."
 )
 
+# What to notice, written after reading the saved run. Midflight's replies change from run
+# to run, so rewrite these after a new run, then `--render`. Each is (steps, note).
+RUN_NOTES: list[tuple[str, str]] = [
+    (
+        "5 to 8",
+        "An assumption no contract covers reaches the right agent. Reports assumed a "
+        "function in the bookings code; Bookings saw that at its check-in and answered in its "
+        "own claim. Midflight recorded it as agreed, and Reports saw both. No person was "
+        "involved.",
+    ),
+    (
+        "7",
+        "The reviewer's first pass raised two flags here (“Bookings and Pricing can't "
+        "both compute prices” was one). The second look dropped both, so nobody was "
+        "stopped. Before the second look, flags like these went to the lead.",
+    ),
+    (
+        "9 to 12",
+        "The plan change produced four directives and none for the catalog, which the "
+        "change doesn't touch.",
+    ),
+    (
+        "16 to 19",
+        "A product question: a full refund against a 20% fee. It changes what the customer "
+        "gets back, so Midflight sent it to the lead with both sides. The lead answered once.",
+    ),
+    (
+        "23, 24",
+        "A technical question: Bookings would overwrite a booking's total with the fee, and "
+        "Reports would take 10% of that total. Both agree on the 10%; they differ on what a "
+        "field holds. Midflight settled it itself, told both, and listed it for the lead, "
+        "who left it standing.",
+    ),
+    ("25 to 28", "Both agents copied the ruling into their claims and were approved."),
+    (
+        "29, 30",
+        "The command line was never stopped. In the experiment it was stopped three times.",
+    ),
+]
+RUN_VERDICT = (
+    "On this run the lead acted once, on the one product question. Midflight settled one "
+    "technical question itself and recorded two assumptions as agreed. The reviewer's first "
+    "pass raised four flags; the second look dropped two, and no false alarm reached "
+    "anyone. This is one run: the model doesn't answer the same way every time."
+)
+
 
 # Recording -------------------------------------------------------------------------------
 
 
-@dataclass
-class Step:
-    act: str
-    who: str  # a task id, or "lead"
-    title: str
-    story: str
-    sent: list[tuple[str, Any]] = field(default_factory=list)  # (label, text or list)
-    reply: str = ""
-    behind: list[str] = field(default_factory=list)  # what the reviewer did, if it ran
-    outcome: str = ""
-
-
 class WatchedReviewer:
-    """The real reviewer, noting what its first pass flagged and what the second look kept."""
+    """The real reviewer, noting what each of its questions to the model came back with."""
 
     def __init__(self, reviewer: BedrockReviewer) -> None:
         self._reviewer = reviewer
         self.notes: list[str] = []
-        self.reviews = 0
-        self.second_looks = 0
-        self.dropped = 0
-        confirm = reviewer._confirmed
+        self.counts = {"reviews": 0, "second looks": 0, "dropped": 0}
+        ask = reviewer._call
 
-        def watched(finding: dict[str, Any], request: ClaimReviewRequest) -> bool:
-            kept = confirm(finding, request)
-            self.second_looks += 1
-            self.dropped += not kept
-            said = str(finding.get("explanation", ""))
-            self.notes.append(
-                f"First pass flagged a conflict: “{said}” Second look: "
-                + (
-                    "a real contradiction. It blocks."
-                    if kept
-                    else "not a contradiction. Kept as a note."
+        def watched(system: str, task: str, data: dict[str, Any], tool: str, schema: Any) -> Any:
+            answer = ask(system, task, data, tool, schema)
+            if tool == "confirm_conflict":
+                real = isinstance(answer, dict) and answer.get("contradiction") is True
+                self.counts["second looks"] += 1
+                self.counts["dropped"] += not real
+                self.notes.append(
+                    f"First pass flagged: “{data['reported_conflict']}” Second look: "
+                    + ("a real contradiction." if real else "not a contradiction. Kept as a note.")
                 )
-            )
-            return kept
+            if tool == "decide_conflict" and isinstance(answer, dict):
+                who = {
+                    "lead": "the lead (a product question)",
+                    "reviewer": "Midflight (a technical question)",
+                }.get(str(answer.get("decides")), "unclear")
+                self.notes.append(f"Who settles it: {who}. Answer: “{answer.get('answer')}”")
+            return answer
 
-        reviewer._confirmed = watched  # type: ignore[method-assign]
+        reviewer._call = watched  # type: ignore[method-assign]
 
     def review_claim(self, request: ClaimReviewRequest) -> Any:
-        self.reviews += 1
+        self.counts["reviews"] += 1
         others = (
             ", ".join(f"{c.id} ({c.task_id})" for c in request.other_claims) or "no other claims"
         )
@@ -152,9 +190,9 @@ class Run:
         )
         self.recorded = _recorded_claims()
         self.claim_ids: dict[str, str] = {}
-        self.steps: list[Step] = []
+        self.steps: list[dict[str, Any]] = []
         self.act = ""
-        self.lead_decisions = 0
+        self.noted: set[str] = set()  # escalations already described in a step
 
     # The lead ----------------------------------------------------------------------------
 
@@ -194,65 +232,79 @@ class Run:
             )
             untouched = [t for t in TASKS if t not in {d.task_id for d in directives}]
             reply += f"\nNo directive for: {', '.join(untouched) or 'nobody'}"
-        self._add(
-            Step(self.act, "lead", title, story, sent, reply, outcome=f"plan v{approved.version}")
-        )
+        self._add("lead", title, story, sent, reply, outcome=f"plan v{approved.version}")
 
-    def lead_looks(self, title: str, story: str) -> list[str]:
-        """What the lead sees: the open escalations, as project_status lists them."""
+    def lead_looks(self, title: str, story: str) -> None:
+        """What the lead sees: open questions and what was settled, as project_status
+        lists them."""
         self.clock.advance(minutes=2)
-        waiting = self._open_escalations()
+        waiting = self._open()
         lines = [f"Open escalations: {len(waiting)}"]
         for e in waiting:
             lines.append(f"- {e.id} (claims {', '.join(e.claim_ids)}): {e.explanation}")
             lines += [f"    {ev.ref}: {ev.excerpt}" for ev in e.evidence if ev.excerpt]
         if waiting:
-            lines.append("Decide each one with resolve_escalation. Midflight won't pick a side.")
-        self._add(
-            Step(
-                self.act,
-                "lead",
-                title,
-                story,
-                [],
-                "\n".join(lines),
-                outcome=f"{len(waiting)} waiting" if waiting else "nothing waiting",
+            lines.append(
+                "Decide each one with resolve_escalation. These are product decisions; "
+                "Midflight won't pick a side on them."
             )
-        )
-        return [e.id for e in waiting]
+        decisions = self._decisions()
+        lines.append(f"\nDecisions in force: {len(decisions)}")
+        lines += [
+            f"- {d.id} ({decided_by(d)}; claims {', '.join(d.claim_ids)}): {d.reason}"
+            for d in decisions
+        ]
+        if any(d.resolved_by == MIDFLIGHT for d in decisions):
+            lines.append(
+                "Overturn anything Midflight settled with resolve_escalation: request_revision "
+                "with your own ruling, or dismiss to withdraw it."
+            )
+        outcome = f"{len(waiting)} waiting" if waiting else "nothing waiting"
+        self._add("lead", title, story, [], "\n".join(lines), outcome=outcome)
 
-    def lead_decides(self, title: str, story: str, resolution: Resolution, reason: str) -> None:
-        self.clock.advance(minutes=2)
-        waiting = self._open_escalations()
-        if not waiting:
+    def lead_resolves(
+        self, targets: list[Escalation], title: str, story: str, resolution: Resolution, reason: str
+    ) -> None:
+        if not targets:
             return
+        self.clock.advance(minutes=2)
         replies = []
-        for escalation in waiting:
+        for escalation in targets:
             self.services.escalations.resolve(self.lead, escalation.id, resolution, reason)
             replies.append(
                 f"Escalation {escalation.id} resolved ({resolution.value}). Claims "
                 f"{', '.join(escalation.claim_ids)} were updated; their agents see it at "
                 "their next check_in."
             )
-        self.lead_decisions += 1
-        self._add(
-            Step(
-                self.act,
-                "lead",
-                title,
-                story,
-                [("Decision", resolution.value), ("Reason the team sees", reason)],
-                "\n".join(replies),
-                outcome="decided",
-            )
-        )
+        sent = [("Decision", resolution.value), ("Reason the team sees", reason)]
+        self._add("lead", title, story, sent, "\n".join(replies), outcome="decided")
+
+    def lead_decides(self, title: str, story: str, reason: str) -> None:
+        """Answer every open question with the lead's ruling."""
+        self.lead_resolves(self._open(), title, story, Resolution.REQUEST_REVISION, reason)
+
+    def settled_by_midflight(self, *tasks: str) -> list[Escalation]:
+        """Rulings (not agreements) Midflight made that involve all of these tasks' claims."""
+        wanted = {self.claim_ids[t] for t in tasks}
+        return [
+            d
+            for d in self._decisions()
+            if d.resolved_by == MIDFLIGHT and not is_agreement(d) and wanted <= set(d.claim_ids)
+        ]
+
+    def ruling(self, *tasks: str) -> str:
+        """The decision these tasks now build to, whoever made it."""
+        wanted = {self.claim_ids[t] for t in tasks}
+        rulings = [
+            d for d in self._decisions() if not is_agreement(d) and wanted <= set(d.claim_ids)
+        ]
+        return f"Per decision {rulings[-1].id}: {rulings[-1].reason}" if rulings else TOTAL_DECISION
 
     # The agents ---------------------------------------------------------------------------
 
     def check_in(self, task: str, title: str, story: str) -> None:
         self.clock.advance(minutes=1)
         reply = self.services.check_ins.check_in(self.agents[task], task)
-        sent: list[tuple[str, Any]] = []
         answered = []
         for directive in reply.directives:
             if directive.state.value == "delivered":
@@ -270,7 +322,7 @@ class Run:
         outcome = reply.claim.state.value if reply.claim else "no claim yet"
         if self.act.startswith("7.") and reply.ready_to_push:
             outcome = "ready to push"
-        self._add(Step(self.act, task, title, story, sent, text, outcome=outcome))
+        self._add(task, title, story, [], text, outcome=outcome)
 
     def claim(
         self,
@@ -285,7 +337,7 @@ class Run:
         """Submit a claim shaped like recorded claim `like`, with these assumptions.
 
         `disagreement` marks the claims where the story has a real one. If Midflight
-        stops any other claim for the lead, that is a false alarm: the lead dismisses it
+        sends any other claim to the lead, that is a false alarm: the lead dismisses it
         and the agent checks in again.
         """
         self.clock.advance(minutes=2)
@@ -323,13 +375,15 @@ class Run:
         ]
         if len(behind) == 1 and verdict["state"] == "approved":
             behind.append("It flagged nothing.")
-        self._add(Step(self.act, task, title, story, sent, reply, behind, verdict["state"]))
-        if not disagreement and self._open_escalations():
-            self.lead_decides(
+        behind += self._newly_settled()
+        self._add(task, title, story, sent, reply, behind, verdict["state"])
+        if not disagreement and self._open():
+            self.lead_resolves(
+                self._open(),
                 "The lead dismisses a false alarm",
-                "Not scripted: on this run the reviewer stopped a claim over something that "
-                "isn't a disagreement between people. The lead says so, and Midflight "
-                "reviews the claim again without it.",
+                "Not scripted: on this run the reviewer sent the lead something that isn't a "
+                "disagreement between people. The lead says so, and Midflight reviews the "
+                "claim again without it.",
                 Resolution.DISMISS,
                 "Not a real conflict: both parts can be built as written.",
             )
@@ -341,12 +395,85 @@ class Run:
 
     # Helpers ------------------------------------------------------------------------------
 
-    def _open_escalations(self) -> list[Any]:
+    def _open(self) -> list[Escalation]:
         return [e for e in self.store.list_escalations(PROJECT) if e.state is EscalationState.OPEN]
 
-    def _add(self, step: Step) -> None:
-        self.steps.append(step)
-        print(f"{len(self.steps):>2}. [{step.who}] {step.title} -> {step.outcome}")
+    def _decisions(self) -> list[Escalation]:
+        return decisions_in_force(
+            self.store.list_escalations(PROJECT), self.store.list_claims(PROJECT)
+        )
+
+    def _newly_settled(self) -> list[str]:
+        """What Midflight settled by itself during the step just taken."""
+        notes = []
+        for e in self.store.list_escalations(PROJECT):
+            if e.id in self.noted or e.resolved_by != MIDFLIGHT:
+                continue
+            self.noted.add(e.id)
+            claims = ", ".join(e.claim_ids)
+            if is_agreement(e):
+                notes.append(f"Recorded as agreed ({e.id}; claims {claims}): “{e.reason}”")
+            else:
+                notes.append(
+                    f"Midflight settled it ({e.id}; claims {claims}): “{e.reason}” Those "
+                    "claims go back for revision. The lead can overturn it."
+                )
+        return notes
+
+    def _add(
+        self,
+        who: str,
+        title: str,
+        story: str,
+        sent: list[tuple[str, Any]],
+        reply: str,
+        behind: list[str] | None = None,
+        outcome: str = "",
+    ) -> None:
+        self.steps.append(
+            {
+                "act": self.act,
+                "who": who,
+                "title": title,
+                "story": story,
+                "sent": sent,
+                "reply": reply,
+                "behind": behind or [],
+                "outcome": outcome,
+            }
+        )
+        print(f"{len(self.steps):>2}. [{who}] {title} -> {outcome}")
+
+    def snapshot(self) -> dict[str, Any]:
+        """Everything the page needs, so it can be rebuilt without running again."""
+        plan = self.store.get_plan(PROJECT, 2)
+        assert plan is not None
+        escalations = self.store.list_escalations(PROJECT)
+        by_midflight = [e for e in escalations if e.resolved_by == MIDFLIGHT]
+        claims = sum(any(label == "Assumptions" for label, _ in s["sent"]) for s in self.steps)
+        dismissed = sum(s["title"] == "The lead dismisses a false alarm" for s in self.steps)
+        decided = sum(s["who"] == "lead" and s["outcome"] == "decided" for s in self.steps)
+        return {
+            "model": self.model,
+            "ran_at": datetime.now(UTC).strftime("%B %d, %Y").replace(" 0", " "),
+            "tasks": [
+                [t.id, t.title, ", ".join(t.provides), ", ".join(t.consumes)] for t in plan.tasks
+            ],
+            "all_ready": all(
+                self.services.check_ins.check_in(self.agents[t], t).ready_to_push for t in TASKS
+            ),
+            "stats": [
+                [claims, "claims and revisions"],
+                [self.reviewer.counts["reviews"], "AI reviews"],
+                [self.reviewer.counts["second looks"], "flags given a second look"],
+                [self.reviewer.counts["dropped"], "of those dropped as not real"],
+                [sum(is_agreement(e) for e in by_midflight), "assumptions recorded as agreed"],
+                [sum(not is_agreement(e) for e in by_midflight), "questions Midflight settled"],
+                [decided - dismissed, "questions the lead decided"],
+                [dismissed, "false alarms the lead dismissed"],
+            ],
+            "steps": self.steps,
+        }
 
 
 def _person(name: str, role: Role) -> Participant:
@@ -370,51 +497,6 @@ def _recorded_claims() -> dict[str, Any]:
     return {"plans": plans, "claims": claims}
 
 
-# What to notice, written after reading the run of October 10, 2026. Midflight's replies
-# change from run to run, so rewrite these if you run it again. Each is (steps, note).
-RUN_NOTES = [
-    (
-        "6, 7, 10",
-        "An assumption no contract covers reaches the right agent. Reports assumed "
-        "a function in the bookings code; Bookings saw that at its check-in, agreed in its own "
-        "claim, and Reports saw the answer. Nobody else was involved.",
-    ),
-    (
-        "7 to 9",
-        "A false alarm, not scripted. The reviewer said Bookings and Pricing can't "
-        "both compute prices. They can; it is duplicated work, not a disagreement. The second "
-        "look kept it, so the lead had to dismiss it.",
-    ),
-    (
-        "11 to 14",
-        "The plan change produced four directives and none for the catalog, which "
-        "the change doesn't touch.",
-    ),
-    (
-        "16",
-        "A second false alarm. Bookings was stopped because the plan “does not "
-        "mention” refunds. A plan being silent is not a conflict. It happened to land on "
-        "the agent that was about to be in a real one.",
-    ),
-    (
-        "18 to 21",
-        "The real disagreement: a full refund against a 20% fee. Reports' conflict "
-        "joined the open question, so the lead read both sides once and answered once.",
-    ),
-    (
-        "25 to 27",
-        "A real catch before any code: Bookings would overwrite a booking's total "
-        "with the fee, and Reports would take 10% of that total.",
-    ),
-    ("32, 33", "The command line was never stopped. In the experiment it was stopped three times."),
-]
-RUN_VERDICT = (
-    "On this run Midflight stopped a claim four times. Two were the real questions and two "
-    "were false alarms, so the reviewer is better than in the experiment but not fixed. "
-    "The lead acted three times: one dismissal and two decisions."
-)
-
-
 # The story -------------------------------------------------------------------------------
 
 
@@ -423,9 +505,8 @@ def play(run: Run) -> None:
     run.approve_plan(
         3,
         "The lead approves plan v1",
-        "The lead splits HireBot Pro into five tasks and writes down the contracts between "
-        "them: which task provides which data, with field names and types. This is the "
-        "lead's up-front work.",
+        "The lead's agent drafts the plan: five tasks, and the contracts between them (which "
+        "task provides which data, with field names and types). The lead approves it.",
         "First plan for HireBot Pro",
     )
 
@@ -493,7 +574,9 @@ def play(run: Run) -> None:
     run.claim(
         "T3",
         "Bookings answers by revising its claim",
-        "Bookings agrees to provide the function and says so in its own claim, naming T4.",
+        "Bookings agrees to provide the function and says so in its own claim, naming T4. "
+        "Because Bookings saw the assumption and its claim is approved without objecting, "
+        "Midflight records it as agreed. No person is involved.",
         ("C-10", 1),
         [
             "bookings.py computes the quote itself from the README rules, with its own copy "
@@ -505,7 +588,7 @@ def play(run: Run) -> None:
     run.check_in(
         "T4",
         "Reports checks in and sees the answer",
-        "The loop closes without either developer or the lead doing anything.",
+        "Reports sees Bookings' answer, and the agreement now listed with its decisions.",
     )
 
     run.act = "3. The lead changes the plan"
@@ -519,8 +602,8 @@ def play(run: Run) -> None:
     run.check_in(
         "T1",
         "Catalog checks in",
-        "The change doesn't touch the catalog, so the catalog agent hears nothing and keeps "
-        "working.",
+        "The change doesn't touch the catalog, so the catalog agent hears nothing about it "
+        "and keeps working.",
     )
     run.check_in(
         "T2",
@@ -543,7 +626,8 @@ def play(run: Run) -> None:
         ],
     )
 
-    run.act = "4. Two developers disagree"
+    run.act = "4. Two developers disagree: a product question"
+    before_the_question = {e.id for e in run.store.list_escalations(PROJECT)}
     run.check_in("T3", "Bookings checks in", "Bookings picks up its plan-change directive.")
     run.claim(
         "T3",
@@ -565,8 +649,8 @@ def play(run: Run) -> None:
         "T4",
         "Reports revises, with a different instruction",
         "The reports developer has told their agent the opposite: a cancelled booking keeps "
-        "a 20% fee, and the fee is revenue. Neither agent can settle this, and Midflight "
-        "must not pick a side.",
+        "a 20% fee, and the fee is revenue. This is about what the customer gets back, so it "
+        "is the lead's to decide, not Midflight's.",
         ("C-12", 2),
         [
             "Developer decision: a cancelled booking keeps a 20% cancellation fee, which "
@@ -580,26 +664,32 @@ def play(run: Run) -> None:
     )
     run.check_in(
         "T3",
-        "Bookings checks in and learns it is part of the question",
-        "Bookings' claim was fine when it was reviewed. Now it is one side of a "
-        "disagreement, so its agent is told too.",
+        "Bookings checks in and learns where it stands",
+        "Bookings' claim was fine when it was reviewed. Now it is one side of a question, "
+        "so its agent is told too.",
     )
     run.lead_looks(
         "The lead looks at the project",
-        "The lead sees the question with both developers' sentences side by side.",
+        "The lead sees what is waiting for them, with both developers' sentences side by "
+        "side and a suggested answer, and what Midflight settled without them.",
     )
     run.lead_decides(
         "The lead decides",
         "The answer is neither developer's: a 10% fee.",
+        FEE_DECISION,
+    )
+    run.lead_resolves(
+        [d for d in run.settled_by_midflight("T3", "T4") if d.id not in before_the_question],
+        "The lead overturns Midflight's ruling",
+        "Not scripted: on this run Midflight treated the fee as a technical question and "
+        "settled it itself. The lead disagrees and replaces the ruling with their own.",
         Resolution.REQUEST_REVISION,
         FEE_DECISION,
     )
 
-    run.act = "5. The decision reaches both agents"
+    run.act = "5. The decision reaches both agents, and a technical question follows"
     run.check_in(
-        "T3",
-        "Bookings checks in",
-        "The decision arrives as a directive, with the lead's words.",
+        "T3", "Bookings checks in", "The decision arrives as a directive, with the lead's words."
     )
     run.claim(
         "T3",
@@ -623,7 +713,8 @@ def play(run: Run) -> None:
         "Reports revises to the lead's decision",
         "Reports takes 10% of each cancelled booking's total, assuming the total is still "
         "the amount charged. Built as claimed, the two parts would count a tenth of a "
-        "tenth.",
+        "tenth. Both sides agree on the 10%; they differ on which number a field holds. "
+        "That is a technical question, so Midflight should settle it without the lead.",
         ("C-12", 2),
         [
             "Per the lead's decision: revenue is confirmed totals plus 10% of each cancelled "
@@ -639,47 +730,51 @@ def play(run: Run) -> None:
     )
     run.lead_looks(
         "The lead looks again",
-        "If Midflight caught the mismatch, it is waiting here.",
+        "If Midflight settled the question, it is listed here for the lead to overturn or "
+        "leave. If the model sent it to the lead after all, it is waiting.",
     )
     run.lead_decides(
         "The lead settles what total means",
-        "One sentence from the lead fixes the interface for both.",
-        Resolution.REQUEST_REVISION,
+        "Not as intended: on this run the model sent a technical question to the lead.",
         TOTAL_DECISION,
     )
     run.check_in("T3", "Bookings checks in", "Bookings reads the ruling.")
     run.claim(
         "T3",
-        "Bookings revises",
-        "Bookings keeps total as it was and adds two fields.",
+        "Bookings revises to the ruling",
+        "The agent copies the ruling into its claim and builds to it.",
         ("C-10", 2),
         [
-            "A booking's total never changes, also after cancelling.",
-            "On cancel the booking gets cancellation_fee (10% of total, rounded half up) and "
-            "refund (total minus the fee); both are 0 while confirmed.",
+            run.ruling("T3", "T4"),
+            "On cancel the booking gets cancellation_fee (10% of the original total, rounded "
+            "half up) and refund (the rest); both are 0 while confirmed.",
             PROVIDES_LIST,
         ],
-        [
-            "Cancel returns the hours, sets status cancelled, leaves total unchanged, and sets "
-            "cancellation_fee and refund"
-        ],
+        ["Cancel returns the hours, sets status cancelled, and sets cancellation_fee and refund"],
+        disagreement=True,
     )
     run.check_in("T4", "Reports checks in", "Reports reads the ruling.")
     run.claim(
         "T4",
-        "Reports revises",
-        "Reports' plan already matched the ruling; it says so.",
+        "Reports revises to the ruling",
+        "Reports does the same.",
         ("C-12", 2),
         [
-            "booking.total never changes after cancelling. Revenue is confirmed totals plus "
-            "10% of each cancelled booking's total, rounded half up; I compute the fee from "
-            "total myself.",
+            run.ruling("T3", "T4"),
+            "Revenue is confirmed totals plus the 10% fee on each cancelled booking, rounded "
+            "half up.",
             LIST_BOOKINGS,
         ],
         [
             "GET /api/report returns revenue (confirmed totals + 10% of cancelled totals), "
             "confirmed, cancelled, and hours per agent"
         ],
+        disagreement=True,
+    )
+    run.lead_decides(
+        "The lead answers one more question",
+        "Not scripted: the reviewer sent the lead another question after the ruling.",
+        TOTAL_DECISION,
     )
 
     run.act = "6. Everyone else carried on"
@@ -687,7 +782,7 @@ def play(run: Run) -> None:
         "T5",
         "The command line checks in",
         "The command line uses every API. In the experiment it was stopped three times by "
-        "questions that changed nothing it wrote. Here it was never part of one.",
+        "questions that changed nothing it wrote.",
     )
     run.claim(
         "T5",
@@ -709,7 +804,7 @@ def play(run: Run) -> None:
             task,
             f"{name} checks in before pushing",
             "The last check-in. “Ready to push: yes” is what the pre-push hook asks "
-            "for; after the push, midflight/verify checks the real code on GitHub."
+            "for. After the push, GitHub runs the tests and Midflight relays any failure."
             if task == "T1"
             else "",
         )
@@ -791,13 +886,14 @@ pre .hl.wait { background:var(--wait-bg); border-color:var(--wait) }
 .behind li { padding:4px 0 4px 12px; border-left:2px solid var(--line); margin:4px 0 }
 nav { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 }
 nav a { text-decoration:none; color:var(--ink); background:var(--card);
-  border:1px solid var(--line);
-  border-radius:6px; padding:4px 9px; font-size:.85rem }
+  border:1px solid var(--line); border-radius:6px; padding:4px 9px; font-size:.85rem }
 """
 
 # Lines of a reply worth a second glance, and how to tint them.
 HIGHLIGHTS = [
     ("OTHER TASKS ASSUME THIS ABOUT YOURS", "wait"),
+    ("DECISIONS THAT APPLY TO YOUR TASK", "wait"),
+    ("Decisions in force", "wait"),
     ("WAITING FOR THE LEAD", "warn"),
     ("ESCALATIONS WAITING", "warn"),
     ("Only the part of your work", "warn"),
@@ -836,7 +932,7 @@ def fold_contracts(reply: str) -> str:
     return re.sub(r"Build against:\n((?:  .*\n)+)", folded, reply)
 
 
-def sent_html(sent: list[tuple[str, Any]]) -> str:
+def sent_html(sent: list[list[Any]]) -> str:
     rows = []
     for label, value in sent:
         if isinstance(value, list):
@@ -858,70 +954,63 @@ def badge(outcome: str) -> str:
     return f'<span class="badge {kind}">{html.escape(outcome.replace("_", " "))}</span>'
 
 
-def step_html(number: int, step: Step) -> str:
-    lead = step.who == "lead"
-    who = "The lead" if lead else f"{step.who} · {TASKS[step.who]} agent"
+def step_html(number: int, step: dict[str, Any]) -> str:
+    lead = step["who"] == "lead"
+    who = "The lead" if lead else f"{step['who']} · {TASKS[step['who']]} agent"
     verb = "The lead told Midflight" if lead else "The agent told Midflight"
-    tool = "submit_claim" if any(label == "Assumptions" for label, _ in step.sent) else "check_in"
-    left = f"<div><h4>{verb}</h4>{sent_html(step.sent)}</div>" if step.sent else ""
+    sent = step["sent"]
+    left = f"<div><h4>{verb}</h4>{sent_html(sent)}</div>" if sent else ""
     asked = (
         ""
-        if step.sent or lead
-        else f'<p class="dim" style="margin:0 0 8px">The agent called <code>{tool}</code>.</p>'
+        if sent or lead
+        else '<p class="dim" style="margin:0 0 8px">The agent called <code>check_in</code>.</p>'
     )
     behind = (
-        "<ul class='behind'>" + "".join(f"<li>{html.escape(b)}</li>" for b in step.behind) + "</ul>"
-        if step.behind
+        "<ul class='behind'>" + "".join(f"<li>{html.escape(b)}</li>" for b in step["behind"])
+        + "</ul>"
+        if step["behind"]
         else ""
-    )
-    heading = "The lead saw" if lead and not step.sent else "Midflight replied"
-    right = f"<div><h4>{heading}</h4>{asked}<pre>{reply_html(step.reply)}</pre>{behind}</div>"
-    story = f'<p class="story">{html.escape(step.story)}</p>' if step.story else ""
+    )  # fmt: skip
+    heading = "The lead saw" if lead and not sent else "Midflight replied"
+    right = f"<div><h4>{heading}</h4>{asked}<pre>{reply_html(step['reply'])}</pre>{behind}</div>"
+    story = f'<p class="story">{html.escape(step["story"])}</p>' if step["story"] else ""
     return (
         f'<article class="step{" lead" if lead else ""}" id="s{number}"><header>'
         f'<span class="num">{number}</span><div><span class="who">{who}</span>'
-        f"<h3>{html.escape(step.title)}</h3>{story}</div>{badge(step.outcome)}</header>"
+        f"<h3>{html.escape(step['title'])}</h3>{story}</div>{badge(step['outcome'])}</header>"
         f'<div class="cols{"" if left else " one"}">{left}{right}</div></article>'
     )
 
 
-def page(run: Run) -> str:
-    plan = run.store.get_plan(PROJECT, 2)
-    assert plan is not None
-    escalations = run.store.list_escalations(PROJECT)
-    real = sum(e.resolution is Resolution.REQUEST_REVISION for e in escalations)
-    claims = sum(any(label == "Assumptions" for label, _ in s.sent) for s in run.steps)
-    all_ready = all(run.services.check_ins.check_in(run.agents[t], t).ready_to_push for t in TASKS)
+def page(run: dict[str, Any]) -> str:
     acts: list[str] = []
     body = []
-    for number, step in enumerate(run.steps, start=1):
-        if step.act not in acts:
-            acts.append(step.act)
-            body.append(f'<h2 id="a{len(acts)}">{html.escape(step.act)}</h2>')
+    for number, step in enumerate(run["steps"], start=1):
+        if step["act"] not in acts:
+            acts.append(step["act"])
+            body.append(f'<h2 id="a{len(acts)}">{html.escape(step["act"])}</h2>')
         body.append(step_html(number, step))
     nav = "".join(f'<a href="#a{i}">{html.escape(a)}</a>' for i, a in enumerate(acts, start=1))
     tasks = "".join(
-        f"<tr><td>{t.id}</td><td>{html.escape(t.title)}</td>"
-        f"<td>{html.escape(', '.join(t.provides) or 'nothing')}</td>"
-        f"<td>{html.escape(', '.join(t.consumes) or 'nothing')}</td></tr>"
-        for t in plan.tasks
+        "<tr>" + "".join(f"<td>{html.escape(cell or 'nothing')}</td>" for cell in row) + "</tr>"
+        for row in run["tasks"]
     )
-    stats = [
-        (claims, "claims and revisions"),
-        (run.reviewer.reviews, "AI reviews"),
-        (run.reviewer.second_looks, "conflicts given a second look"),
-        (run.reviewer.dropped, "of those the second look dropped"),
-        (len(escalations), "questions that reached the lead"),
-        (real, "of those the lead had to decide"),
-        (len(escalations) - real, "of those the lead dismissed"),
-    ]
+    stats = "".join(
+        f'<div class="stat"><b>{n}</b><span>{html.escape(label)}</span></div>'
+        for n, label in run["stats"]
+    )
     notes = "".join(
         f"<tr><td style='white-space:nowrap'>{html.escape(steps)}</td>"
         f"<td>{html.escape(note)}</td></tr>"
         for steps, note in RUN_NOTES
     )
-    stats_html = "".join(
-        f'<div class="stat"><b>{n}</b><span>{label}</span></div>' for n, label in stats
+    notice = (
+        '<h2 style="border:0;margin-top:26px">What to notice in this run</h2>\n'
+        f"<p>{html.escape(RUN_VERDICT)}</p>\n"
+        '<div class="scroll"><table><tr><th>Steps</th><th>What happened</th></tr>'
+        f"{notes}</table></div>"
+        if RUN_NOTES
+        else ""
     )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -932,18 +1021,22 @@ def page(run: Run) -> str:
 <p>Five AI agents and a lead build HireBot Pro, a marketplace for hiring AI agents by the
 hour. Each card shows what one of them told Midflight and the exact text Midflight sent
 back. Read it top to bottom: claim, check, change the plan, disagree, decide, push.</p>
-<div class="note"><b>What this is.</b> A simulation, run once on October 10, 2026 with
-<code>experiment/walkthrough.py</code>. It uses Midflight's real service code in memory
-and the real AI reviewer (<code>{html.escape(run.model)}</code> on Amazon Bedrock). The
-plan and the claims come from the agents in our experiment, shortened. The agents here
-follow a script; Midflight's replies do not: they are whatever the code and the model
-produced on this run. It is not the deployed service and no code was built.</div>
-<div class="stats">{stats_html}</div>
-<p class="dim">At the end, every task was ready to push: <b>{"yes" if all_ready else "no"}</b>.</p>
-<h2 style="border:0;margin-top:26px">What to notice in this run</h2>
-<p>{html.escape(RUN_VERDICT)}</p>
-<div class="scroll"><table><tr><th>Steps</th><th>What happened</th></tr>{notes}</table></div>
-<h2 style="border:0;margin-top:26px">The plan the lead wrote</h2>
+<div class="note"><b>What this is.</b> A simulation, run once on {html.escape(run["ran_at"])}
+with <code>experiment/walkthrough.py</code>. It uses Midflight's real service code in memory
+and the real AI reviewer (<code>{html.escape(run["model"])}</code> on Amazon Bedrock). The
+plan and the claims come from the agents in our experiment, shortened. The agents and the
+lead here follow a script; Midflight's replies do not: they are whatever the code and the
+model produced on this run. It is not the deployed service and no code was built.</div>
+<div class="note"><b>Who settles what.</b> Midflight asks the lead only for a product
+decision: something that changes what the customer or the business ends up with. A
+technical question between two agents (a name, a shape, what a field holds) it settles
+itself, tells both, and lists for the lead, who can overturn it. An assumption one task
+states about another, which the other saw and didn't object to, is recorded as agreed.</div>
+<div class="stats">{stats}</div>
+<p class="dim">At the end, every task was ready to push:
+<b>{"yes" if run["all_ready"] else "no"}</b>.</p>
+{notice}
+<h2 style="border:0;margin-top:26px">The plan the lead approved</h2>
 <p>Each contract is a named piece of data with fields and types. One task provides it and
 others use it. Requirements and field lists appear in the replies below.</p>
 <div class="scroll"><table>
@@ -956,10 +1049,13 @@ others use it. Requirements and field lists appear in the replies below.</p>
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    run = Run()
-    play(run)
-    OUT.write_text(page(run), encoding="utf-8")
-    print(f"\nwrote {OUT}")
+    if "--render" not in sys.argv:
+        run = Run()
+        play(run)
+        SAVED.write_text(json.dumps(run.snapshot(), indent=1), encoding="utf-8")
+        print(f"\nsaved the run to {SAVED}")
+    OUT.write_text(page(json.loads(SAVED.read_text(encoding="utf-8"))), encoding="utf-8")
+    print(f"wrote {OUT}")
 
 
 if __name__ == "__main__":

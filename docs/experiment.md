@@ -233,6 +233,26 @@ table shows the bugs are fixed, not that new ones won't appear. A simulated run 
 freshly worded claims already shows the limit: Midflight stopped a claim four times, and
 two of those were false alarms.
 
+### What changed next (S-12)
+
+After reading the run step by step, the lead asked for less human involvement. Midflight
+now asks the lead only for a product decision (what the customer or the business ends up
+with) and settles the rest itself:
+
+1. **An assumption the other task saw and didn't object to is recorded as agreed.**
+2. **A technical question between two claims is settled by the AI reviewer at once.**
+   Both agents get the answer and revise; nobody waits. The lead sees every such
+   decision and can overturn it.
+3. **A product question still goes to the lead**, with both sides and a suggested answer.
+4. **After a push, no AI reads the code.** CI's failing tests become a directive; a
+   passing run gets three rule checks.
+
+On the 13 recorded escalations (five reviews each), the reviewer now stops a real question
+in 19 of 20 reviews and sends 15 of those to the right decider; no false alarm reached the
+lead in 45 reviews, and 4 asked an agent to revise for nothing
+([evals/results.md](../evals/results.md)). In the simulated run, the lead acted once, on
+the cancellation fee; Midflight settled what `total` means itself.
+
 To see the whole workflow with these changes, step by step, open
 [the walkthrough](pages/walkthrough.html): what each agent told Midflight and exactly what
 it answered.

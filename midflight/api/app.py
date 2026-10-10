@@ -68,7 +68,7 @@ def build_services(
     assert runner is not None
     claims = ClaimService(store, runner, clock, reviewer)
     sync = SyncService(store, clock, runner)
-    verifications = VerificationService(store, clock, runner, sync, github, reviewer)
+    verifications = VerificationService(store, clock, runner, sync, github)
     if inline is not None:
         inline.register(JobKind.CLAIM_REVIEW, claims.run_review)
         inline.register(JobKind.VERIFICATION, verifications.run)
