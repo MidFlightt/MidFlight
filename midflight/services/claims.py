@@ -416,19 +416,34 @@ class ClaimService:
     ) -> list[Entity]:
         """An escalation for the lead, plus the other claims it involves (UC-12).
 
-        Nothing new if an escalation for this claim is already open.
+        Nothing new if an escalation for this claim is already open. If one is open about
+        the same requirement, this claim joins it, so the lead decides one question once.
         """
         conflicts = [
             f for f in findings if f.blocking and f.kind is FindingKind.REQUIREMENT_CONFLICT
         ]
-        already_open = any(
-            e.state is EscalationState.OPEN and claim.id in e.claim_ids
-            for e in self._store.list_escalations(project.id)
-        )
-        if not conflicts or already_open:
+        still_open = [
+            e for e in self._store.list_escalations(project.id) if e.state is EscalationState.OPEN
+        ]
+        if not conflicts or any(claim.id in e.claim_ids for e in still_open):
             return []
         cited = {i for f in conflicts for i in f.affected_ids}
         involved = [claim, *(o for o in others if o.id in cited and o.id != claim.id)]
+        requirements = {i for i in cited if plan.requirement(i)}
+        same_question = next(
+            (e for e in still_open if requirements & set(e.competing_requirement_ids)), None
+        )
+        if same_question is not None:
+            joined = Escalation.model_validate(
+                same_question.model_dump()
+                | {
+                    "claim_ids": list(
+                        dict.fromkeys([*same_question.claim_ids, *(c.id for c in involved)])
+                    ),
+                    "finding_ids": [*same_question.finding_ids, *(f.id for f in conflicts)],
+                }
+            )
+            return [joined]
         escalation = Escalation(
             id=self._store.next_id(project.id, "E"),
             project_id=project.id,

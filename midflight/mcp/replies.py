@@ -33,12 +33,16 @@ NEXT_STEP = {
 }
 
 
-def verdict_text(verdict: dict[str, Any], heading: str | None = None) -> str:
+def verdict_text(
+    verdict: dict[str, Any], heading: str | None = None, contracts: bool = True
+) -> str:
+    """`contracts=False` when the reply already listed the task's contracts above."""
     state = verdict["state"]
     lines = [heading or f"Claim {verdict['claim_id']} rev {verdict['revision']}: {state.upper()}"]
     if not verdict.get("review_complete", True):
         lines.append("The AI review didn't complete, so the claim can't be approved yet.")
-    lines += ["", *contracts_text(verdict.get("contracts", []))]
+    if contracts:
+        lines += ["", *contracts_text(verdict.get("contracts", []))]
     lines += findings_text(verdict.get("findings", []))
     lines += ["", verdict.get("note", ""), "", NEXT_STEP.get(state, "")]
     return "\n".join(lines).strip()
@@ -99,7 +103,7 @@ def check_in_text(reply: dict[str, Any]) -> str:
     lines += ["", *contracts_text(reply.get("contracts", []))]
     claim = reply.get("claim")
     if claim:
-        lines += ["", verdict_text(claim, heading=_claim_heading(claim))]
+        lines += ["", verdict_text(claim, heading=_claim_heading(claim), contracts=False)]
     else:
         lines += ["", "You have no claim for this task yet. Call submit_claim before coding."]
     lines += ["", directives_block(reply.get("directives", []))]
