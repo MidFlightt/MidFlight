@@ -55,8 +55,8 @@ DIRECTIVE_TRANSITIONS: Mapping[DirectiveState, frozenset[DirectiveState]] = {
 # Directives still waiting on the agent. Blocking ones refuse a push (UC-16).
 OPEN_DIRECTIVE_STATES = frozenset({_D.QUEUED, _D.DELIVERED, _D.NEEDS_CLARIFICATION})
 
-# A newer plan supersedes the task's directives in these states (D13).
-SUPERSEDABLE_DIRECTIVE_STATES = frozenset({_D.QUEUED, _D.DELIVERED})
+# A replacement retires all open directives, including questions awaiting the lead (D13).
+SUPERSEDABLE_DIRECTIVE_STATES = OPEN_DIRECTIVE_STATES
 
 
 def check_claim_transition(current: ClaimState | None, target: ClaimState) -> None:

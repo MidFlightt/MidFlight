@@ -19,6 +19,7 @@ from midflight.adapters.memory_store import MemoryStore
 from midflight.api.app import Services, build_services, create_app
 from midflight.domain.models import (
     ClaimState,
+    DirectiveResponse,
     DirectiveSource,
     DirectiveState,
     EscalationState,
@@ -160,10 +161,17 @@ def test_a_push_without_an_approved_claim_is_incomplete() -> None:
     assert v.outcome is VerificationOutcome.INCOMPLETE and v.claim_id is None
 
 
-def test_a_newer_failure_supersedes_the_older_correction() -> None:
+@pytest.mark.parametrize("needs_clarification", [False, True])
+def test_a_newer_failure_supersedes_the_older_correction(needs_clarification) -> None:
     team = Team()
     failing = {"app/api.py": WRONG_API}
     team.verify(team.push(sha="aaa1111", files=failing))
+    if needs_clarification:
+        actor = team.people["p-t1"]
+        [old] = team.services.check_ins.check_in(actor, "T1").directives
+        team.services.directives.acknowledge(
+            actor, old.id, DirectiveResponse.NEEDS_CLARIFICATION, "Which correction?"
+        )
     team.verify(team.push(sha="bbb2222", files=failing))
     states = [d.state for d in team.store.list_directives(PROJECT, "T1")]
     assert states == [DirectiveState.SUPERSEDED, DirectiveState.QUEUED]
