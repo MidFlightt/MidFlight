@@ -62,6 +62,17 @@ picks the simplest way to get it.
 | D25 | What each escalation resolution does | `clarify_plan` needs a newer approved plan first; the claims are reviewed again and revise against it. `request_revision` sends each involved agent a directive with the lead's decision (superseding open ones). `dismiss` reviews the claims again with the conflict kept as `info`, for revisions written before the decision. | Default | S-7, UC-13 |
 | D26 | How does a developer get the pre-push hook without cloning Midflight? | `hook_setup` returns the commands: download the script from `GET /hook/pre-push`, and store the project, a personal hook token, and the task in `.git/config`. The hook asks `POST /projects/{pid}/push-check`, which answers plain text 200 or 409. | Default | M-4, UC-16, D20 |
 
+## After the experiment (October 10, 2026)
+
+Changes that follow from the HireBot experiment ([experiment.md](experiment.md)). None
+changes `models.py` or `ports.py`.
+
+| ID | Question | Decision | Status | Affects |
+| --- | --- | --- | --- | --- |
+| D27 | An agent states an assumption about another task that no contract covers (a function it calls, a route it posts to). Who hears it? In the experiment, the heavier case's only failing check was an assumption Midflight approved and never passed on. | **The task it is about, at its next check-in.** `check_in` lists what other active claims assume about this task, as written and unchecked, fenced as data. An assumption is about a task when it names the task's id, its title, or a file only that task's claim lists (`domain/neighbours.py`). It never blocks. The agent answers by building it, or by saying otherwise in its own assumptions. | Default | UC-07 |
+| D28 | What may an agent do while its claim waits for the lead? In the experiment, an agent was stopped three times over questions that changed nothing it wrote, and the lead only learned of escalations by asking. | **Everything the question doesn't touch.** The reply names the question and says only the part that depends on it waits; the push stays blocked. `check_in` shows each open escalation to the agents whose claims are part of it, and all of them to the lead. | Default | UC-07, UC-12 |
+| D29 | How are false alarms kept from stopping agents? In the experiment, 8 of 13 escalations were false alarms. | Three things. (1) The AI reviewer isn't shown claims in `needs_revision`: their agents were told to change them. (2) A blocking `requirement_conflict` gets a second, narrower model call with only the cited statements ("could one program satisfy both?"); if it could, the finding becomes `info`; if the call fails, it stays blocking. (3) A conflict that cites a claim already in an open escalation joins that escalation. | Default | S-5, UC-05, UC-12 |
+
 ## Architecture baseline (October 7, 2026)
 
 Simplifications adopted in the [development plan](development-plan.md#architecture-baseline):
