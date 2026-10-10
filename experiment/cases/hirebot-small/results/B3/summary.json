@@ -1,0 +1,46 @@
+{
+  "case": "hirebot-small",
+  "run": "B3",
+  "approach": "Midflight",
+  "model": "sonnet",
+  "merge": [
+    "t1-catalog: merged",
+    "t2-hiring: merged",
+    "t3-storefront: merged"
+  ],
+  "scores": [
+    {
+      "passed": 8,
+      "of": 8,
+      "failed": []
+    }
+  ],
+  "agent_starts_without_midflight": 3,
+  "stats": {
+    "cost": 1.1224,
+    "warmup_cost": 0.2448614,
+    "turns": 69,
+    "input": 96,
+    "output": 23396,
+    "cache_read": 2419064,
+    "cache_write": 101115,
+    "agent_minutes": 4.1,
+    "tool_calls": 59,
+    "midflight_calls": {
+      "check_in": 14,
+      "submit_claim": 10,
+      "acknowledge_directive": 3
+    },
+    "cost_by_agent": {
+      "t1": 0.20874339999999997,
+      "t2": 0.46395880000000006,
+      "t3": 0.44972260000000003
+    }
+  },
+  "notes": [
+    "Scored by hand in a browser (this case has no score.py).",
+    "Phase 1: Midflight's AI reviewer raised two false alarms (E-1 compared T2's claim with a withdrawn claim; E-2 called two compatible assumptions a conflict). T2 and T3 stopped. The lead dismissed both, then sent message 4/5.",
+    "Phase 2: the lead approved plan v2 in Midflight (not pasted to anyone). Directives went to T2 and T3, none to T1. Midflight escalated T2's 'no tax' claim against requirement R-2 (E-3, and E-4 for the same question). The lead resolved both with request_revision and the fixed decision, then sent the last messages.",
+    "3 of 10 agent starts had Midflight connected but no tools loaded; the driver restarted them before they did any work."
+  ]
+}
