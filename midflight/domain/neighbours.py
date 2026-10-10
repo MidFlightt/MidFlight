@@ -34,9 +34,14 @@ class NeighbourAssumption:
 
 
 def assumptions_about(
-    task: Task, own_files: Collection[str], claims: Sequence[Claim]
+    task: Task, own_files: Collection[str], claims: Sequence[Claim], by_title: bool = True
 ) -> list[NeighbourAssumption]:
-    """What the other tasks' active claims assume about `task`, oldest claim first."""
+    """What the other tasks' active claims assume about `task`, oldest claim first.
+
+    A title is often an ordinary word ("Bookings", "Reports"). That is fine for passing
+    an assumption on, where a stray match costs one extra line. Recording one as agreed
+    needs more, so `by_title=False` counts only the task's id and files (D30).
+    """
     found = []
     for claim in sorted(claims, key=lambda c: c.created_at):
         if claim.task_id == task.id or claim.state not in ACTIVE_CLAIM_STATES:
@@ -46,15 +51,15 @@ def assumptions_about(
         found += [
             NeighbourAssumption(claim.task_id, claim.id, text[:MAX_LENGTH])
             for text in claim.assumptions
-            if _mentions(text, task, files)
+            if _mentions(text, task, files, by_title)
         ]
     return found[:MAX_ASSUMPTIONS]
 
 
-def _mentions(text: str, task: Task, files: Collection[str]) -> bool:
+def _mentions(text: str, task: Task, files: Collection[str], by_title: bool) -> bool:
     if re.search(rf"\b{re.escape(task.id)}\b", text):
         return True
-    if re.search(rf"\b{re.escape(task.title)}\b", text, re.IGNORECASE):
+    if by_title and re.search(rf"\b{re.escape(task.title)}\b", text, re.IGNORECASE):
         return True
     return any(path in text or _name(path) in text for path in files)
 

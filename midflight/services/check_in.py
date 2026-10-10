@@ -6,8 +6,9 @@ or consumes), the agent's current claim verdict, and open directives. Directives
 which case they're held (INV-09). `ready_to_push` is what the pre-push hook checks.
 
 It also carries what the plan can't: what other tasks' claims assume about this one
-(D27), and the escalations the lead hasn't decided yet (D28). An agent sees the ones its
-claim is part of; the lead sees all of them.
+(D27), the escalations the lead hasn't decided yet (D28), and the decisions already made
+(D30, D31). An agent sees the ones its claim is part of. The lead sees every open
+escalation, and everything Midflight settled without them, so they can overturn it.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from midflight.domain.states import (
 from midflight.ports import Clock, Commit, Store
 from midflight.services.audit import audit_event, new_correlation_id
 from midflight.services.claims import ClaimService, Verdict
+from midflight.services.decisions import MIDFLIGHT, decisions_in_force
 from midflight.services.errors import InvalidRequest, NotFound, PermissionDenied, StateConflict
 
 
@@ -59,6 +61,7 @@ class CheckIn:
     assumed_by_others: Sequence[NeighbourAssumption] = ()
     escalations: Sequence[Escalation] = ()
     you_decide: bool = False  # the escalations are the lead's own to resolve
+    decisions: Sequence[Escalation] = ()
 
 
 class CheckInService:
@@ -134,11 +137,20 @@ class CheckInService:
         verdict = self._claims.verdict(claim.id, claim.revision) if claim else None
         blockers = _push_blockers(claim, directives)
         lead = actor.role is Role.LEAD
+        escalations = self._store.list_escalations(project.id)
         undecided = [
             e
-            for e in self._store.list_escalations(project.id)
+            for e in escalations
             if e.state is EscalationState.OPEN
             and (lead or (claim is not None and claim.id in e.claim_ids))
+        ]
+        # An agent builds to the decisions its claim is part of. The lead reviews what
+        # Midflight settled on its own.
+        decisions = [
+            d
+            for d in decisions_in_force(escalations, claims)
+            if (lead and d.resolved_by == MIDFLIGHT)
+            or (claim is not None and claim.id in d.claim_ids)
         ]
         return CheckIn(
             plan_version=plan.version,
@@ -158,6 +170,7 @@ class CheckInService:
             assumed_by_others=assumptions_about(task, claim.files if claim else [], claims),
             escalations=undecided,
             you_decide=lead,
+            decisions=decisions,
         )
 
     def _task(self, plan: Plan, actor: Participant, task_id: str | None) -> Task:

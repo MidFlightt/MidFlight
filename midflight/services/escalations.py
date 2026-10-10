@@ -12,15 +12,19 @@ A review that finds a conflict between people's requirements opens an escalation
   dismissed conflict is set aside (kept as an `info` finding, not blocking).
 
 Midflight records who decided and why, and keeps the original finding.
+
+The lead can also overturn something Midflight settled without them (D31): a technical
+decision by the AI reviewer, or an assumption recorded as agreed. `request_revision`
+replaces it with the lead's own ruling; `dismiss` withdraws it.
 """
 
 from __future__ import annotations
 
 from midflight.domain.models import (
+    Claim,
     ClaimState,
     Directive,
     DirectiveSource,
-    DirectiveState,
     Entity,
     Escalation,
     EscalationState,
@@ -30,10 +34,11 @@ from midflight.domain.models import (
     Resolution,
     Role,
 )
-from midflight.domain.states import SUPERSEDABLE_DIRECTIVE_STATES, move_claim, move_directive
+from midflight.domain.states import ACTIVE_CLAIM_STATES, move_claim
 from midflight.ports import Clock, Commit, JobRunner, Store
 from midflight.services.audit import audit_event, new_correlation_id
 from midflight.services.claims import review_subject
+from midflight.services.decisions import MIDFLIGHT, revision_requests
 from midflight.services.errors import InvalidRequest, NotFound, PermissionDenied, StateConflict
 
 
@@ -53,13 +58,16 @@ class EscalationService:
         escalation = self._store.get_escalation(escalation_id)
         if escalation is None or escalation.project_id != lead.project_id:
             raise NotFound(f"no escalation {escalation_id}")
-        if escalation.state is not EscalationState.OPEN:
-            raise StateConflict(f"escalation {escalation_id} is already resolved")
         project = self._store.get_project(lead.project_id)
         assert project is not None and project.current_plan_version is not None
         version = project.current_plan_version
-
         claims = [self._store.get_claim(cid) for cid in escalation.claim_ids]
+        if escalation.state is not EscalationState.OPEN:
+            if escalation.resolved_by != MIDFLIGHT:
+                raise StateConflict(f"escalation {escalation_id} is already resolved")
+            involved = [c for c in claims if c and c.state in ACTIVE_CLAIM_STATES]
+            return self._overturn(lead, escalation, involved, version, resolution, reason)
+
         waiting = [c for c in claims if c and c.state is ClaimState.HUMAN_REVIEW_REQUIRED]
         if resolution is Resolution.CLARIFY_PLAN and all(
             c.plan_version >= version for c in waiting
@@ -74,31 +82,12 @@ class EscalationService:
         correlation_id = new_correlation_id()
         puts: list[Entity] = []
         jobs: list[Job] = []
-        directives = self._store.list_directives(project.id)
+        if resolution is Resolution.REQUEST_REVISION:
+            puts += revision_requests(
+                self._store, self._clock, escalation, waiting, version, reason, lead.id
+            )
         for claim in waiting:
-            if resolution is Resolution.REQUEST_REVISION:
-                puts.append(move_claim(claim, ClaimState.NEEDS_REVISION))
-                puts += [
-                    move_directive(d, DirectiveState.SUPERSEDED)
-                    for d in directives
-                    if d.task_id == claim.task_id and d.state in SUPERSEDABLE_DIRECTIVE_STATES
-                ]
-                puts.append(
-                    Directive(
-                        id=self._store.next_id(project.id, "D"),
-                        project_id=project.id,
-                        source=DirectiveSource.PLAN_CHANGE,
-                        task_id=claim.task_id,
-                        recipient_id=claim.agent_id,
-                        plan_version=version,
-                        changed_ids=escalation.competing_requirement_ids,
-                        requested_adjustment=f"The lead decided escalation {escalation.id}: "
-                        f"{reason} Revise claim {claim.id} to match, then submit it again.",
-                        reason=escalation.explanation,
-                        created_at=now,
-                    )
-                )
-            else:
+            if resolution is not Resolution.REQUEST_REVISION:
                 job = Job(
                     id=self._store.next_id(project.id, "J"),
                     project_id=project.id,
@@ -147,3 +136,74 @@ class EscalationService:
         for job in jobs:
             self._runner.submit(job)
         return resolved
+
+    def _overturn(
+        self,
+        lead: Participant,
+        escalation: Escalation,
+        involved: list[Claim],
+        version: int,
+        resolution: Resolution,
+        reason: str,
+    ) -> Escalation:
+        """Replace or withdraw something Midflight settled without the lead."""
+        if resolution is Resolution.CLARIFY_PLAN:
+            raise InvalidRequest(
+                "Midflight already settled this one",
+                "Overturn it with request_revision (your own ruling) or dismiss (withdraw it).",
+            )
+        now = self._clock.now()
+        puts: list[Entity] = []
+        if resolution is Resolution.REQUEST_REVISION:
+            puts += revision_requests(
+                self._store, self._clock, escalation, involved, version, reason, lead.id
+            )
+        else:
+            puts += [
+                Directive(
+                    id=self._store.next_id(escalation.project_id, "D"),
+                    project_id=escalation.project_id,
+                    source=DirectiveSource.PLAN_CHANGE,
+                    task_id=claim.task_id,
+                    recipient_id=claim.agent_id,
+                    plan_version=version,
+                    requested_adjustment=f"The lead withdrew {escalation.id} "
+                    f"({escalation.reason!r}): {reason} It no longer applies. If you changed "
+                    f"claim {claim.id} because of it, revise the claim again.",
+                    reason=escalation.explanation,
+                    created_at=now,
+                )
+                for claim in involved
+            ]
+        overturned = Escalation.model_validate(
+            escalation.model_dump()
+            | {
+                "resolution": resolution,
+                "resolved_by": lead.id,
+                "reason": reason,
+                "resolved_at": now,
+            }
+        )
+        key = f"overturn:{escalation.id}:{new_correlation_id()}"
+        event = audit_event(
+            self._store,
+            self._clock,
+            project_id=escalation.project_id,
+            actor=lead.id,
+            action=f"escalation.overturned.{resolution}",
+            entity_ids=[escalation.id, *(c.id for c in involved)],
+            reason=f"was {escalation.reason!r} (by {escalation.resolved_by}); now: {reason}",
+            correlation_id=new_correlation_id(),
+            idempotency_key=key,
+            versions={"plan": version},
+        )
+        self._store.commit(
+            Commit(
+                project_id=escalation.project_id,
+                idempotency_key=key,
+                puts=[overturned, *puts],
+                audit=[event],
+                bump_coord_rev=True,
+            )
+        )
+        return overturned

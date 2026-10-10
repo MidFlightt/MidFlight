@@ -32,7 +32,11 @@ class FakeBedrock:
         self.calls.append(request)
         if self.error:
             raise ClientError({"Error": {"Code": "ThrottlingException"}}, "Converse")
-        tool_use = {"toolUse": {"name": "report_findings", "input": {"findings": self.findings}}}
+        tool = request["toolConfig"]["toolChoice"]["tool"]["name"]
+        answer: dict[str, Any] = {"findings": self.findings}
+        if tool == "confirm_conflict":  # the second look: a real one, for the lead
+            answer = {"contradiction": True, "decides": "lead", "why": "they differ"}
+        tool_use = {"toolUse": {"name": tool, "input": answer}}
         return {"output": {"message": {"content": [tool_use]}}}
 
 

@@ -94,18 +94,16 @@ def test_a_correct_push_is_verified_and_published_as_success() -> None:
     assert v.check_run_id == 1
 
 
-def test_wrong_field_fails_with_evidence_and_a_correction_directive() -> None:
+def test_a_failing_contract_test_becomes_a_correction_directive() -> None:
     team = Team()
     run = team.push(
         files={"app/api.py": WRONG_API}, tests=[("test_total_cents_is_an_integer", False)]
     )
     v = team.verify(run)
 
+    # CI ran the contract tests; Midflight relays what failed and adds no opinion (D33).
     assert v.outcome is VerificationOutcome.FAILED
-    kinds = {f.kind for f in v.findings if f.blocking}
-    assert kinds == {FindingKind.MISSING_CHANGE, FindingKind.TEST_FAILURE}
-    missing = next(f for f in v.findings if f.kind is FindingKind.MISSING_CHANGE)
-    assert "total_cents" in missing.explanation
+    assert {f.kind for f in v.findings if f.blocking} == {FindingKind.TEST_FAILURE}
     assert team.github.checks[0].conclusion == "failure"
     assert "total_cents" in team.github.checks[0].summary
 
@@ -162,9 +160,9 @@ def test_a_push_without_an_approved_claim_is_incomplete() -> None:
 
 def test_a_newer_failure_supersedes_the_older_correction() -> None:
     team = Team()
-    failing = {"app/api.py": WRONG_API}
-    team.verify(team.push(sha="aaa1111", files=failing))
-    team.verify(team.push(sha="bbb2222", files=failing))
+    failing = {"files": {"app/api.py": WRONG_API}, "tests": [("test_total_cents", False)]}
+    team.verify(team.push(sha="aaa1111", **failing))
+    team.verify(team.push(sha="bbb2222", **failing))
     states = [d.state for d in team.store.list_directives(PROJECT, "T1")]
     assert states == [DirectiveState.SUPERSEDED, DirectiveState.QUEUED]
 
@@ -172,9 +170,46 @@ def test_a_newer_failure_supersedes_the_older_correction() -> None:
 def test_a_comment_naming_the_field_does_not_count() -> None:
     team = Team()
     sneaky = "# returns total_cents, honest\ndef checkout():\n    return {'total': 49.99}\n"
-    v = team.verify(team.push(files={"app/api.py": sneaky}))
+    # No test results for this commit, so the field check is the only one there is.
+    v = team.verify(team.push(files={"app/api.py": sneaky}, artifact_sha="0ld5ha1"))
     assert FindingKind.MISSING_CHANGE in {f.kind for f in v.findings if f.blocking}
     assert "total_cents" in team.github.checks[0].title  # the clearest reason leads
+
+
+def test_passing_contract_tests_are_trusted_over_the_field_check() -> None:
+    team = Team()
+    v = team.verify(team.push(files={"app/api.py": WRONG_API}))
+    assert v.outcome is VerificationOutcome.VERIFIED
+    assert not [f for f in v.findings if f.kind is FindingKind.MISSING_CHANGE]
+
+
+def test_changing_another_tasks_file_fails_the_push() -> None:
+    team = Team()
+    t2 = team.services.claims.submit(team.people["p-t2"], submission("T2"))
+    assert t2.state is ClaimState.APPROVED  # T2's claim lists web/checkout.js
+
+    files = {"app/api.py": GOOD_API, "web/checkout.js": "// T1 was here\n"}
+    v = team.verify(team.push(files=files))
+
+    assert v.outcome is VerificationOutcome.FAILED
+    [foreign] = [f for f in v.findings if f.blocking]
+    assert foreign.kind is FindingKind.UNDECLARED_CHANGE
+    assert "web/checkout.js (T2)" in foreign.explanation
+    [directive] = team.store.list_directives(PROJECT, "T1")
+    assert "Undo those changes" in directive.requested_adjustment
+
+
+def test_no_ai_reads_the_pushed_code() -> None:
+    class NeverAsked:
+        def review_claim(self, request: object) -> list[object]:
+            return []
+
+        def review_commit(self, request: object) -> list[object]:
+            raise AssertionError("the pushed code must not go to the AI reviewer")
+
+    team = Team()
+    team.services = build_services(team.store, FixedClock(NOW), NeverAsked(), github=team.github)
+    assert team.verify(team.push()).outcome is VerificationOutcome.VERIFIED
 
 
 def test_a_url_is_not_mistaken_for_a_comment() -> None:
