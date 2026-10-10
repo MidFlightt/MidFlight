@@ -22,10 +22,10 @@ is buffer and submission.
 
 **Current state:** the specs; the shared models and ports (S-1); the claim rules
 (S-2); the claim service with the in-memory store, runners, and clock (S-3); the YAML
-scenarios (S-4); and the REST API with token auth, plans, check-in, and directive
-answers (M-2). The
+scenarios (S-4); the REST API with token auth, plans, check-in, and directive answers
+(M-2); and the MCP adapter (M-3). The
 old prototype (`midflight/claims.py`, `__main__.py`) is still there for the README
-commands. The other planned packages (`mcp/`, `hooks/`, ...) appear as tasks land. Don't
+commands. The other planned packages (`hooks/`, `worker/`, ...) appear as tasks land. Don't
 assume a module exists. Check first.
 
 ## Where things are
