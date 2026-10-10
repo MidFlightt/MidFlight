@@ -1,7 +1,12 @@
 # Claim template
 
-Use this human-readable template in a task issue before implementing. It is a
-collaboration starting point, not a finalized machine API or database schema.
+Start with an owner and intended outcome. Add expected files and shared
+interfaces when known; exact code changes are not required upfront. Midflight
+asks for more detail when tasks may interact. Refine the claim as you learn.
+
+The sections below are prompts, not mandatory fields. For the local prototype's
+JSON input, see examples/claims.json and README.md. This human-readable template
+is not a finalized API or database schema.
 
 ```markdown
 ## Outcome

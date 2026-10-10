@@ -1,9 +1,18 @@
 # Open design decisions
 
 The project brief proposes Strands, Bedrock AgentCore, DynamoDB, and Lambda.
-No implementation architecture has been approved yet.
+The first local prototype uses Python and in-memory state. AWS architecture
+and model reasoning remain undecided.
 
-## First decision: evaluating claims
+## Confirmed: lightweight claims
+
+Start with broad claims and ask targeted questions when tasks may interact.
+Exact changes are not mandatory upfront; claims can be refined during work.
+The local prototype compares exact declared files and shared interface names.
+Overlap requests clarification; missing information remains unknown. It does
+not determine semantic incompatibility or approve tasks.
+
+## Open: evaluating semantic compatibility
 
 How should Midflight determine that two claims are incompatible, and which
 decisions require the model versus deterministic checks or a human?
