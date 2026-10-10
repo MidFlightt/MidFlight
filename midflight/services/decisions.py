@@ -60,13 +60,18 @@ def decisions_in_force(
 ) -> list[Escalation]:
     """The decisions agents should build to right now, oldest first.
 
-    `claims` are the latest revisions. An agreement holds only while the claim that
-    proposed it (the first one listed) is active and still states the assumption.
+    `claims` are the latest revisions. A decision applies while at least one claim it
+    was about is still active: once every one is withdrawn or closed, there is nobody
+    left to build to it. An agreement also holds only while the claim that proposed it
+    (the first one listed) is active and still states the assumption.
     """
     latest = {c.id: c for c in claims}
+    active = {c.id for c in claims if c.state in ACTIVE_CLAIM_STATES}
     in_force = []
     for escalation in sorted(escalations, key=lambda e: e.created_at):
         if escalation.state is not EscalationState.RESOLVED:
+            continue
+        if not active & set(escalation.claim_ids):
             continue
         if is_agreement(escalation):
             proposer = latest.get(escalation.claim_ids[0])
