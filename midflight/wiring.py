@@ -6,7 +6,7 @@ so both build the same thing:
 | Port | Configured | Not configured |
 | --- | --- | --- |
 | Store | DynamoDB (`MIDFLIGHT_TABLE`) | in memory |
-| Reviewer | Bedrock (`MIDFLIGHT_REVIEWER_MODEL`) | none: rules only |
+| Reviewer | Bedrock (`MIDFLIGHT_REVIEWER_MODEL`), maybe via another account | rules only |
 | GitHub | the GitHub App (App id and private key) | none: verification can't run |
 """
 
@@ -25,7 +25,9 @@ def store_for(settings: Settings) -> Store:
 
 
 def reviewer_for(settings: Settings) -> Reviewer | None:
-    return BedrockReviewer(settings.reviewer_model) if settings.reviewer_model else None
+    if not settings.reviewer_model:
+        return None
+    return BedrockReviewer(settings.reviewer_model, role_arn=settings.reviewer_role_arn)
 
 
 def github_for(settings: Settings) -> GitHub | None:

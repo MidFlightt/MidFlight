@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
 from botocore.exceptions import ClientError
 
 from demo_fixture import NOW, make_claim, make_plan, seed, submission
+from midflight.adapters import bedrock as bedrock_module
 from midflight.adapters.bedrock import BedrockReviewer
 from midflight.adapters.clock import FixedClock
 from midflight.adapters.memory_store import MemoryStore
@@ -108,3 +110,54 @@ def test_a_reply_citing_unknown_ids_is_discarded() -> None:
 def test_no_model_configured_means_rules_only() -> None:
     assert reviewer_for(Settings()) is None
     assert isinstance(reviewer_for(Settings(reviewer_model="m")), BedrockReviewer)
+
+
+# Bedrock in another account, through a role ------------------------------------------
+
+ROLE = "arn:aws:iam::111122223333:role/midflight-bedrock-reviewer"
+
+
+def fake_aws(monkeypatch: pytest.MonkeyPatch, lasts: timedelta, refuse: bool = False):
+    """Replace boto3.client; returns the list of (service or "assume", arguments) calls."""
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    class FakeSts:
+        def assume_role(self, **arguments: Any) -> dict[str, Any]:
+            calls.append(("assume", arguments))
+            if refuse:
+                raise ClientError({"Error": {"Code": "AccessDenied"}}, "AssumeRole")
+            credentials = {"AccessKeyId": "AK", "SecretAccessKey": "SK", "SessionToken": "ST"}
+            return {"Credentials": credentials | {"Expiration": datetime.now(UTC) + lasts}}
+
+    def client(service: str, **arguments: Any) -> Any:
+        calls.append((service, arguments))
+        return FakeSts() if service == "sts" else FakeBedrock()
+
+    monkeypatch.setattr(bedrock_module.boto3, "client", client)
+    return calls
+
+
+def test_bedrock_in_another_account_goes_through_the_role(monkeypatch) -> None:
+    calls = fake_aws(monkeypatch, lasts=timedelta(hours=1))
+    reviewer = BedrockReviewer("m", role_arn=ROLE)
+    reviewer.review_claim(request())
+    reviewer.review_claim(request())
+
+    assumed = [arguments for service, arguments in calls if service == "assume"]
+    assert len(assumed) == 1 and assumed[0]["RoleArn"] == ROLE  # reused while it's valid
+    bedrock = next(arguments for service, arguments in calls if service == "bedrock-runtime")
+    assert bedrock["aws_session_token"] == "ST"
+
+
+def test_the_role_is_renewed_before_it_expires(monkeypatch) -> None:
+    calls = fake_aws(monkeypatch, lasts=timedelta(minutes=2))
+    reviewer = BedrockReviewer("m", role_arn=ROLE)
+    reviewer.review_claim(request())
+    reviewer.review_claim(request())
+    assert sum(service == "assume" for service, _ in calls) == 2
+
+
+def test_a_refused_role_means_unavailable_never_a_pass(monkeypatch) -> None:
+    fake_aws(monkeypatch, lasts=timedelta(hours=1), refuse=True)
+    with pytest.raises(ReviewerUnavailable):
+        BedrockReviewer("m", role_arn=ROLE).review_claim(request())

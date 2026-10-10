@@ -15,6 +15,7 @@ Locally, put them in a `.env` file in the repository root (git-ignored); see
 | `MIDFLIGHT_GITHUB_PRIVATE_KEY` | The key itself, instead of a path. Secret. |
 | `MIDFLIGHT_GITHUB_WEBHOOK_SECRET` | The App's webhook secret (verification). Secret. |
 | `MIDFLIGHT_REVIEWER_MODEL` | Bedrock model for the AI reviewer. Unset means rules only. |
+| `MIDFLIGHT_REVIEWER_ROLE_ARN` | A role in another AWS account to call Bedrock through. |
 | `MIDFLIGHT_TABLE` | DynamoDB table name. Unset means an in-memory store. |
 | `MIDFLIGHT_SECRET_ID` | Secrets Manager secret holding the secrets above, as JSON (AWS). |
 """
@@ -39,6 +40,7 @@ class Settings:
     github_private_key: str | None = None
     github_webhook_secret: str | None = None
     reviewer_model: str | None = None
+    reviewer_role_arn: str | None = None
     table_name: str | None = None
 
     @classmethod
@@ -68,6 +70,7 @@ class Settings:
             github_private_key=key or None,
             github_webhook_secret=env.get("MIDFLIGHT_GITHUB_WEBHOOK_SECRET") or None,
             reviewer_model=env.get("MIDFLIGHT_REVIEWER_MODEL") or None,
+            reviewer_role_arn=env.get("MIDFLIGHT_REVIEWER_ROLE_ARN") or None,
             table_name=env.get("MIDFLIGHT_TABLE") or None,
         )
 
