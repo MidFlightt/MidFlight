@@ -1,6 +1,6 @@
 # Midflight system architecture
 
-Proposed AWS hackathon architecture · October 6, 2026
+Proposed AWS hackathon architecture · October 6, 2026 · updated October 7 with the simplified baseline (see [design-decisions.md](design-decisions.md#architecture-baseline-october-7-2026))
 
 Midflight coordinates a small team's coding agents: it checks intended work against a shared plan, distributes approved requirement changes, and verifies pushed code. Start with one Python codebase, separate API and worker entry points, and one AI reviewer. This design supports one GitHub repository and 2–4 developers.
 
@@ -11,24 +11,21 @@ flowchart TB
     subgraph LOCAL["Developer and lead computers"]
         direction LR
         Agents["Coding agents"] <--> MCP["Local MCP adapters"]
+        Hooks["pre-push and Claude Code hooks"]
         Dashboard["Streamlit lead dashboard"]
     end
 
     subgraph AWS["AWS backend"]
         API["API Gateway → Lambda<br/>FastAPI + Mangum"]
-        DB[("DynamoDB<br/>Plans · claims · jobs · audit")]
-        Relay["DynamoDB Streams<br/>+ job relay Lambda"]
-        Queue["SQS review queue"]
+        DB[("DynamoDB + Streams<br/>Plans · claims · jobs · audit")]
         Worker["Review worker Lambda<br/>Rules · evidence · decisions"]
-        Reviewer["AgentCore Runtime<br/>Strands reviewer"]
+        Reviewer["Strands reviewer<br/>runs inside the worker"]
         Model["Bedrock language model"]
         Failed["Dead-letter queue<br/>Failed jobs for recovery"]
 
         API <--> DB
-        DB -->|"Committed jobs"| Relay
-        Relay --> Queue
-        Queue --> Worker
-        Queue -->|"Retry limit reached"| Failed
+        DB -->|"Stream: new job items"| Worker
+        Worker -.->|"Retry limit reached"| Failed
         Worker <--> DB
         Worker <-->|"Context / structured findings"| Reviewer
         Reviewer <--> Model
@@ -41,8 +38,9 @@ flowchart TB
     end
 
     MCP <-->|"Authenticated HTTPS"| API
+    Hooks -->|"check_in"| API
     Dashboard <-->|"Authenticated HTTPS"| API
-    Repo -->|"Signed webhooks"| API
+    CI -->|"Signed webhook: workflow_run.completed"| API
     Worker <-->|"Read code / publish checks"| Repo
     CI -->|"Worker retrieves commit-specific results"| Worker
 
@@ -50,13 +48,13 @@ flowchart TB
     classDef service fill:#f0fdf4,stroke:#16a34a,color:#14532d;
     classDef reasoning fill:#faf5ff,stroke:#9333ea,color:#581c87;
     classDef evidence fill:#fff7ed,stroke:#ea580c,color:#7c2d12;
-    class Agents,MCP,Dashboard client;
-    class API,DB,Relay,Queue,Worker,Failed service;
+    class Agents,MCP,Hooks,Dashboard client;
+    class API,DB,Worker,Failed service;
     class Reviewer,Model reasoning;
     class Repo,CI evidence;
 ```
 
-**Reading the diagram:** clients submit requests to the API; durable jobs reach the queue; workers gather evidence and ask the reviewer for findings. Workers validate those findings before updating state or GitHub. The dashboard and agents retrieve results through the API. Secrets, permissions, and monitoring support all backend components and are described below.
+**Reading the diagram:** clients submit requests to the API; the API saves a claim and its job together, and the DynamoDB Stream delivers the new job to the worker; workers gather evidence and ask the reviewer for findings. Workers validate those findings before updating state or GitHub. The dashboard and agents retrieve results through the API. Secrets, permissions, and monitoring support all backend components and are described below.
 
 **2. Technologies and their roles**
 
@@ -66,20 +64,20 @@ flowchart TB
 | **Pydantic** | Defines and validates structured data: claims, plan versions, directives, and model findings. Application rules additionally check permissions, referenced IDs, and evidence. | [Models and validation](https://docs.pydantic.dev/latest/concepts/models/) |
 | **FastAPI** | The backend web framework. Provides endpoints for submitting claims, reading review status, approving plans, and acknowledging directives, plus interactive API documentation. | [Tutorial](https://fastapi.tiangolo.com/tutorial/) |
 | **API Gateway + Lambda + Mangum** | API Gateway is the public HTTPS entrance. Lambda executes request handlers without a permanently running server; Mangum adapts FastAPI to Lambda events. Slow reviews go to workers. | [HTTP APIs](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api.html) · [Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) · [Mangum](https://mangum.fastapiexpert.com/) |
-| **MCP Python SDK** | MCP is the tool interface used by participating coding agents. A local adapter exposes `submit_claim`, `get_task_context`, `get_directives`, and `acknowledge_directive`, then forwards requests to the API. | [Build an MCP server](https://modelcontextprotocol.io/docs/develop/build-server) |
+| **MCP Python SDK** | MCP is the tool interface used by participating coding agents. A local FastMCP adapter exposes `submit_claim` (waits for the verdict), `check_in`, and `acknowledge_directive` (D3), then forwards requests to the API. Every reply carries pending directives. The adapter's instructions tell each agent to plan checkpoints at the critical points of its task and to report its assumptions (D10). | [Build an MCP server](https://modelcontextprotocol.io/docs/develop/build-server) |
 | **DynamoDB + Boto3** | DynamoDB stores authoritative, versioned state. Conditional writes and transactions protect concurrent decisions. Boto3 is the Python SDK used to call AWS services. | [DynamoDB transactions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html) · [Boto3](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html) |
-| **DynamoDB Streams + relay Lambda** | Streams exposes committed database changes. A relay forwards pending jobs to SQS; recoverable job records allow reconciliation if delivery fails. Save the claim and job together to avoid losing accepted work. | [Transactional outbox pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html) |
-| **SQS + worker Lambda** | SQS buffers background jobs. Workers process them with bounded timeouts and retries; a dead-letter queue retains exhausted failures. Processing can repeat, so writes must be safe to retry. | [Lambda with SQS](https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html) |
+| **DynamoDB Streams + worker Lambda** | Streams exposes committed database changes. The worker Lambda is triggered by the stream, filtered to new job items, with batch size 1 and 2 retries. Saving the claim and its job in one write means accepted work can't be lost. | [Transactional outbox pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html) · [Lambda with DynamoDB Streams](https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html) |
+| **SQS dead-letter queue + Powertools** | Jobs that exhaust their retries land in an SQS dead-letter queue for inspection. Powertools for AWS Lambda provides idempotency, so a repeated delivery produces one outcome. | [Powertools idempotency](https://docs.powertools.aws.dev/lambda/python/latest/utilities/idempotency/) |
 | **Strands Agents SDK** | The framework around the reviewer: prompts, model calls, optional bounded tools, and structured outputs. It helps detect semantic incompatibility, such as dollars versus cents across connected claims. | [Strands documentation](https://strandsagents.com/docs/) |
 | **Amazon Bedrock** | Provides access to the language model used by Strands. Select a model available in the team's account/region after comparing conflict detection, latency, and cost on demo examples. | [Supported models](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html) |
-| **AgentCore Runtime** | Hosts the Strands reviewer in AWS. The worker sends bounded review requests and receives findings; durable application state remains in DynamoDB. | [Runtime overview](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html) |
-| **GitHub App + HTTPX** | The App gives Midflight repository permissions: read contents and pull requests, receive events, and write checks. HTTPX makes the backend's GitHub HTTP requests. | [GitHub Apps](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps) · [HTTPX](https://www.python-httpx.org/) |
+| **AgentCore Runtime (not used)** | An AWS service for hosting agent code. Decided October 7: the hackathon does not require it, so the Strands reviewer runs inside the worker Lambda. It stays behind a `Reviewer` interface and could move here later. | [Runtime overview](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html) |
+| **GitHub App + githubkit** | The App gives Midflight repository permissions: read contents, pull requests, and Actions results, receive events, and write checks. githubkit is the typed Python client that handles App authentication. | [GitHub Apps](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps) · [githubkit](https://github.com/yanyongyu/githubkit) |
 | **pytest + GitHub Actions** | pytest tests Midflight's rules and the demo's interface behavior. Actions executes trusted contract tests against the reviewed commit in isolated CI; the worker retrieves their results. | [pytest](https://docs.pytest.org/en/stable/) · [Actions security](https://docs.github.com/en/actions/reference/security/secure-use) |
 | **Streamlit** | A Python dashboard for the lead: plans, claims, conflicts, resolutions, directives, and verification status. Run its server on the lead's laptop for the first demo. | [Streamlit architecture](https://docs.streamlit.io/develop/concepts/architecture/architecture) |
-| **AWS SAM** | Describes supporting infrastructure as code and deploys the API, queues, database, and Lambdas reproducibly. Deploy the reviewer using AgentCore tooling. | [SAM introduction](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) |
+| **AWS SAM** | Describes supporting infrastructure as code and deploys the API, queues, database, and Lambdas reproducibly, including the worker that runs the reviewer. | [SAM introduction](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) |
 | **IAM · Secrets Manager · CloudWatch** | IAM limits each service's AWS permissions. Secrets Manager stores GitHub credentials and webhook secrets. CloudWatch records failures, latency, and usage to help debug and control costs. | [IAM](https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html) · [Secrets](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html) · [Monitoring](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html) |
 
-**Remember:** Bedrock supplies the model; Strands organizes the review; AgentCore hosts it; MCP connects the developers' agents to Midflight.
+**Remember:** Bedrock supplies the model; Strands organizes the review inside the worker; MCP connects the developers' agents to Midflight.
 
 **3. A claim review, step by step**
 
@@ -89,7 +87,7 @@ sequenceDiagram
     participant A as Coding agent + MCP
     participant API as Midflight API
     participant DB as DynamoDB
-    participant Q as Queue via job relay
+    participant Q as DynamoDB Stream
     participant W as Worker
     participant AI as AI reviewer
 
@@ -97,17 +95,17 @@ sequenceDiagram
     API->>API: Authenticate and validate references
     API->>DB: Save pending claim + job atomically
     API-->>A: Claim ID + job ID
-    DB-->>Q: Relay committed job
-    Q->>W: Deliver review job
+    DB-->>Q: New job item on the stream
+    Q->>W: Trigger worker with new job
     W->>DB: Read plan and active claim snapshot
     W->>W: Check explicit rules and contracts
     W->>AI: Ask about semantic compatibility
     AI-->>W: Structured findings with evidence
     W->>W: Validate findings and references
     W->>DB: Save decision only if snapshot is current
-    A->>API: Retrieve task context and review status
-    API->>DB: Read current result
-    API-->>A: Approved, revise, or human review required
+    A->>API: Adapter polls the job every 2 s (up to 60 s)
+    API->>DB: Read job result
+    API-->>A: approved, needs_revision, or human_review_required, in the same submit_claim call
 ```
 
 A backend claim returning integer `total_cents` and a frontend claim expecting decimal `total` may touch different files yet conflict. Explicit contracts enable deterministic checks; the model helps interpret assumptions and explain mismatches. Shared file access alone requests attention rather than automatically rejecting work.
@@ -130,7 +128,7 @@ flowchart TD
     Fix --> Checkpoint
 ```
 
-Acknowledgment means an update was received. Verification establishes whether the implementation follows it. MCP relies on agents checking before implementation, between meaningful steps, and before pushing.
+Acknowledgment means an update was received. Verification establishes whether the implementation follows it. MCP relies on agents checking in before implementation, at the checkpoints they plan at the critical points of their task (D10), and before pushing.
 
 GitHub webhooks must be signature-validated and recorded durably before acknowledgment. Publish `midflight/verify` for the reviewed commit, and configure it as a required check. Read [webhook handling](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks), [signature validation](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries), and [check runs](https://docs.github.com/en/rest/checks/runs).
 
@@ -145,8 +143,8 @@ GitHub webhooks must be signature-validated and recorded durably before acknowle
 
 **6. Reading and building order**
 
-Read **FastAPI/Pydantic → MCP → Strands/Bedrock → DynamoDB transactions/SQS → GitHub webhooks/checks → AgentCore/SAM**. Use the links above for focused tutorials rather than studying every service feature.
+Read **FastAPI/Pydantic → MCP → Strands/Bedrock → DynamoDB transactions/Streams → GitHub webhooks/checks → SAM**. Use the links above for focused tutorials rather than studying every service feature.
 
-Build the first complete path locally: two agent sessions submit incompatible claims, Midflight explains the conflict, and a revised claim passes. Then add durable state and deployment, approved-plan changes, and GitHub verification. Keep the reviewer interface replaceable so the same review logic runs locally and on AgentCore.
+Build the first complete path locally: two agent sessions submit incompatible claims, Midflight explains the conflict, and a revised claim passes. Then add durable state and deployment, approved-plan changes, and GitHub verification. Keep the reviewer interface replaceable so the same review logic runs locally and in the worker Lambda.
 
-Before implementation, confirm the two coding-agent hosts, AWS region/model access, and canonical demo contract. The existing notes also need one policy for incomplete claims: a useful starting proposal is to allow drafts but require explicit dependencies and acceptance criteria before approval.
+Decisions D1–D15 in [design-decisions.md](design-decisions.md) settle the agent hosts, the canonical demo change, the trigger, and the incomplete-claim policy. Ports, fakes, and the code layout are in [AGENTS.md](../AGENTS.md#ownership) and [domain.md](domain.md#ports).

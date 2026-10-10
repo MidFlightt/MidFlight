@@ -1,10 +1,24 @@
 # Midflight — Project Requirements
 
-Version: 0.1<br/>
-Status: Draft for team review<br/>
+Version: 0.2<br/>
+Status: Draft for team review. Updated October 7 with decisions D1–D15.<br/>
 Created: October 6, 2026<br/>
 Team: Team Yoga<br/>
 Project lead: Somesh Agrawal
+
+## How to use this document
+
+- **Coding agents:** don't read this end to end. Find your task's use cases in
+  [development-plan.md](development-plan.md), then look up the FR and NFR IDs those
+  use cases cite. [§14](#14-traceability) maps every requirement to its use cases
+  and tasks.
+- Each requirement has a stable ID (`FR-04`, `NFR-03`). Cite IDs in tests, PRs, and
+  findings.
+- Acceptance checkboxes are gates for the finished MVP, not a record of what works
+  today.
+- Exact names (states, tools, check names) are in [domain.md](domain.md). Decisions
+  that changed this document are in [design-decisions.md](design-decisions.md).
+- Everything in §5 and §6 is P0: required for the demo, not optional.
 
 ## 1. Product purpose
 
@@ -79,9 +93,9 @@ Acceptance criteria:
 - Require a claim before a participating agent begins implementation.
 - Capture task ID, agent ID, developer, branch, base commit SHA, plan version, requirement IDs, intended files, provided interfaces, consumed interfaces, and acceptance criteria.
 - Validate required fields and references before reviewing a claim.
-- Allow agents to revise or withdraw their claims and explicitly close completed work.
+- Allow agents to revise or withdraw their claims and explicitly close completed work (`status: closed`, D11).
 - Retain claim revision history.
-- Track `pending`, `approved`, `needs_revision`, `human_review_required`, `withdrawn`, and `closed` states.
+- Track `draft`, `pending`, `approved`, `needs_revision`, `human_review_required`, `withdrawn`, and `closed` states. An incomplete claim is saved as `draft` and cannot be approved until its interfaces (or an explicit `no_interfaces: true`) and acceptance criteria exist (D5, D12).
 
 Acceptance criteria:
 - [ ] A valid submission receives a stable claim ID and a review job ID.
@@ -125,7 +139,7 @@ Acceptance criteria:
 - Create a directive for each affected task with a stable ID and recipient.
 - Include the source plan version, changed requirement IDs, reason, requested adjustment, and relevant evidence.
 - Deliver directives as structured data; never execute directive text as commands.
-- Track `pending`, `acknowledged`, `rejected`, `needs_clarification`, and `superseded` delivery states.
+- Track `queued`, `delivered`, `acknowledged`, `rejected`, `needs_clarification`, and `superseded` delivery states.
 - Record the receiving agent's response.
 - Supersede directives made obsolete by later approved changes.
 - Distinguish acknowledgment from proof that the code has been corrected.
@@ -138,15 +152,19 @@ Acceptance criteria:
 
 ### FR-07 — Integrate with coding agents through checkpoints
 
-- Provide a local MCP adapter exposing `submit_claim`, `get_task_context`, `get_directives`, and `acknowledge_directive`.
-- Let clients retrieve asynchronous review status without resubmitting the claim.
-- Document that participating agents must check before implementation, between meaningful work steps, and before pushing.
+- Provide a local MCP adapter exposing `submit_claim`, `check_in`, and `acknowledge_directive` (D3).
+- `submit_claim` waits up to 60 seconds and returns the verdict in the same call. A longer review returns `pending` with a job ID, and the verdict arrives with the next `check_in`, without resubmitting the claim.
+- Every tool reply carries the task's unacknowledged directives.
+- Provide a git pre-push hook that refuses a push while a blocking directive is unacknowledged or the claim is not approved for the current plan version, and a Claude Code hook that runs `check_in` automatically.
+- Deliver checkpoint rules to the agent through the MCP adapter's server instructions and tool descriptions (D10): list assumptions in the claim; plan checkpoints at the critical points of the task (before implementation, before building on a contract or shared interface, when an assumption or the scope changes, before pushing); call `check_in` at each; submit a revised claim when an assumption or the scope changes and wait for the verdict.
 - Return current plan context and unresolved directives at checkpoints.
 - Demonstrate the integration with at least two actual coding-agent sessions.
 
 Acceptance criteria:
 - [ ] Both agent sessions can submit claims and retrieve review results.
 - [ ] A plan change becomes visible at an affected agent's next checkpoint.
+- [ ] An agent given only the adapter's instructions lists its assumptions in the claim and checks in at a critical point before pushing.
+- [ ] An assumption added mid-task reaches Midflight as a revised claim and gets a verdict before the agent builds on it.
 - [ ] An agent with unresolved blocking findings is instructed to pause or revise its work.
 - [ ] The interface states that acknowledgment does not equal completed implementation.
 
@@ -155,7 +173,7 @@ Constraint: The MVP relies on agent cooperation at checkpoints. It does not guar
 ### FR-08 — Integrate with GitHub
 
 - Use a GitHub App to read repository content and pull requests and write check runs.
-- Receive authenticated GitHub webhook events for relevant pull-request and branch changes.
+- Receive authenticated GitHub webhook events. Verification starts on `workflow_run.completed` for the contract-test workflow, so test evidence exists for the commit (D4).
 - Validate webhook signatures before accepting events.
 - Persist or enqueue accepted events before acknowledging successful receipt.
 - Fetch current GitHub state rather than assuming webhook arrival order is authoritative.
@@ -268,21 +286,21 @@ The approved plan and durable application state are authoritative. Agent convers
 
 ## 8. Proposed implementation stack
 
-These choices come from the initial development plan and can change without changing the product requirements.
+These choices come from the [development plan](development-plan.md#architecture-baseline) and can change without changing the product requirements.
 
 | Area | Initial choice |
 | --- | --- |
 | Language and validation | Python 3.12, Pydantic, uv |
-| Coordinating agent | Strands Agents SDK with a configurable Bedrock model; initial candidate: Claude Sonnet 4.5 |
-| Agent hosting | Amazon Bedrock AgentCore Runtime |
+| Coordinating agent | Strands Agents SDK with a configurable Bedrock model (`MIDFLIGHT_BEDROCK_MODEL_ID`); candidates are the current Claude Sonnet and Haiku models, chosen from S-8 eval results |
+| Agent hosting | Runs inside the worker Lambda (AgentCore Runtime not required; D1) |
 | API | FastAPI and Mangum on Lambda behind API Gateway HTTP API |
 | Persistent state | DynamoDB through Boto3 |
-| Background processing | SQS, worker Lambda, dead-letter queue |
-| GitHub | GitHub App, REST API, HTTPX |
-| Agent adapter | Official MCP Python SDK, local stdio transport |
+| Background processing | DynamoDB Streams trigger the worker Lambda; SQS dead-letter queue; Powertools idempotency |
+| GitHub | GitHub App through githubkit |
+| Agent adapter | Official MCP Python SDK (FastMCP), local stdio transport, plus git and Claude Code hooks |
 | Dashboard | Streamlit; local hosting is acceptable for the hackathon demo |
 | Tests and CI | pytest, GitHub Actions |
-| Deployment and operations | AWS SAM for supporting infrastructure, AgentCore deployment tooling, Secrets Manager, CloudWatch |
+| Deployment and operations | AWS SAM, Secrets Manager, CloudWatch |
 
 ## 9. Proposed enhancements — P1
 
@@ -348,13 +366,45 @@ Measure detection results, unnecessary blocks, review latency, acknowledgment st
 - [ ] The demo uses synthetic project data and no real user data.
 - [ ] A repeatable demo script and backup recording are ready.
 
-## 13. Decisions still to confirm
+## 13. Decisions
 
-- Team name, lead, and member ownership.
-- The two coding-agent environments used for the demonstration.
-- Demo repository and AWS account/region, including model access.
-- Concrete API authentication mechanism for the MVP.
-- Final approved demo contracts and acceptance tests.
-- Input size limits, retry limits, and review timeout settings.
-- Whether submission requires a publicly hosted dashboard.
-- The official October 11 submission cutoff; plan to finish on October 10 until clarified.
+Settled and open decisions live in [design-decisions.md](design-decisions.md).
+As of October 7: team and ownership are in [development-plan.md](development-plan.md);
+the demo uses two Claude Code sessions (D6) and the `currency` change (D2); the MVP
+uses hashed, revocable bearer tokens per participant (UC-01); REST paths are fixed in
+[domain.md](domain.md#rest-api) (D15). The AWS region (D7),
+video rules (D9), limits and timeouts, hosted dashboard, and the official cutoff are
+still open.
+
+## 14. Traceability
+
+Use this table to find what implements a requirement and where it is tested. Task
+IDs are from [development-plan.md](development-plan.md); use cases are in
+[use-cases.md](use-cases.md); invariants are in [domain.md](domain.md#invariants).
+
+| Requirement | Use cases | Tasks | Invariants |
+| --- | --- | --- | --- |
+| FR-01 Project and participants | UC-01 | M-2, S-1 | INV-08, INV-12 |
+| FR-02 Versioned plan | UC-03 | S-1, S-6, M-2 | INV-04 |
+| FR-03 Claims | UC-04, UC-06 | S-3, M-2, M-3 | — |
+| FR-04 Claim checks | UC-04, UC-05, UC-12 | S-2, S-3, S-5, S-8 | INV-01, INV-02, INV-14 |
+| FR-05 Affected tasks | UC-08, UC-12 | S-6 | INV-11 |
+| FR-06 Directives | UC-07, UC-08, UC-09 | S-6, M-3, M-4 | INV-05, INV-10 |
+| FR-07 Agent checkpoints | UC-02, UC-07, UC-09, UC-16 | M-3, M-4, F-3 | INV-07 |
+| FR-08 GitHub integration | UC-10, UC-15 | M-6, M-7 | INV-03, INV-06 |
+| FR-09 Verification | UC-10, UC-11, UC-12 | S-10, M-6, F-2 | INV-03, INV-04, INV-15 |
+| FR-10 Escalation | UC-03, UC-12, UC-13 | S-7 | INV-11 |
+| FR-11 Dashboard | UC-14 | S-9 | — |
+| FR-12 Audit trail | UC-13, UC-14 | S-3, S-6, S-7, S-9 | INV-13 |
+| NFR-01 Async reviews | UC-04 | M-3, M-5 | — |
+| NFR-02 Safe retries | UC-05, UC-08 | S-3, S-6, M-5 | INV-05, INV-06 |
+| NFR-03 Concurrent updates | UC-05 | S-3, M-5 | INV-02 |
+| NFR-04 GitHub errors | UC-15 | M-7 | INV-09 |
+| NFR-05 Bounded work | UC-05 | S-5, M-5 | — |
+| NFR-06 Failed jobs visible | UC-14, UC-15 | M-5, S-9 | — |
+| NFR-07 Authorization | UC-01 | M-2 | INV-08 |
+| NFR-08 Untrusted content | UC-10 | S-5, S-10, S-8 | INV-07 |
+| NFR-09 Credentials | UC-01 | M-2, M-5, M-6 | INV-12 |
+| NFR-10 Trustworthy evidence | UC-10 | F-2, M-6, S-10 | INV-15 |
+| NFR-11 Reproducible deploy | — | M-1, M-5 | — |
+| NFR-12 Behavior and cost | UC-14 | M-5, S-8 | — |

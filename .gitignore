@@ -9,3 +9,16 @@ __pycache__/
 .pytest_cache/
 node_modules/
 .DS_Store
+
+# Tooling caches and build output
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.aws-sam/
+dist/
+build/
+*.egg-info/
+
+# Personal learning notes (VibeWise)
+.vibe-wise/

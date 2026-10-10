@@ -1,10 +1,16 @@
 # Midflight: shared vocabulary and coordination workflows
 
+> **Archived October 7, 2026.** Background reading only. Its vocabulary now lives in
+> [domain.md](../domain.md), and its agent rules in [AGENTS.md](../../AGENTS.md). It
+> uses Alice/Bob and a subtotal/tax change; the canonical demo is T1/T2/T3 and the
+> `currency` change (decision D2). Where this file disagrees with the current docs,
+> the current docs win.
+
 Version: 1.1 | October 6, 2026 | Design reference, not implemented functionality
 
-This document describes the brainstormed coordination service and complements the [open design decisions](design-decisions.md) and [proposed system architecture](../systemarchitecture.md). It does not amend the [draft project requirements](../PROJECT_REQUIREMENTS.md); the documents illustrate different proposed requirement-change examples until the team selects one. The diagrams assume a GitHub-connected project and participating coding agents that consult Midflight at supported checkpoints.
+This document describes the brainstormed coordination service and complements the [open design decisions](../design-decisions.md) and [proposed system architecture](../architecture.md). It does not amend the [draft project requirements](../requirements.md); the documents illustrate different proposed requirement-change examples until the team selects one. The diagrams assume a GitHub-connected project and participating coding agents that consult Midflight at supported checkpoints.
 
-The current prototype only compares declared overlap and asks for clarification; it does not implement the approvals, semantic checks, propagation, or verification below. Claims can begin broad and be refined when dependencies emerge. The detailed checkout claims illustrate a shared interface after discovery, not a requirement to enumerate every implementation detail upfront. See the [README](../README.md) for current capabilities.
+The current prototype only compares declared overlap and asks for clarification; it does not implement the approvals, semantic checks, propagation, or verification below. Claims can begin broad and be refined when dependencies emerge. The detailed checkout claims illustrate a shared interface after discovery, not a requirement to enumerate every implementation detail upfront. See the [README](../../README.md) for current capabilities.
 
 ## Shared vocabulary
 

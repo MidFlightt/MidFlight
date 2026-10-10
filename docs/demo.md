@@ -1,32 +1,44 @@
 # Hackathon demo
 
-Use a synthetic repository with two coding agents and a human integration lead.
-Demonstrate a coherent Claim → Check → Propagate → Verify workflow.
+> Frederik rewrites the demo sequence below in task F-1, starting from the
+> [storyboard draft](development-plan.md#demo-storyboard). The full scenario list
+> with expected results is [requirements §11](requirements.md#11-required-demonstration-and-evaluation),
+> traced to use cases in [use-cases.md](use-cases.md#demo-traceability).
+
+Use the synthetic checkout project (`midflight-demo-shop`), two Claude Code sessions
+(T1 backend, T2 frontend), and a human integration lead. Demonstrate a coherent
+Claim → Check → Propagate → Verify workflow.
 
 ## Acceptance scenarios
 
+The headline scenarios. Requirements §11 has the full list.
+
 | Scenario | Expected evidence |
 | --- | --- |
-| Two compatible claims | Both can proceed; decisions cite the plan and relevant claims. |
-| Incompatible interface changes | Objection is raised before coding; human resolution is requested. |
-| Requirement changes while work is active | Only affected tasks receive scoped suggestions; each has a logged reason. |
-| Agent says done but diff breaks its contract | Actual diff overrides the completion statement; GitHub alignment status blocks. |
-| Diff matches the agreed contract | GitHub alignment status passes with an explanation tied to that commit. |
-| GitHub rate limit or API error | Affected state is visibly stale; no directives are emitted until refreshed. |
-| Repository content includes malicious instructions | Content remains data and does not cause command execution or widen tool access. |
+| Two compatible claims | Both approved; the verdict cites the plan and the contract. |
+| T2 expects `total`, the contract has `total_cents` | `needs_revision` before coding, with the correction in the same call. The agent revises and is approved. |
+| T2 wants a tax-inclusive total, T1 returns tax-exclusive | A conflict between people's requirements. Escalated to the lead, who resolves it; the audit trail records why. |
+| Lead adds `currency` while work is active | Only T1 and T2 get directives, each with a logged reason. T3 gets nothing. |
+| Agent says done but the diff breaks its contract | The diff overrides the completion message; `midflight/verify` fails and blocks merge. |
+| Diff matches the agreed contract | `midflight/verify` passes, tied to that commit and plan version. |
+| GitHub rate limit or API error (labeled `SIMULATED`) | State is visibly stale; no directives or passes until data is fresh. |
+| Repository content includes instructions aimed at the AI | Treated as data; nothing runs and no permission changes. |
 
 ## Demo sequence
 
-1. Show the shared plan and two claims.
-2. Trigger an interface disagreement and show the escalation.
-3. Resolve it as a human, then change a requirement and inspect suggestions.
-4. Push a deliberately mismatched implementation and show the blocked status.
-5. Push the corrected implementation and show the passing status.
-6. Simulate a GitHub failure and show stale state suppressing suggestions.
+1. Show plan v1 and the two claims.
+2. T2 claims `total`; Midflight answers `needs_revision` with the `total_cents`
+   correction in the same call; the agent revises and is approved.
+3. The lead approves plan v2 (`currency`); the directive reaches T1 and T2 at their
+   next step, T3 stays quiet, and the pre-push hook blocks until it is acknowledged.
+4. T1's agent says "done" but pushes the wrong field; `midflight/verify` fails with
+   evidence.
+5. Push the fix; the check passes and the timeline explains every step.
+6. Quick cuts: an escalation resolved by the lead, the stale banner during a
+   simulated rate limit, injected instructions ignored.
 
-The local claim prototype includes synthetic examples and tests for overlap,
-independent declarations, refinements, and missing information. It implements
-clarification questions, not the full acceptance scenarios above. Shared-plan
-checks, model reasoning, GitHub integration, and AWS runtime remain unimplemented.
-A convincing demo must distinguish simulated failures from live API behavior
-and must not equate file overlap with semantic incompatibility.
+The local claim prototype (`midflight/claims.py`) only compares declared files and
+interface names. Shared-plan checks, model reasoning, GitHub integration, and AWS
+runtime are not implemented yet. A convincing demo must distinguish simulated
+failures from live API behavior and must not equate file overlap with semantic
+incompatibility.
