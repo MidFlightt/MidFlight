@@ -4,6 +4,9 @@
 runner. `run_review` is the job handler: rules first, then the AI reviewer, then a
 pure decision, saved only if the project's coord_rev hasn't moved since the review
 read it (INV-02). If it moved, the review reruns from a fresh read.
+
+A conflict between people's requirements opens an escalation for the lead in the same
+commit (UC-12); `midflight.services.escalations` resolves it (UC-13).
 """
 
 from __future__ import annotations
@@ -19,8 +22,14 @@ from midflight.domain.models import (
     ClaimState,
     Contract,
     Directive,
+    Entity,
+    Escalation,
+    EscalationState,
+    Evidence,
+    EvidenceKind,
     Finding,
     FindingKind,
+    FindingSeverity,
     Id,
     InterfaceUse,
     Job,
@@ -30,6 +39,7 @@ from midflight.domain.models import (
     Participant,
     Plan,
     Project,
+    Resolution,
     Role,
     Sha,
     SyncState,
@@ -38,6 +48,7 @@ from midflight.domain.models import (
 )
 from midflight.domain.rules import check_claim, has_blocking, stale_plan, unknown_references
 from midflight.domain.states import (
+    CLAIM_TRANSITIONS,
     OPEN_DIRECTIVE_STATES,
     IllegalTransition,
     check_claim_transition,
@@ -306,11 +317,17 @@ class ClaimService:
             findings = check_claim(claim, plan, others)
             if claim.is_complete and not has_blocking(findings):
                 findings += self._reviewer_findings(claim, plan, others, findings)
+                findings = self._set_aside_dismissed(project, claim, findings)
             target = decide_claim(claim, findings, stale=project.sync_state is SyncState.STALE)
             if target is not claim.state:
                 check_claim_transition(claim.state, target)
             reviewed = Claim.model_validate(
                 claim.model_dump() | {"state": target, "findings": findings}
+            )
+            escalated = (
+                self._escalation(project, plan, claim, findings, others)
+                if target is ClaimState.HUMAN_REVIEW_REQUIRED
+                else []
             )
             incomplete = any(f.kind is FindingKind.REVIEWER_UNAVAILABLE for f in findings)
             done = job.model_copy(
@@ -331,7 +348,7 @@ class ClaimService:
                 project_id=project.id,
                 actor="midflight",
                 action="claim.reviewed",
-                entity_ids=[claim_id, job.id],
+                entity_ids=[claim_id, job.id, *(e.id for e in escalated)],
                 reason=f"{target}: {blocking} blocking, {len(findings) - blocking} info",
                 correlation_id=job.correlation_id,
                 idempotency_key=f"review:{job.id}",
@@ -346,7 +363,7 @@ class ClaimService:
                     Commit(
                         project_id=project.id,
                         idempotency_key=f"review:{job.id}",
-                        puts=[reviewed, done],
+                        puts=[reviewed, done, *escalated],
                         audit=[event],
                         expected_coord_rev=project.coord_rev,
                         bump_coord_rev=True,
@@ -385,6 +402,90 @@ class ClaimService:
                 return parsed
             reason = "the reply didn't match the findings schema or cited unknown ids"
         return [reviewer_unavailable(claim, reason)]
+
+    def _escalation(
+        self,
+        project: Project,
+        plan: Plan,
+        claim: Claim,
+        findings: Sequence[Finding],
+        others: Sequence[Claim],
+    ) -> list[Entity]:
+        """An escalation for the lead, plus the other claims it involves (UC-12).
+
+        Nothing new if an escalation for this claim is already open.
+        """
+        conflicts = [
+            f for f in findings if f.blocking and f.kind is FindingKind.REQUIREMENT_CONFLICT
+        ]
+        already_open = any(
+            e.state is EscalationState.OPEN and claim.id in e.claim_ids
+            for e in self._store.list_escalations(project.id)
+        )
+        if not conflicts or already_open:
+            return []
+        cited = {i for f in conflicts for i in f.affected_ids}
+        involved = [claim, *(o for o in others if o.id in cited and o.id != claim.id)]
+        escalation = Escalation(
+            id=self._store.next_id(project.id, "E"),
+            project_id=project.id,
+            competing_requirement_ids=sorted(i for i in cited if plan.requirement(i)),
+            claim_ids=[c.id for c in involved],
+            finding_ids=[f.id for f in conflicts],
+            evidence=[
+                *(e for f in conflicts for e in f.evidence),
+                *(
+                    Evidence(
+                        kind=EvidenceKind.CLAIM,
+                        ref=f"{c.id} rev {c.revision} ({c.task_id})",
+                        excerpt="Assumes: " + "; ".join(c.assumptions)[:480],
+                    )
+                    for c in involved
+                    if c.assumptions
+                ),
+            ],
+            explanation=" ".join(f.explanation for f in conflicts),
+            created_at=self._clock.now(),
+        )
+        # The other side's claims wait for the lead too (D14).
+        waiting = ClaimState.HUMAN_REVIEW_REQUIRED
+        moved = [
+            move_claim(c, waiting) for c in involved[1:] if waiting in CLAIM_TRANSITIONS[c.state]
+        ]
+        return [escalation, *moved]
+
+    def _set_aside_dismissed(
+        self, project: Project, claim: Claim, findings: list[Finding]
+    ) -> list[Finding]:
+        """Keep a conflict the lead dismissed as `info`, so it no longer blocks (UC-13).
+
+        Applies to claim revisions written before the lead decided; a later revision gets
+        a fresh review.
+        """
+        dismissed = [
+            e
+            for e in self._store.list_escalations(project.id)
+            if e.resolution is Resolution.DISMISS
+            and claim.id in e.claim_ids
+            and e.resolved_at is not None
+            and claim.created_at <= e.resolved_at
+        ]
+        if not dismissed:
+            return findings
+        note = "; ".join(f"{e.id}: {e.reason}" for e in dismissed)
+        return [
+            Finding.model_validate(
+                f.model_dump()
+                | {
+                    "severity": FindingSeverity.INFO,
+                    "explanation": f"{f.explanation} (Set aside: the lead dismissed this "
+                    f"conflict, {note})",
+                }
+            )
+            if f.kind is FindingKind.REQUIREMENT_CONFLICT and f.blocking
+            else f
+            for f in findings
+        ]
 
     def _close_job(self, job: Job, project: Project, state: JobState, note: str) -> None:
         done = job.model_copy(

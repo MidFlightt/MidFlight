@@ -21,6 +21,7 @@ from midflight.domain.models import (
     JobState,
     Model,
     Participant,
+    Resolution,
     Role,
     Text,
 )
@@ -29,6 +30,7 @@ from midflight.services.check_in import CheckInService
 from midflight.services.claims import ClaimService, ClaimSubmission, parse_review_subject
 from midflight.services.directives import ACK_NOTE, DirectiveService
 from midflight.services.errors import NotFound, PermissionDenied, ServiceError
+from midflight.services.escalations import EscalationService
 from midflight.services.participants import ParticipantService
 from midflight.services.plans import PlanDraft, PlanService
 
@@ -43,6 +45,7 @@ class Services:
     participants: ParticipantService
     check_ins: CheckInService
     directives: DirectiveService
+    escalations: EscalationService
 
 
 def build_services(
@@ -67,6 +70,7 @@ def build_services(
         participants=ParticipantService(store, clock),
         check_ins=CheckInService(store, clock, claims),
         directives=DirectiveService(store, clock),
+        escalations=EscalationService(store, clock, runner),
     )
 
 
@@ -95,6 +99,11 @@ class CheckInRequest(Model):
 class AckRequest(Model):
     response: DirectiveResponse
     note: str | None = None
+
+
+class ResolveRequest(Model):
+    resolution: Resolution
+    reason: Text
 
 
 # App -----------------------------------------------------------------------------------
@@ -254,6 +263,14 @@ def create_app(services: Services, lifespan: Any = None) -> FastAPI:
     def acknowledge(directive_id: str, body: AckRequest, actor: Caller) -> dict[str, Any]:
         answered = services.directives.acknowledge(actor, directive_id, body.response, body.note)
         return {"directive": dump(answered), "note": ACK_NOTE}
+
+    # Escalations (UC-13)
+
+    @app.post("/escalations/{escalation_id}/resolve")
+    def resolve_escalation(escalation_id: str, body: ResolveRequest, actor: Caller) -> Any:
+        return dump(
+            services.escalations.resolve(actor, escalation_id, body.resolution, body.reason)
+        )
 
     # Dashboard and audit (UC-14)
 

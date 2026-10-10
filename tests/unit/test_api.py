@@ -388,3 +388,9 @@ def test_local_tokens_stay_the_same_across_restarts(tmp_path: Path) -> None:
     first = demo.local_tokens(path)
     assert set(first) == {pid for pid, *_ in demo.PEOPLE}
     assert demo.local_tokens(path) == first
+
+
+def test_only_the_lead_resolves_escalations(client: TestClient) -> None:
+    body = {"resolution": "dismiss", "reason": "mine wins"}
+    assert client.post("/escalations/E-1/resolve", json=body, headers=T2).status_code == 403
+    assert client.post("/escalations/E-1/resolve", json=body, headers=LEAD).status_code == 404
