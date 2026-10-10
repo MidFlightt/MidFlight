@@ -110,8 +110,9 @@ midflight/
     domain/rules.py                     S  contract fields, references, file overlap, verify rules
     domain/impact.py                    S  plan diff, affected tasks
     domain/states.py                    S  allowed state transitions
+    domain/decide.py                    S  findings to claim verdict
     ports.py                            S  Store, JobRunner, Reviewer, GitHub, Clock protocols
-    services/                           S  claims.py, plans.py, directives.py, escalations.py, verify.py
+    services/                           S  claims.py, review.py, audit.py, errors.py, plans.py, directives.py, escalations.py, verify.py
     adapters/memory_store.py            S
     adapters/fake_reviewer.py           S
     adapters/bedrock_reviewer.py        S

@@ -283,59 +283,6 @@ class Plan(Model):
 # Claims and findings -------------------------------------------------------------------
 
 
-class InterfaceUse(Model):
-    """One contract a claim provides or consumes, with the fields and types it expects."""
-
-    contract_id: Id
-    fields: dict[Text, FieldType] = Field(min_length=1)
-
-
-class Claim(Model):
-    """One revision of an agent's declaration of intent. Revised, never edited in place."""
-
-    id: Id
-    revision: Version
-    project_id: Id
-    task_id: Id
-    agent_id: Id
-    branch: Text
-    base_sha: Sha
-    plan_version: Version
-    state: ClaimState
-    requirement_ids: list[Id] = []
-    files: list[Text] = []
-    provides: list[InterfaceUse] = []
-    consumes: list[InterfaceUse] = []
-    no_interfaces: bool = False
-    assumptions: list[Text] = []
-    acceptance_criteria: list[Text] = []
-    reason: str | None = None
-    created_at: AwareDatetime
-
-    @model_validator(mode="after")
-    def _interfaces_are_consistent(self) -> Self:
-        if self.no_interfaces and (self.provides or self.consumes):
-            raise ValueError("no_interfaces is true, but the claim lists provides or consumes")
-        for side, uses in (("provides", self.provides), ("consumes", self.consumes)):
-            ids = [use.contract_id for use in uses]
-            if len(ids) != len(set(ids)):
-                raise ValueError(f"{side} lists the same contract twice")
-        return self
-
-    def missing_details(self) -> list[str]:
-        """What keeps this claim in `draft` (D5, D12). Empty means complete."""
-        missing = []
-        if not (self.provides or self.consumes or self.no_interfaces):
-            missing.append("interfaces: list provides/consumes, or set no_interfaces: true")
-        if not self.acceptance_criteria:
-            missing.append("acceptance_criteria: at least one")
-        return missing
-
-    @property
-    def is_complete(self) -> bool:
-        return not self.missing_details()
-
-
 class Evidence(Model):
     kind: EvidenceKind
     ref: Text
@@ -363,6 +310,64 @@ class Finding(Model):
     @property
     def blocking(self) -> bool:
         return self.severity is FindingSeverity.BLOCKING
+
+
+class InterfaceUse(Model):
+    """One contract a claim provides or consumes, with the fields and types it expects."""
+
+    contract_id: Id
+    fields: dict[Text, FieldType] = Field(min_length=1)
+
+
+class Claim(Model):
+    """One revision of an agent's declaration of intent. Revised, never edited in place.
+
+    `state` and `findings` together are the revision's verdict. Only they change after
+    the revision is saved; everything the agent declared stays as submitted.
+    """
+
+    id: Id
+    revision: Version
+    project_id: Id
+    task_id: Id
+    agent_id: Id
+    branch: Text
+    base_sha: Sha
+    plan_version: Version
+    state: ClaimState
+    requirement_ids: list[Id] = []
+    files: list[Text] = []
+    provides: list[InterfaceUse] = []
+    consumes: list[InterfaceUse] = []
+    no_interfaces: bool = False
+    assumptions: list[Text] = []
+    acceptance_criteria: list[Text] = []
+    reason: str | None = None
+    findings: list[Finding] = []
+    created_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def _interfaces_are_consistent(self) -> Self:
+        if self.no_interfaces and (self.provides or self.consumes):
+            raise ValueError("no_interfaces is true, but the claim lists provides or consumes")
+        for side, uses in (("provides", self.provides), ("consumes", self.consumes)):
+            ids = [use.contract_id for use in uses]
+            if len(ids) != len(set(ids)):
+                raise ValueError(f"{side} lists the same contract twice")
+        return self
+
+    def missing_details(self) -> list[str]:
+        """What keeps this claim in `draft` (D5, D12). Empty means complete."""
+        missing = []
+        if not (self.provides or self.consumes or self.no_interfaces):
+            missing.append("interfaces: list provides/consumes, or set no_interfaces: true")
+        if not self.acceptance_criteria:
+            missing.append("acceptance_criteria: at least one")
+        return missing
+
+    @property
+    def is_complete(self) -> bool:
+        return not self.missing_details()
 
 
 # Directives and escalations ------------------------------------------------------------

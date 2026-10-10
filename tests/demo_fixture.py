@@ -7,6 +7,7 @@ adds `currency: string`.
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from typing import Any
 
@@ -16,11 +17,16 @@ from midflight.domain.models import (
     Contract,
     FieldType,
     InterfaceUse,
+    Participant,
     Plan,
     PlanStatus,
+    Project,
     Requirement,
+    Role,
     Task,
 )
+from midflight.ports import Commit, Store
+from midflight.services.claims import ClaimSubmission
 
 NOW = datetime(2026, 10, 8, 12, 0, tzinfo=UTC)
 PROJECT = "demo"
@@ -43,18 +49,18 @@ def make_plan(version: int = 1) -> Plan:
             Task(
                 id="T1",
                 title="Checkout API",
-                owner="p-somesh",
+                owner="p-t1",
                 requirement_ids=["R-1"],
                 provides=["checkout-response"],
             ),
             Task(
                 id="T2",
                 title="Checkout page",
-                owner="p-frederik",
+                owner="p-t2",
                 requirement_ids=["R-1"],
                 consumes=["checkout-response"],
             ),
-            Task(id="T3", title="Contributor guide", owner="p-mithilesh", requirement_ids=["R-2"]),
+            Task(id="T3", title="Contributor guide", owner="p-t3", requirement_ids=["R-2"]),
         ],
         contracts=[
             Contract(
@@ -94,3 +100,72 @@ def make_claim(task_id: str = "T2", **overrides: Any) -> Claim:
     }
     values.update(overrides)
     return Claim(**values)
+
+
+def token_hash(participant_id: str) -> str:
+    return hashlib.sha256(f"token-{participant_id}".encode()).hexdigest()
+
+
+def seed(store: Store, plan_version: int = 1) -> dict[str, Participant]:
+    """Save the demo project, its lead and three agents, and plans v1..plan_version."""
+    people = {
+        "p-lead": Participant(
+            id="p-lead",
+            project_id=PROJECT,
+            role=Role.LEAD,
+            developer_name="somesh",
+            token_hash=token_hash("p-lead"),
+        )
+    }
+    for task, developer in (("t1", "somesh"), ("t2", "frederik"), ("t3", "mithilesh")):
+        people[f"p-{task}"] = Participant(
+            id=f"p-{task}",
+            project_id=PROJECT,
+            role=Role.AGENT,
+            developer_name=developer,
+            agent_name="claude-code",
+            token_hash=token_hash(f"p-{task}"),
+        )
+    project = Project(
+        id=PROJECT,
+        repository="MidFlightt/midflight-demo-shop",
+        github_installation_id=169380149,
+        lead_id="p-lead",
+        participant_ids=list(people),
+        current_plan_version=plan_version,
+    )
+    plans = [make_plan(v) for v in range(1, plan_version + 1)]
+    store.commit(
+        Commit(
+            project_id=PROJECT,
+            idempotency_key="seed",
+            puts=[project, *people.values(), *plans],
+        )
+    )
+    return people
+
+
+def submission(base: str = "T2", **overrides: Any) -> ClaimSubmission:
+    """A claim as task `base`'s agent sends it, with the same defaults as make_claim."""
+    claim = make_claim(base)
+    values = claim.model_dump(
+        include=set(ClaimSubmission.model_fields) - {"claim_id"}, exclude_none=True
+    )
+    if base == "T1":
+        values |= {
+            "files": ["app/api.py", "README.md"],
+            "consumes": [],
+            "provides": [
+                {"contract_id": "checkout-response", "fields": {"total_cents": "integer"}}
+            ],
+            "acceptance_criteria": ["GET /checkout returns total_cents as an integer"],
+        }
+    if base == "T3":
+        values |= {
+            "requirement_ids": ["R-2"],
+            "files": ["CONTRIBUTING.md", "README.md"],
+            "consumes": [],
+            "no_interfaces": True,
+            "acceptance_criteria": ["The guide explains branch naming"],
+        }
+    return ClaimSubmission.model_validate(values | overrides)

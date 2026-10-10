@@ -20,11 +20,11 @@ while they work:
 Team Yoga, AWS Agentic AI hackathon. Planned finish **Sat Oct 10, 2026**; Sun Oct 11
 is buffer and submission.
 
-**Current state:** the specs, the shared models and ports from S-1
-(`midflight/domain/models.py`, `states.py`, `midflight/ports.py`), and the old local
-prototype (`midflight/claims.py`, deleted once S-3 lands). The other planned packages
-(`services/`, `api/`, ...) appear as tasks land. Don't assume a module exists. Check
-first.
+**Current state:** the specs; the shared models and ports (S-1); the claim rules
+(S-2); and the claim service with the in-memory store, runners, and clock (S-3). The
+old prototype (`midflight/claims.py`, `__main__.py`) is still there for the README
+commands. The other planned packages (`api/`, `mcp/`, ...) appear as tasks land. Don't
+assume a module exists. Check first.
 
 ## Where things are
 
