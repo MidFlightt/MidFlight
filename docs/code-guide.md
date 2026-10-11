@@ -66,7 +66,7 @@ touches AWS or GitHub.
 | `decisions.py` | What counts as a decision in force (the lead's, Midflight's, or an agreement between tasks), and sending claims back for revision with one (D30, D31). |
 | `verification.py` | The verification job: read the push from GitHub, run the checks, publish `midflight/verify`, and queue a correction directive or an escalation. |
 | `sync.py` | Stale and fresh GitHub data, and the demo fault switch. |
-| `check_in.py` | What an agent gets at a checkpoint: its task, requirements, contracts, claim verdict, directives, what other tasks assume about it, open escalations, and whether it may push. |
+| `check_in.py` | What an agent gets at a checkpoint: its task, requirements, contracts, claim verdict, directives, what other tasks assume about it, open escalations, and whether it may push. With the marker of an earlier reply (`since`), it also works out what that reply already held (D34). |
 | `directives.py` | An agent's answer to a directive. |
 | `participants.py` | Tokens for scripts and the pre-push hook (stored as hashes); `issue_hook_token` for `hook_setup`. |
 | `audit.py`, `errors.py` | Building audit events; the errors services raise (each maps to an HTTP status). |
@@ -80,7 +80,7 @@ touches AWS or GitHub.
 | `wiring.py` | Which real adapter each part uses (DynamoDB or memory, Bedrock or no reviewer, the GitHub App), shared by the server and the worker. |
 | `mcp/hosted.py` | The connector's 16 tools. Each one finds who's calling (from their sign-in), finds their project, calls a service, and replies in plain text. |
 | `mcp/instructions.py` | The rules every connected agent is told (claim first, check in at checkpoints, ...), and the tool descriptions. |
-| `mcp/replies.py` | Turns results into the text an agent reads, with directives fenced off as data. |
+| `mcp/replies.py` | Turns results into the text an agent reads, with directives fenced off as data. Leaves out and names what the agent already has (D34). |
 | `api/oauth.py` | Sign in with GitHub: the OAuth flow AI clients expect, with GitHub doing the login. |
 | `api/app.py`, `api/views.py` | The REST API (for scripts and hooks) and the JSON shapes it returns. |
 | `api/webhook.py` | `POST /github/webhook`: checks GitHub's signature and queues a verification when the contract tests finish. |
