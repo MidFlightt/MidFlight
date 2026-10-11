@@ -213,4 +213,4 @@ The full index is [docs/README.md](docs/README.md). The ones to read first:
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). Copyright (c) 2026 Team Yoga.
