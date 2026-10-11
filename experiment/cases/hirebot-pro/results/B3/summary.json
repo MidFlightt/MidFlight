@@ -1,0 +1,52 @@
+{
+  "case": "hirebot-pro",
+  "run": "B3",
+  "approach": "Midflight",
+  "model": "sonnet",
+  "merge": [
+    "t1-catalog: merged",
+    "t2-pricing: merged",
+    "t3-bookings: merged",
+    "t4-reports: merged",
+    "t5-cli: merged"
+  ],
+  "scores": [
+    {
+      "passed": 14,
+      "of": 14,
+      "failed": []
+    }
+  ],
+  "agent_starts_without_midflight": 0,
+  "stats": {
+    "cost": 2.2089,
+    "warmup_cost": 0.1563306,
+    "turns": 142,
+    "input": 178,
+    "output": 44246,
+    "cache_read": 4792760,
+    "cache_write": 201881,
+    "agent_minutes": 6.5,
+    "tool_calls": 130,
+    "midflight_calls": {
+      "check_in": 25,
+      "submit_claim": 18,
+      "acknowledge_directive": 14
+    },
+    "cost_by_agent": {
+      "t1": 0.25872139999999993,
+      "t2": 0.3966299999999999,
+      "t3": 0.6992552,
+      "t4": 0.41850519999999997,
+      "t5": 0.43578019999999995
+    }
+  },
+  "notes": [
+    "The control for B4: Midflight as on main (17af75d), run on October 11, 2026, a few minutes after B4.",
+    "Run against a Midflight on the same machine (experiment/local_midflight.py), not the live service: everything in memory, one person signed in who leads the project and owns every task, the HireBot Pro plan as plan v1 and the lead's change as plan v2.",
+    "The AI reviewer was scripted for this run: it raises the case's one real conflict (reports keeps a 20% cancellation fee, bookings refunds in full) as a question for the lead, as the live reviewer did in B2, and nothing else. So this run says nothing about the reviewer.",
+    "Same prompts and checks as B1 and B2. One escalation (E-20, the real one); the lead resolved it once with the fixed decision, then messages 11 and 12 went to the two agents whose claims it sent back.",
+    "Five claims were refused because the agent copied a contract's id together with its version (`agent v1`) from the reply, and one for an invalid claim. Each was sent again. Eight calls to acknowledge_directive failed on their arguments first.",
+    "14 of 14 at merge, no fix round. Midflight sent back about 124,000 characters."
+  ]
+}
