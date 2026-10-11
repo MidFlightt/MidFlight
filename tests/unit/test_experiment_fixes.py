@@ -118,6 +118,18 @@ def test_a_withdrawn_claims_assumptions_are_not_passed_on() -> None:
     assert not services.check_ins.check_in(people["p-t1"], "T1").assumed_by_others
 
 
+def test_a_withdrawn_claim_is_not_shown_as_the_agents_claim() -> None:
+    services, people = team()
+    t2 = services.claims.submit(people["p-t2"], submission("T2"))
+    services.claims.withdraw(people["p-t2"], t2.claim_id)
+
+    reply = services.check_ins.check_in(people["p-t2"], "T2")
+    assert reply.claim is None
+    text = check_in_text(check_in_json(reply))
+    assert "You have no claim for this task yet." in text
+    assert reply.push_blockers == ["no claim for this task; submit one before pushing"]
+
+
 def test_the_check_in_text_shows_assumptions_as_data() -> None:
     services, people = team()
     services.claims.submit(
