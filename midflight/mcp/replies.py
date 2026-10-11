@@ -77,7 +77,8 @@ def contracts_text(contracts: Sequence[dict[str, Any]]) -> list[str]:
     lines = ["Build against:"]
     for c in contracts:
         fields = ", ".join(f"{name}: {kind}" for name, kind in c["fields"].items())
-        lines.append(f"  {c['id']} v{c['version']} (provider {c['provider_task']}): {fields}")
+        # The id stands alone, so it isn't copied into a claim with the version attached.
+        lines.append(f"  {c['id']} (v{c['version']}, provider {c['provider_task']}): {fields}")
     return lines
 
 
