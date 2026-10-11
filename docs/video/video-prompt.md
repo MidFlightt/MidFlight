@@ -5,7 +5,7 @@ everything in the box below into Claude Code, in a new empty folder (Claude Code
 Remotion skills help if you have them installed). Every line of on-screen text is real
 Midflight output or a true statement about it; keep it that way when you edit.
 
-The scene list matches the [storyboard](development-plan.md#demo-storyboard); record the
+The scene list matches the [storyboard](../development-plan.md#demo-storyboard); record the
 real product for the final cut (F-5) and use this as the polished version or B-roll.
 
 ````

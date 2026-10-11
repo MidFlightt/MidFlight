@@ -1,0 +1,209 @@
+{
+  "case": "pigeonpost",
+  "run": "N1",
+  "approach": "no channel",
+  "model": "sonnet",
+  "merge": [
+    "t1-roost: merged",
+    "t2-pricing: merged",
+    "t3-dispatch: merged",
+    "t4-billing: merged",
+    "t5-cli: merged",
+    "t6-tracking: merged"
+  ],
+  "scores": [
+    {
+      "passed": 13,
+      "of": 20,
+      "failed": [
+        "C9",
+        "C11",
+        "C12",
+        "C13",
+        "C18",
+        "C19",
+        "C20"
+      ],
+      "events": {
+        "plain build": {
+          "passed": 8,
+          "of": 8,
+          "held": true
+        },
+        "plan change": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "two developers disagree": {
+          "passed": 0,
+          "of": 2,
+          "held": false
+        },
+        "a note against the plan": {
+          "passed": 0,
+          "of": 2,
+          "held": false
+        },
+        "a unit quietly changed": {
+          "passed": 0,
+          "of": 3,
+          "held": false
+        },
+        "late joiner": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "nobody planned it": {
+          "passed": 1,
+          "of": 1,
+          "held": true
+        }
+      }
+    },
+    {
+      "passed": 18,
+      "of": 20,
+      "failed": [
+        "C14",
+        "C15"
+      ],
+      "events": {
+        "plain build": {
+          "passed": 8,
+          "of": 8,
+          "held": true
+        },
+        "plan change": {
+          "passed": 0,
+          "of": 2,
+          "held": false
+        },
+        "two developers disagree": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a note against the plan": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a unit quietly changed": {
+          "passed": 3,
+          "of": 3,
+          "held": true
+        },
+        "late joiner": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "nobody planned it": {
+          "passed": 1,
+          "of": 1,
+          "held": true
+        }
+      }
+    },
+    {
+      "passed": 20,
+      "of": 20,
+      "failed": [],
+      "events": {
+        "plain build": {
+          "passed": 8,
+          "of": 8,
+          "held": true
+        },
+        "plan change": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "two developers disagree": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a note against the plan": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a unit quietly changed": {
+          "passed": 3,
+          "of": 3,
+          "held": true
+        },
+        "late joiner": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "nobody planned it": {
+          "passed": 1,
+          "of": 1,
+          "held": true
+        }
+      }
+    }
+  ],
+  "agent_starts_without_midflight": 0,
+  "stats": {
+    "cost": 2.0596,
+    "warmup_cost": 0.0,
+    "turns": 126,
+    "input": 152,
+    "output": 32737,
+    "cache_read": 3435624,
+    "cache_write": 261207,
+    "agent_minutes": 6.3,
+    "tool_calls": 104,
+    "midflight_calls": {},
+    "cost_by_agent": {
+      "t1": 0.3332302,
+      "t2": 0.3496578,
+      "t3": 0.3500656,
+      "t4": 0.2191876,
+      "t5": 0.31111700000000003,
+      "t6": 0.16665220000000003,
+      "main": 0.3297163999999999
+    },
+    "chat_calls": {},
+    "lead_actions": 0,
+    "turns_by_call": {
+      "01-t1-p1": 9,
+      "02-t2-p1": 9,
+      "03-t3-p1": 11,
+      "04-t1-p2": 7,
+      "05-t2-p2": 3,
+      "06-t3-p2": 3,
+      "07-t4-p2": 10,
+      "08-t5-p2": 12,
+      "11-t1-p3": 1,
+      "12-t2-p3": 2,
+      "13-t3-p3": 4,
+      "14-t4-p3": 1,
+      "15-t5-p3": 5,
+      "16-t6-p3": 10,
+      "17-t1-p4": 2,
+      "18-t2-p4": 2,
+      "19-t3-p4": 4,
+      "20-t4-p4": 4,
+      "21-t5-p4": 4,
+      "22-t6-p4": 2,
+      "23-main-fix1": 18,
+      "24-main-fix2": 3
+    },
+    "lead_cost": 0.0
+  },
+  "notes": [
+    "Nobody could reach the lead, so none of the lead's three decisions was ever asked for.",
+    "Each agent followed its developer's note and told only its developer: the roost served payloads in grams, pricing charged tax before the promo discount, dispatch refunded in full, and billing kept a 4.00 fee. Tracking was the exception: it kept the contract's field name and told its developer why.",
+    "The parts reached each other over HTTP on the routes in the plan, so the late joiner and billing's list of deliveries worked without anyone agreeing on function names.",
+    "Two fix rounds. The first repaired all seven failing checks but removed the express_fee line from the command line; the second put it back.",
+    "Call numbers 9 and 10 are unused: the run's state file was edited by mistake while phase 2 was running, which shifted the numbering. No agent's work, prompt, or session was affected."
+  ]
+}

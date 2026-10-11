@@ -9,7 +9,7 @@ has everything needed to check them or run them again.
 | Run letter | Approach | How the agents coordinate |
 | --- | --- | --- |
 | **N** | No channel | They can't. Each agent only hears from its own developer. |
-| **A** | Team chat | A shared `TEAM_CHAT.md` file every agent can read and write. |
+| **A** | Team chat | A shared chat file every agent can read and write: `TEAM_CHAT.md` on one disk (HireBot), or `CHAT.md` in the team's repository (PigeonPost). |
 | **B** | Midflight | A Midflight plan with contracts; agents claim, check in, and get directives. |
 
 ## What's here
@@ -26,6 +26,7 @@ has everything needed to check them or run them again.
 | `cases/<case>/starter/` | The near-empty repository every trial starts from |
 | `cases/<case>/checks.md` | The checks, fixed before any trial |
 | `cases/<case>/score.py` | The checks as a program (cases scored automatically) |
+| `cases/<case>/plan.py`, `reference/`, `overlays/` | PigeonPost only: the plan every approach gets, a build that passes every check, and the files only one approach gets (the chat tool) |
 | `cases/<case>/results/<run>/` | One folder per trial (below) |
 
 ### What a results folder holds
@@ -44,6 +45,7 @@ has everything needed to check them or run them again.
 | --- | --- | --- | --- |
 | [`hirebot-small`](cases/hirebot-small/README.md) | 3 | by hand, 8 checks | field names between a page and two small APIs |
 | [`hirebot-pro`](cases/hirebot-pro/README.md) | 5 | automatically, 14 checks | real business rules, a change touching four parts, a decision only the lead can make |
+| [`pigeonpost`](cases/pigeonpost/README.md) | 6 | automatically, 20 checks | six things that happen after the plan is written; separate laptops; agents starting at different times |
 
 ## Running a trial
 
@@ -65,5 +67,18 @@ The driver never lets a run B agent work without Midflight: it reads each agent'
 start-up message and restarts the agent if Midflight's tools aren't loaded. If the Claude
 plan's usage limit is reached, the phase stops and can be run again later; agents that
 already finished are skipped.
+
+PigeonPost scripts the whole trial, including the lead, so one command runs it, and
+running it again continues after an interruption:
+
+```bash
+python experiment/run.py pigeonpost X selftest             # the reference build: no agents, no tokens
+python experiment/run.py pigeonpost N1 auto
+python experiment/run.py pigeonpost A1 auto
+python experiment/run.py pigeonpost B1 auto midflight-1234  # a fresh Midflight project
+python experiment/run.py pigeonpost all table              # every recorded run, side by side
+```
+
+How to set up a laptop for it: [docs/benchmark-pigeonpost.md](../docs/benchmark-pigeonpost.md).
 
 A trial's working folders live outside the repository, in `../experiment-runs/`.

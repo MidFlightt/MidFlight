@@ -1,0 +1,161 @@
+{
+  "case": "pigeonpost",
+  "run": "A1",
+  "approach": "team-chat file",
+  "model": "sonnet",
+  "merge": [
+    "t1-roost: merged",
+    "t2-pricing: merged",
+    "t3-dispatch: merged",
+    "t4-billing: merged",
+    "t5-cli: merged",
+    "t6-tracking: merged"
+  ],
+  "scores": [
+    {
+      "passed": 18,
+      "of": 20,
+      "failed": [
+        "C9",
+        "C11"
+      ],
+      "events": {
+        "plain build": {
+          "passed": 8,
+          "of": 8,
+          "held": true
+        },
+        "plan change": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "two developers disagree": {
+          "passed": 0,
+          "of": 2,
+          "held": false
+        },
+        "a note against the plan": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a unit quietly changed": {
+          "passed": 3,
+          "of": 3,
+          "held": true
+        },
+        "late joiner": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "nobody planned it": {
+          "passed": 1,
+          "of": 1,
+          "held": true
+        }
+      }
+    },
+    {
+      "passed": 20,
+      "of": 20,
+      "failed": [],
+      "events": {
+        "plain build": {
+          "passed": 8,
+          "of": 8,
+          "held": true
+        },
+        "plan change": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "two developers disagree": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a note against the plan": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a unit quietly changed": {
+          "passed": 3,
+          "of": 3,
+          "held": true
+        },
+        "late joiner": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "nobody planned it": {
+          "passed": 1,
+          "of": 1,
+          "held": true
+        }
+      }
+    }
+  ],
+  "agent_starts_without_midflight": 0,
+  "stats": {
+    "cost": 1.8805,
+    "warmup_cost": 0.0,
+    "turns": 105,
+    "input": 180,
+    "output": 34548,
+    "cache_read": 4143513,
+    "cache_write": 210432,
+    "agent_minutes": 6.9,
+    "tool_calls": 82,
+    "midflight_calls": {},
+    "cost_by_agent": {
+      "t1": 0.3023674,
+      "t2": 0.4012916,
+      "t3": 0.3318898,
+      "t4": 0.24233179999999999,
+      "t5": 0.2601244,
+      "t6": 0.21843320000000002,
+      "main": 0.124045
+    },
+    "chat_calls": {
+      "read": 27,
+      "post": 28
+    },
+    "lead_actions": 5,
+    "turns_by_call": {
+      "01-t1-p1": 8,
+      "02-t2-p1": 10,
+      "03-t3-p1": 9,
+      "04-t1-p2": 5,
+      "05-t3-p2": 3,
+      "06-t2-p2": 10,
+      "07-t4-p2": 8,
+      "08-t5-p2": 5,
+      "09-lead-answer": 3,
+      "10-t1-p3": 3,
+      "11-t2-p3": 4,
+      "12-t3-p3": 3,
+      "13-t4-p3": 3,
+      "14-t5-p3": 3,
+      "15-t6-p3": 8,
+      "16-lead-answer": 3,
+      "17-t1-p4": 2,
+      "18-t2-p4": 2,
+      "19-t3-p4": 2,
+      "20-t4-p4": 2,
+      "21-t5-p4": 2,
+      "22-t6-p4": 3,
+      "23-main-fix1": 4
+    },
+    "lead_cost": 0.1358
+  },
+  "notes": [
+    "Lead's first turn: four answers (five over the run), all from the decision sheet. The cancellation decision (a 25% fee) was posted twice, once to dispatch and once to billing; tax stays after the promo discount; payloads stay in kg. The roost and pricing changed their code back.",
+    "Phase 3: dispatch and billing each read the lead's 25% decision, kept their own developer's instruction (full refund; a 4.00 fee), and posted 'CONFLICT for lead' again. The lead's second turn answered only tracking's question about the field name and did not repeat the cancellation decision, which its instructions count as already answered. Neither part changed in phase 4, so C9 and C11 failed at merge. A lead who repeated the decision might have got a different result.",
+    "The team chat is 22 lines after 28 posts and 27 reads."
+  ]
+}

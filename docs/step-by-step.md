@@ -98,7 +98,7 @@ Working on Midflight's own code? `git clone https://github.com/MidFlightt/MidFli
    Saved as `.mcp.json`, Claude Code offers the connector to anyone who opens the repo.
 3. **The storyboard** in [demo.md](demo.md), using the scene list at the end of the
    [development plan](development-plan.md#demo-storyboard), and the animated version from
-   [video-prompt.md](video-prompt.md). For the outage scene, the
+   [video-prompt.md](video/video-prompt.md). For the outage scene, the
    lead asks their agent to "simulate a GitHub outage" (the labeled fault switch) and
    later to turn it off.
 

@@ -2,9 +2,11 @@
 
     python experiment/run.py <case> <run> <step> [args]
 
-    setup              a fresh repo with one branch and folder per agent
+    setup [project]    a fresh repo with one branch and folder per agent (run B of a
+                       case that doesn't name its Midflight project: give the project id)
     phase 1            every agent builds its first version, in parallel
     phase 2            the surprises (plan change, developer notes)
+    lead <step>        the lead's turn, in cases that script it (plan, answer, change)
     say <agent> "..."  one more message to one agent
     merge              merge every agent's branch into main
     score              run the case's checks (cases with a score.py)
@@ -12,6 +14,10 @@
     repair             score, then fix the failing checks, up to 3 rounds
     stats              tokens, cost, turns, tool calls
     record             write the run's results into the case's results/ folder
+    auto [project]     set up if needed, then every step the case lists in STEPS, in
+                       order; run it again to continue after an interruption
+    selftest           score the case's reference build (no agents, no tokens)
+    table              every recorded run of the case, side by side
 
 The run's first letter picks the approach: N (no channel), A (shared team-chat file),
 B (Midflight). Runs live outside the repository, in ../experiment-runs/<case>/<run>/.
@@ -27,6 +33,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -52,7 +59,8 @@ MIDFLIGHT_TOOLS = [
 MCP_CONFIG = Path(
     os.environ.get("MIDFLIGHT_MCP_CONFIG") or HERE / "midflight-only.mcp.json"
 ).resolve()
-GIT_ID = ["-c", "user.name=HireBot", "-c", "user.email=hirebot@example.com"]
+GIT_ID = ["-c", "user.name=Experiment", "-c", "user.email=experiment@example.com"]
+APPROACHES = {"N": "no channel", "A": "team-chat file", "B": "Midflight"}
 LIMIT_TEXT = "hit your session limit"
 STATE_LOCK = threading.Lock()  # agents run in parallel threads and share one state file
 
@@ -80,8 +88,32 @@ class Trial:
         return self.approach == "B"
 
     @property
+    def laptops(self) -> bool:
+        """Cases that give every agent its own clone of a shared repository (its
+        developer's laptop) instead of a worktree on one disk."""
+        return getattr(self.case, "SEPARATE_LAPTOPS", False)
+
+    @property
+    def scripted(self) -> bool:
+        """Cases that say who gets a turn in each phase, and script the lead."""
+        return hasattr(self.case, "PHASES")
+
+    @property
+    def origin(self) -> Path:
+        return self.root / "origin.git"  # stands in for the team's GitHub repository
+
+    @property
     def chat(self) -> Path:
         return self.root / "TEAM_CHAT.md"
+
+    @property
+    def project(self) -> str | None:
+        """Run B's Midflight project: given at setup, or named by the case."""
+        return self.state().get("project") or getattr(self.case, "PROJECT_B", None)
+
+    def folder(self, name: str) -> Path:
+        """Where an agent, the lead, or the merged product ("main") works."""
+        return self.root / name / "repo" if self.laptops else self.root / name
 
     def state(self) -> dict:
         return json.loads((self.root / "state.json").read_text(encoding="utf-8"))
@@ -98,28 +130,68 @@ def load_module(path: Path, name: str) -> ModuleType:
     return module
 
 
-def git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], cwd=cwd, check=check, capture_output=True, text=True)
+def git(
+    cwd: Path, *args: str, check: bool = True, stdin: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run git. `stdin` is passed as bytes, so line endings stay as written."""
+    done = subprocess.run(["git", *args], cwd=cwd, check=check, capture_output=True,
+                          input=stdin.encode() if stdin is not None else None)  # fmt: skip
+    return subprocess.CompletedProcess(
+        done.args, done.returncode, done.stdout.decode(errors="replace"),
+        done.stderr.decode(errors="replace"),
+    )  # fmt: skip
 
 
 # Steps ---------------------------------------------------------------------------------
 
 
-def setup(trial: Trial) -> None:
+def setup(trial: Trial, project: str | None = None) -> None:
     if trial.root.exists():
         sys.exit(f"{trial.root} already exists")
-    main = trial.root / "main"
+    if trial.with_midflight and not (project or getattr(trial.case, "PROJECT_B", None)):
+        sys.exit("run B needs a fresh Midflight project: setup <project id>")
+    main = trial.root / "main" / "repo" if trial.laptops else trial.root / "main"
     shutil.copytree(trial.case_dir / "starter", main)
+    overlay = trial.case_dir / "overlays" / trial.approach  # files only this approach gets
+    if overlay.exists():
+        shutil.copytree(overlay, main, dirs_exist_ok=True)
     git(main, "init", "-q", "-b", "main")
     git(main, "add", "-A")
     git(main, *GIT_ID, "commit", "-q", "-m", "starter")
-    for agent, branch in trial.agents.items():
-        git(main, "worktree", "add", "-q", "-b", branch, str(trial.root / agent))
+    if trial.laptops:
+        clone_laptops(trial, main)
+    else:
+        for agent, branch in trial.agents.items():
+            git(main, "worktree", "add", "-q", "-b", branch, str(trial.root / agent))
+        trial.chat.write_text("# Team chat\n\n", encoding="utf-8")
     for folder in ("logs", "prompts"):
         (trial.root / folder).mkdir()
-    trial.chat.write_text("# Team chat\n\n", encoding="utf-8")
-    trial.save({"approach": trial.approach, "sessions": {}, "calls": [], "done": {}})
+    state = {"approach": trial.approach, "sessions": {}, "calls": [], "done": {}}
+    if project:
+        state["project"] = project
+    trial.save(state)
     print(f"set up {trial.root}")
+
+
+def clone_laptops(trial: Trial, main: Path) -> None:
+    """A shared repository (standing in for GitHub) and one clone of it per agent, plus
+    one for the lead. With the team-chat approach the shared repository also gets a `chat`
+    branch holding CHAT.md."""
+    git(trial.root, "clone", "-q", "--bare", str(main), str(trial.origin))
+    git(main, "remote", "add", "origin", str(trial.origin))
+    if trial.approach == "A":
+        blob = git(main, "hash-object", "-w", "--stdin", stdin="# Team chat\n\n").stdout.strip()
+        tree = git(main, "mktree", stdin=f"100644 blob {blob}\tCHAT.md\n").stdout.strip()
+        first = git(main, *GIT_ID, "commit-tree", tree, "-m", "chat").stdout.strip()
+        git(main, "push", "-q", "origin", f"{first}:refs/heads/chat")
+    for name, branch in [*trial.agents.items(), ("lead", None)]:
+        laptop = trial.folder(name)
+        laptop.parent.mkdir()
+        git(trial.root, "clone", "-q", str(trial.origin), str(laptop))
+        git(laptop, "config", "user.name", name)
+        git(laptop, "config", "user.email", f"{name}@example.com")
+        if branch:
+            git(laptop, "switch", "-q", "-c", branch)
 
 
 def phase(trial: Trial, number: int) -> None:
@@ -127,18 +199,22 @@ def phase(trial: Trial, number: int) -> None:
     so a phase interrupted by the usage limit can simply be run again."""
     state = trial.state()
     label = f"p{number}"
-    todo = [a for a in trial.agents if not state["done"].get(label, {}).get(a)]
+    taking_part = trial.case.PHASES[number] if trial.scripted else trial.agents
+    todo = [a for a in taking_part if not state["done"].get(label, {}).get(a)]
     if not todo:
         print(f"phase {number}: every agent already finished it")
         return
     if trial.with_midflight:
         warm_up(trial)
+    workers = min(len(todo), getattr(trial.case, "PARALLEL", len(todo)))
 
     def one(indexed: tuple[int, str]) -> tuple[str, dict | None]:
         index, agent = indexed
-        if trial.with_midflight:
+        if trial.with_midflight and index < workers:
             time.sleep(20 * index)  # one at a time, so start-up requests don't pile up
-        if number == 1:
+        if trial.scripted:
+            prompt = trial.case.prompt(trial.approach, agent, number, trial.project)
+        elif number == 1:
             prompt = trial.case.first_prompt(trial.approach, agent, str(trial.chat))
         else:
             prompt = trial.case.second_prompt(trial.approach, agent)
@@ -147,7 +223,7 @@ def phase(trial: Trial, number: int) -> None:
         except UsageLimit:
             return agent, None
 
-    with ThreadPoolExecutor(max_workers=len(todo)) as pool:
+    with ThreadPoolExecutor(max_workers=workers) as pool:
         results = list(pool.map(one, enumerate(todo)))
     blocked = [agent for agent, result in results if result is None]
     for agent, result in results:
@@ -162,11 +238,39 @@ def say(trial: Trial, agent: str, message: str) -> None:
     print(f"{agent}: {result['num_turns']} turns: {result['text'][-400:]}")
 
 
+def lead(trial: Trial, step: str) -> None:
+    """The lead's turn: propose the plan, answer what was asked, or announce a change.
+    What that means in each approach is the case's `lead(approach, step, project)`."""
+    action = trial.case.lead(trial.approach, step, trial.project)
+    if action is None:
+        print(f"lead {step}: nothing to do in this approach")
+    elif "post" in action:
+        subprocess.run([sys.executable, "tools/chat.py", "post", action["post"]],
+                       cwd=trial.folder("lead"), check=True)  # fmt: skip
+        state = trial.state()
+        state.setdefault("lead_posts", []).append({"step": step, "text": action["post"]})
+        trial.save(state)
+        print(f"lead {step}: posted in the team chat")
+    else:
+        if trial.with_midflight:
+            warm_up(trial)
+        result = call(trial, "lead", step, action["prompt"], tools=action["tools"])
+        print(f"lead {step}: {result['num_turns']} turns: {result['text'][-400:]}")
+
+
 def merge(trial: Trial) -> None:
-    main = trial.root / "main"
+    main = trial.folder("main")
     report = []
+    if trial.laptops:  # every developer pushes their branch; the merge happens on main
+        for agent, branch in trial.agents.items():
+            laptop = trial.folder(agent)
+            if git(laptop, "status", "--porcelain", "--untracked-files=no").stdout.strip():
+                report.append(f"{branch}: uncommitted changes were left out")
+            git(laptop, "push", "-q", "origin", branch)
+        git(main, "fetch", "-q", "origin")
     for branch in trial.agents.values():
-        done = git(main, *GIT_ID, "merge", "--no-edit", branch, check=False)
+        ref = f"origin/{branch}" if trial.laptops else branch
+        done = git(main, *GIT_ID, "merge", "--no-edit", ref, check=False)
         if done.returncode != 0:
             conflicted = git(main, "diff", "--name-only", "--diff-filter=U").stdout.split()
             git(main, "add", "-A")
@@ -183,7 +287,7 @@ def merge(trial: Trial) -> None:
 def score(trial: Trial) -> dict:
     """Run the case's checks against the merged app and save the result."""
     scorer = load_module(trial.case_dir / "score.py", "scorer")
-    result = scorer.score(trial.root / "main")
+    result = scorer.score(trial.folder("main"))
     state = trial.state()
     rounds = state.setdefault("scores", [])
     rounds.append(result)
@@ -228,10 +332,22 @@ def repair(trial: Trial) -> None:
 # Calling an agent ----------------------------------------------------------------------
 
 
-def call(trial: Trial, agent: str, label: str, prompt: str, midflight: bool | None = None) -> dict:
+def call(
+    trial: Trial,
+    agent: str,
+    label: str,
+    prompt: str,
+    midflight: bool | None = None,
+    tools: list[str] | None = None,
+) -> dict:
     """One headless Claude Code call in the agent's folder. The message is saved in
-    prompts/, the event stream in logs/, and the call is noted in the run's state."""
+    prompts/, the event stream in logs/, and the call is noted in the run's state.
+    `tools` replaces the usual tools (the lead's turns)."""
     use_midflight = trial.with_midflight if midflight is None else midflight
+    if tools is None:
+        tools = [*TOOLS, *(MIDFLIGHT_TOOLS if use_midflight else [])]
+    required = [tool for tool in tools if tool.startswith("mcp__")]
+    use_midflight = bool(required)
     session_key = "fixer" if agent == "main" else agent
     with STATE_LOCK:
         state = trial.state()
@@ -242,7 +358,7 @@ def call(trial: Trial, agent: str, label: str, prompt: str, midflight: bool | No
         trial.save(state)
     args = [claude_exe(), "-p", "--model", MODEL, "--max-turns", MAX_TURNS,
             "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
-            "--allowedTools", *TOOLS, *(MIDFLIGHT_TOOLS if use_midflight else []),
+            "--allowedTools", *tools,
             # Only these MCP servers: none, or only Midflight (others slow the start).
             "--strict-mcp-config"]  # fmt: skip
     if use_midflight:
@@ -252,7 +368,7 @@ def call(trial: Trial, agent: str, label: str, prompt: str, midflight: bool | No
     (trial.root / "prompts" / f"{name}.txt").write_text(prompt, encoding="utf-8")
     log = trial.root / "logs" / f"{name}.jsonl"
     for attempt in range(1, 9):
-        if run_agent(args, prompt, trial.root / agent, log, needs_midflight=use_midflight):
+        if run_agent(args, prompt, trial.folder(agent), log, required):
             break
         # Midflight's tools weren't loaded at start-up: the agent was stopped before it
         # did any work. Wait and start it again.
@@ -279,17 +395,17 @@ def call(trial: Trial, agent: str, label: str, prompt: str, midflight: bool | No
     return result
 
 
-def run_agent(args: list[str], prompt: str, cwd: Path, log: Path, needs_midflight: bool) -> bool:
-    """Run one agent to the end, saving its event stream. With `needs_midflight`, the
-    agent is stopped at once (returning False) unless its start-up message lists every
-    Midflight tool, so no agent ever works without Midflight by accident."""
+def run_agent(args: list[str], prompt: str, cwd: Path, log: Path, required: list[str]) -> bool:
+    """Run one agent to the end, saving its event stream. The agent is stopped at once
+    (returning False) unless its start-up message lists every `required` Midflight tool,
+    so no agent ever works without Midflight by accident."""
     with log.open("w", encoding="utf-8") as out:
         proc = subprocess.Popen(args, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True, encoding="utf-8")  # fmt: skip
         assert proc.stdin and proc.stdout
         proc.stdin.write(prompt)
         proc.stdin.close()
-        ready = not needs_midflight
+        ready = not required
         for line in proc.stdout:
             out.write(line)
             if ready:
@@ -299,7 +415,7 @@ def run_agent(args: list[str], prompt: str, cwd: Path, log: Path, needs_midfligh
             except ValueError:
                 continue
             if event.get("type") == "system" and event.get("subtype") == "init":
-                if set(MIDFLIGHT_TOOLS) <= set(event.get("tools", [])):
+                if set(required) <= set(event.get("tools", [])):
                     ready = True
                 else:
                     proc.kill()
@@ -325,7 +441,7 @@ def warm_up(trial: Trial) -> None:
     log = trial.root / "logs" / f"warmup-{int(time.time())}.jsonl"
     prompt = "Call the Midflight my_projects tool once and reply with one word: ready."
     for attempt in range(1, 6):
-        if run_agent(args, prompt, trial.root, log, needs_midflight=True):
+        if run_agent(args, prompt, trial.root, log, MIDFLIGHT_TOOLS):
             if LIMIT_TEXT in summarize(log)["text"]:
                 sys.exit("USAGE LIMIT reached during warm-up. Run this phase again later.")
             print("Midflight is warm and connected", flush=True)
@@ -374,7 +490,8 @@ def stats(trial: Trial, show: bool = True) -> dict:
     totals: dict = {
         "cost": 0.0, "warmup_cost": 0.0, "turns": 0, "input": 0, "output": 0,
         "cache_read": 0, "cache_write": 0, "agent_minutes": 0.0, "tool_calls": 0,
-        "midflight_calls": {}, "cost_by_agent": {},
+        "midflight_calls": {}, "cost_by_agent": {}, "chat_calls": {}, "lead_actions": 0,
+        "turns_by_call": {},
     }  # fmt: skip
     for log in sorted((trial.root / "logs").glob("*.jsonl")):
         warmup = log.name.startswith("warmup")
@@ -392,6 +509,7 @@ def stats(trial: Trial, show: bool = True) -> dict:
                 if not usage.get("output_tokens"):
                     continue  # a call that did nothing (for example, a usage limit)
                 totals["turns"] += event.get("num_turns", 0)
+                totals["turns_by_call"][log.stem] = event.get("num_turns", 0)
                 totals["input"] += usage.get("input_tokens", 0)
                 totals["output"] += usage.get("output_tokens", 0)
                 totals["cache_read"] += usage.get("cache_read_input_tokens", 0)
@@ -406,6 +524,17 @@ def stats(trial: Trial, show: bool = True) -> dict:
                             short = name.removeprefix("mcp__midflight-live__")
                             calls = totals["midflight_calls"]
                             calls[short] = calls.get(short, 0) + 1
+                            totals["lead_actions"] += short == "resolve_escalation"
+                        command = str(block.get("input", {}).get("command", ""))
+                        for verb in ("read", "post"):
+                            times = command.count(f"chat.py {verb}")  # one command can post twice
+                            if times:
+                                chat = totals["chat_calls"]
+                                chat[verb] = chat.get(verb, 0) + times
+                                if agent == "lead" and verb == "post":
+                                    totals["lead_actions"] += times
+    # The lead's agent stands in for a person, so its spend is kept apart.
+    totals["lead_cost"] = round(totals["cost_by_agent"].pop("lead", 0.0), 4)
     totals["cost"] = round(sum(totals["cost_by_agent"].values()), 4)
     totals["agent_minutes"] = round(totals["agent_minutes"], 1)
     state = trial.state()
@@ -425,7 +554,7 @@ def record(trial: Trial) -> None:
     summary = {
         "case": trial.case_name,
         "run": trial.run,
-        "approach": {"N": "no channel", "A": "team-chat file", "B": "Midflight"}[trial.approach],
+        "approach": APPROACHES[trial.approach],
         "model": MODEL,
         "merge": state.get("merge", []),
         "scores": [
@@ -433,6 +562,7 @@ def record(trial: Trial) -> None:
                 "passed": sum(c["passed"] for c in s["checks"]),
                 "of": len(s["checks"]),
                 "failed": [c["id"] for c in s["checks"] if not c["passed"]],
+                **({"events": s["events"]} if "events" in s else {}),
             }
             for s in state.get("scores", [])
         ],
@@ -468,22 +598,85 @@ def record(trial: Trial) -> None:
             )
     (out / "prompts.md").write_text("".join(prompts), encoding="utf-8")
     (out / "agents.md").write_text("".join(replies), encoding="utf-8")
-    if trial.approach == "A" and trial.chat.exists():
+    if trial.approach == "A" and trial.laptops:
+        chat = git(trial.origin, "show", "chat:CHAT.md").stdout
+        (out / "team-chat.md").write_text(chat, encoding="utf-8")
+    elif trial.approach == "A" and trial.chat.exists():
         shutil.copy(trial.chat, out / "team-chat.md")
     print(f"recorded {out}")
 
 
-if __name__ == "__main__":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # agents write any character
-    if len(sys.argv) < 4:
-        sys.exit(__doc__)
-    trial = Trial(sys.argv[1], sys.argv[2])
-    step, rest = sys.argv[3], sys.argv[4:]
+def auto(trial: Trial, project: str | None) -> None:
+    """Set up if needed, then run every step in the case's STEPS. A step that finished is
+    not run again, so after an interruption (the usage limit, a closed laptop) the same
+    command continues where it stopped."""
+    if not trial.root.exists():
+        setup(trial, project)
+    for index, (step, *rest) in enumerate(trial.case.STEPS):
+        if index < trial.state().get("steps_done", 0):
+            continue
+        print(f"--- {step} {' '.join(map(str, rest))}".rstrip(), flush=True)
+        run_step(trial, step, [str(value) for value in rest])
+        state = trial.state()
+        state["steps_done"] = index + 1
+        trial.save(state)
+    print(f"finished: results are in {trial.case_dir / 'results' / trial.run}")
+
+
+def selftest(trial: Trial) -> None:
+    """Score the case's reference build. It needs no agents and spends no tokens: it shows
+    that uv, the app, and the checks work on this machine."""
+    with tempfile.TemporaryDirectory() as folder:
+        main = Path(folder) / "main"
+        shutil.copytree(trial.case_dir / "starter", main)
+        shutil.copytree(trial.case_dir / "reference", main, dirs_exist_ok=True)
+        scorer = load_module(trial.case_dir / "score.py", "scorer")
+        checks = scorer.score(main)["checks"]
+    for check in checks:
+        if not check["passed"]:
+            print(f"  FAIL {check['id']} {check['name']}: {check['observed'][:200]}")
+    passed = sum(c["passed"] for c in checks)
+    print(f"reference build: {passed} of {len(checks)} checks pass")
+    if passed != len(checks):
+        sys.exit(1)
+
+
+def table(trial: Trial) -> None:
+    """Every recorded run of the case, one row each, from its summary.json."""
+    rows = []
+    for file in sorted((trial.case_dir / "results").glob("*/summary.json")):
+        run = json.loads(file.read_text(encoding="utf-8"))
+        scores, totals = run["scores"], run["stats"]
+        if not scores:
+            continue
+        at_merge = scores[0]
+        events = {k: v for k, v in at_merge.get("events", {}).items() if k != "plain build"}
+        held = f"{sum(e['held'] for e in events.values())} of {len(events)}" if events else "-"
+        rows.append([
+            run["run"], run["approach"], f"{at_merge['passed']} of {at_merge['of']}", held,
+            str(len(scores) - 1), str(totals.get("lead_actions", "-")),
+            f"${totals['cost']:.2f}", str(totals["turns"]),
+        ])  # fmt: skip
+    head = ["Run", "Approach", "Checks at merge", "Events held", "Fix rounds",
+            "Lead answered", "Cost", "Turns"]  # fmt: skip
+    for row in [head, ["---"] * len(head), *rows]:
+        print("| " + " | ".join(row) + " |")
+
+
+def run_step(trial: Trial, step: str, rest: list[str]) -> None:
     match step:
         case "setup":
-            setup(trial)
+            setup(trial, rest[0] if rest else None)
         case "phase":
             phase(trial, int(rest[0]))
+        case "lead":
+            lead(trial, rest[0])
+        case "auto":
+            auto(trial, rest[0] if rest else None)
+        case "selftest":
+            selftest(trial)
+        case "table":
+            table(trial)
         case "say":
             say(trial, rest[0], rest[1])
         case "merge":
@@ -500,3 +693,10 @@ if __name__ == "__main__":
             record(trial)
         case _:
             sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # agents write any character
+    if len(sys.argv) < 4:
+        sys.exit(__doc__)
+    run_step(Trial(sys.argv[1], sys.argv[2]), sys.argv[3], sys.argv[4:])

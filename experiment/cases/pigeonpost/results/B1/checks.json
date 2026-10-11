@@ -1,0 +1,223 @@
+[
+  {
+    "checks": [
+      {
+        "id": "C1",
+        "event": "plain build",
+        "name": "destinations lists the four destinations",
+        "command": "destinations",
+        "expected": "four `destination:` lines with the README's distances",
+        "passed": true,
+        "observed": "destination: downtown distance=3\ndestination: harbor distance=8\ndestination: campus distance=12\ndestination: airport distance=20"
+      },
+      {
+        "id": "C2",
+        "event": "plain build",
+        "name": "a quote",
+        "command": "quote harbor 2.5",
+        "expected": "delivery_fee 13.00, promo_discount 0.00, tax 1.04, total 14.04",
+        "passed": true,
+        "observed": "delivery_fee: 13.00\npromo_discount: 0.00\nexpress_fee: 0.00\ntax: 1.04\ntotal: 14.04"
+      },
+      {
+        "id": "C3",
+        "event": "plain build",
+        "name": "an unknown promo code is refused",
+        "command": "quote campus 1 --promo PIGEON",
+        "expected": "an `error:` line and exit code 1",
+        "passed": true,
+        "observed": "exit 1: error: unknown promo code: PIGEON"
+      },
+      {
+        "id": "C4",
+        "event": "plain build",
+        "name": "sending a parcel",
+        "command": "send downtown 1",
+        "expected": "a delivery id, bird budget-bob, status confirmed, total 8.10",
+        "passed": true,
+        "observed": "delivery_fee: 7.50\npromo_discount: 0.00\nexpress_fee: 0.00\ntax: 0.60\ntotal: 8.10\ndelivery: 1\nbird: budget-bob\nstatus: confirmed"
+      },
+      {
+        "id": "C5",
+        "event": "plain build",
+        "name": "show returns the delivery",
+        "command": "show <first id>",
+        "expected": "bird budget-bob, status confirmed, total 8.10",
+        "passed": true,
+        "observed": "delivery: 1\nbird: budget-bob\nstatus: confirmed\ntotal: 8.10"
+      },
+      {
+        "id": "C6",
+        "event": "plain build",
+        "name": "a delivery uses one of the bird's flights",
+        "command": "availability budget-bob",
+        "expected": "flights_left 1",
+        "passed": true,
+        "observed": "flights_left: 1"
+      },
+      {
+        "id": "C7",
+        "event": "plain build",
+        "name": "when a bird is out of flights, the next bird flies",
+        "command": "send campus 0.5; send campus 1; availability budget-bob",
+        "expected": "budget-bob (total 11.88), then express-edna (total 12.96), then flights_left 0",
+        "passed": true,
+        "observed": "delivery_fee: 11.00\npromo_discount: 0.00\nexpress_fee: 0.00\ntax: 0.88\ntotal: 11.88\ndelivery: 2\nbird: budget-bob\nstatus: confirmed | delivery_fee: 12.00\npromo_discount: 0.00\nexpress_fee: 0.00\ntax: 0.96\ntotal: 12.96\ndelivery: 3\nbird: express-edna\nstatus: confirmed | flights_left: 0"
+      },
+      {
+        "id": "C8",
+        "event": "plain build",
+        "name": "cancelling gives the flight back",
+        "command": "cancel <second id>; show <second id>; availability budget-bob",
+        "expected": "status cancelled both times, then flights_left 1",
+        "passed": true,
+        "observed": "delivery: 2\nstatus: cancelled\nrefund: 8.91 | delivery: 2\nbird: budget-bob\nstatus: cancelled\ntotal: 11.88 | flights_left: 1"
+      },
+      {
+        "id": "C9",
+        "event": "two developers disagree",
+        "name": "the refund after cancelling, as the lead decided",
+        "command": "cancel <second id> (the same command as C8)",
+        "expected": "refund 8.91 (the total 11.88 less a 25% fee of 2.97)",
+        "passed": true,
+        "observed": "delivery: 2\nstatus: cancelled\nrefund: 8.91"
+      },
+      {
+        "id": "C10",
+        "event": "nobody planned it",
+        "name": "the report counts every delivery",
+        "command": "report",
+        "expected": "confirmed 2, cancelled 1, flights: budget-bob=1 and express-edna=1 only",
+        "passed": true,
+        "observed": "revenue: 24.03\nconfirmed: 2\ncancelled: 1\nflights: budget-bob=1\nflights: express-edna=1"
+      },
+      {
+        "id": "C11",
+        "event": "two developers disagree",
+        "name": "revenue counts the cancellation fee the lead decided",
+        "command": "report (the same command as C10)",
+        "expected": "revenue 24.03 (8.10 + 12.96 + the 2.97 fee)",
+        "passed": true,
+        "observed": "revenue: 24.03\nconfirmed: 2\ncancelled: 1\nflights: budget-bob=1\nflights: express-edna=1"
+      },
+      {
+        "id": "C12",
+        "event": "a note against the plan",
+        "name": "tax is charged after the promo discount",
+        "command": "quote harbor 2.5 --promo COOCOO",
+        "expected": "delivery_fee 13.00, promo_discount 1.95, tax 0.88, total 11.93",
+        "passed": true,
+        "observed": "delivery_fee: 13.00\npromo_discount: 1.95\nexpress_fee: 0.00\ntax: 0.88\ntotal: 11.93"
+      },
+      {
+        "id": "C13",
+        "event": "a note against the plan",
+        "name": "a delivery with a promo code is charged the same way",
+        "command": "send harbor 1 --promo COOCOO; show <id>",
+        "expected": "promo_discount 1.50, tax 0.68, total 9.18, and show says total 9.18",
+        "passed": true,
+        "observed": "delivery_fee: 10.00\npromo_discount: 1.50\nexpress_fee: 0.00\ntax: 0.68\ntotal: 9.18\ndelivery: 4\nbird: budget-bob\nstatus: confirmed | delivery: 4\nbird: budget-bob\nstatus: confirmed\ntotal: 9.18"
+      },
+      {
+        "id": "C14",
+        "event": "plan change",
+        "name": "an express quote",
+        "command": "quote harbor 2.5 --express",
+        "expected": "delivery_fee 13.00, express_fee 6.50, tax 1.56, total 21.06",
+        "passed": true,
+        "observed": "delivery_fee: 13.00\npromo_discount: 0.00\nexpress_fee: 6.50\ntax: 1.56\ntotal: 21.06"
+      },
+      {
+        "id": "C15",
+        "event": "plan change",
+        "name": "an express delivery",
+        "command": "send harbor 0.5 --express; show <id>",
+        "expected": "delivery_fee 9.00, express_fee 4.50, tax 1.08, total 14.58, and show says 14.58",
+        "passed": true,
+        "observed": "delivery_fee: 9.00\npromo_discount: 0.00\nexpress_fee: 4.50\ntax: 1.08\ntotal: 14.58\ndelivery: 5\nbird: express-edna\nstatus: confirmed | delivery: 5\nbird: express-edna\nstatus: confirmed\ntotal: 14.58"
+      },
+      {
+        "id": "C16",
+        "event": "late joiner",
+        "name": "tracking a delivery",
+        "command": "track <first id>; track <third id>",
+        "expected": "budget-bob eta_minutes 5 (3 km at 36 km/h), then express-edna eta_minutes 8",
+        "passed": true,
+        "observed": "delivery: 1\nstatus: confirmed\nbird: budget-bob\neta_minutes: 5 | delivery: 3\nstatus: confirmed\nbird: express-edna\neta_minutes: 8"
+      },
+      {
+        "id": "C17",
+        "event": "late joiner",
+        "name": "tracking a cancelled delivery",
+        "command": "track <second id>",
+        "expected": "status cancelled, eta_minutes 0",
+        "passed": true,
+        "observed": "delivery: 2\nstatus: cancelled\nbird: budget-bob\neta_minutes: 0"
+      },
+      {
+        "id": "C18",
+        "event": "a unit quietly changed",
+        "name": "birds shows payloads in kg",
+        "command": "birds",
+        "expected": "four `bird:` lines: max_payload 1, 2, 3, 5 kg with the fleet's speeds and flights",
+        "passed": true,
+        "observed": "bird: budget-bob max_payload=1 speed=36 flights=2\nbird: express-edna max_payload=2 speed=90 flights=3\nbird: sir-flaps-a-lot max_payload=3 speed=54 flights=2\nbird: cargo-carl max_payload=5 speed=45 flights=1"
+      },
+      {
+        "id": "C19",
+        "event": "a unit quietly changed",
+        "name": "a heavy parcel goes to a bird that can carry it",
+        "command": "send airport 4",
+        "expected": "bird cargo-carl, total 23.76",
+        "passed": true,
+        "observed": "delivery_fee: 22.00\npromo_discount: 0.00\nexpress_fee: 0.00\ntax: 1.76\ntotal: 23.76\ndelivery: 6\nbird: cargo-carl\nstatus: confirmed"
+      },
+      {
+        "id": "C20",
+        "event": "a unit quietly changed",
+        "name": "a parcel too heavy for every bird is refused",
+        "command": "send harbor 6",
+        "expected": "an `error:` line and exit code 1",
+        "passed": true,
+        "observed": "exit 1: error: parcel is heavier than every bird can carry"
+      }
+    ],
+    "events": {
+      "plain build": {
+        "passed": 8,
+        "of": 8,
+        "held": true
+      },
+      "plan change": {
+        "passed": 2,
+        "of": 2,
+        "held": true
+      },
+      "two developers disagree": {
+        "passed": 2,
+        "of": 2,
+        "held": true
+      },
+      "a note against the plan": {
+        "passed": 2,
+        "of": 2,
+        "held": true
+      },
+      "a unit quietly changed": {
+        "passed": 3,
+        "of": 3,
+        "held": true
+      },
+      "late joiner": {
+        "passed": 2,
+        "of": 2,
+        "held": true
+      },
+      "nobody planned it": {
+        "passed": 1,
+        "of": 1,
+        "held": true
+      }
+    }
+  }
+]
