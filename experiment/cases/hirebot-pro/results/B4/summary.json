@@ -1,0 +1,54 @@
+{
+  "case": "hirebot-pro",
+  "run": "B4",
+  "approach": "Midflight",
+  "model": "sonnet",
+  "merge": [
+    "t1-catalog: merged",
+    "t2-pricing: merged",
+    "t3-bookings: merged",
+    "t4-reports: merged",
+    "t5-cli: merged"
+  ],
+  "scores": [
+    {
+      "passed": 14,
+      "of": 14,
+      "failed": []
+    }
+  ],
+  "agent_starts_without_midflight": 0,
+  "stats": {
+    "cost": 1.7553,
+    "warmup_cost": 0.2626414,
+    "turns": 120,
+    "input": 146,
+    "output": 34572,
+    "cache_read": 3700305,
+    "cache_write": 167298,
+    "agent_minutes": 5.1,
+    "tool_calls": 108,
+    "midflight_calls": {
+      "check_in": 21,
+      "submit_claim": 13,
+      "acknowledge_directive": 10
+    },
+    "cost_by_agent": {
+      "t1": 0.22427319999999998,
+      "t2": 0.2868486,
+      "t3": 0.5241216,
+      "t4": 0.3581074,
+      "t5": 0.36191419999999996
+    }
+  },
+  "notes": [
+    "Midflight with S-13 (branch S-13-lean-context, 0bb9e01): a reply says each thing once. Run on October 11, 2026. B3 is its control.",
+    "Run against a Midflight on the same machine (experiment/local_midflight.py), not the live service: everything in memory, one person signed in who leads the project and owns every task, the HireBot Pro plan as plan v1 and the lead's change as plan v2.",
+    "The AI reviewer was scripted for this run: it raises the case's one real conflict (reports keeps a 20% cancellation fee, bookings refunds in full) as a question for the lead, as the live reviewer did in B2, and nothing else. So this run says nothing about the reviewer.",
+    "Same prompts and checks as B1 and B2. One escalation (E-20, the real one); the lead resolved it once with the fixed decision, then messages 11 and 12 went to the two agents whose claims it sent back.",
+    "Agents passed the check-in marker back in 12 of the 16 check-ins after their first. Within one session they always did; of the 7 sessions that were resumed with a new message, 4 left it out on their first check-in and got everything.",
+    "No claim was refused over a contract id; one was refused as invalid. Four calls to acknowledge_directive failed on their arguments first.",
+    "14 of 14 at merge, no fix round. Midflight sent back about 70,000 characters.",
+    "A first attempt on October 10 stopped in phase 1 when the Claude plan's usage limit was reached, and the local Midflight's memory was lost with it. Nothing from that attempt is counted (kept as B4-aborted)."
+  ]
+}
