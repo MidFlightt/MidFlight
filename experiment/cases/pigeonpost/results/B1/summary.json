@@ -1,0 +1,123 @@
+{
+  "case": "pigeonpost",
+  "run": "B1",
+  "approach": "Midflight",
+  "model": "sonnet",
+  "merge": [
+    "t1-roost: merged",
+    "t2-pricing: merged",
+    "t3-dispatch: merged",
+    "t4-billing: merged",
+    "t5-cli: merged",
+    "t6-tracking: merged"
+  ],
+  "scores": [
+    {
+      "passed": 20,
+      "of": 20,
+      "failed": [],
+      "events": {
+        "plain build": {
+          "passed": 8,
+          "of": 8,
+          "held": true
+        },
+        "plan change": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "two developers disagree": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a note against the plan": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "a unit quietly changed": {
+          "passed": 3,
+          "of": 3,
+          "held": true
+        },
+        "late joiner": {
+          "passed": 2,
+          "of": 2,
+          "held": true
+        },
+        "nobody planned it": {
+          "passed": 1,
+          "of": 1,
+          "held": true
+        }
+      }
+    }
+  ],
+  "agent_starts_without_midflight": 5,
+  "stats": {
+    "cost": 2.6869,
+    "warmup_cost": 0.643742,
+    "turns": 177,
+    "input": 228,
+    "output": 58981,
+    "cache_read": 6284550,
+    "cache_write": 302023,
+    "agent_minutes": 10.9,
+    "tool_calls": 153,
+    "midflight_calls": {
+      "project_status": 4,
+      "propose_plan": 2,
+      "approve_plan": 2,
+      "check_in": 26,
+      "submit_claim": 20,
+      "resolve_escalation": 3,
+      "acknowledge_directive": 10
+    },
+    "cost_by_agent": {
+      "t1": 0.5406292000000001,
+      "t2": 0.4594082,
+      "t3": 0.622073,
+      "t4": 0.3480904,
+      "t5": 0.4528168,
+      "t6": 0.2639262
+    },
+    "chat_calls": {},
+    "lead_actions": 3,
+    "turns_by_call": {
+      "01-lead-plan": 5,
+      "02-t1-p1": 13,
+      "03-t2-p1": 14,
+      "04-t3-p1": 15,
+      "05-t1-p2": 9,
+      "06-t2-p2": 4,
+      "07-t3-p2": 6,
+      "08-t4-p2": 12,
+      "09-t5-p2": 13,
+      "10-lead-answer": 4,
+      "11-lead-change": 4,
+      "12-t1-p3": 5,
+      "13-t2-p3": 6,
+      "14-t3-p3": 9,
+      "15-t4-p3": 10,
+      "16-t5-p3": 8,
+      "17-t6-p3": 12,
+      "18-lead-answer": 4,
+      "19-t1-p4": 6,
+      "20-t2-p4": 2,
+      "21-t3-p4": 6,
+      "22-t4-p4": 2,
+      "23-t5-p4": 3,
+      "24-t6-p4": 5
+    },
+    "lead_cost": 0.3683
+  },
+  "notes": [
+    "The lead proposed and approved plan version 1 and, before phase 3, version 2, through Midflight. Nothing was pasted to any agent.",
+    "Phase 2: Midflight blocked pricing's revised claim (tax before the promo discount) as contradicting R-2, and pricing kept the plan's rule. It raised the cancellation disagreement between dispatch and billing as E-116; the lead decided it from the sheet.",
+    "Phase 3: the roost rejected Midflight's direction to keep kg because its developer said grams, and the lead ruled kg (E-117). Dispatch still refunded in full after E-116, which Midflight raised again as E-124; the lead ruled again, and dispatch and billing both built the 25% fee in phase 4. Tracking kept the contract's field name.",
+    "Three escalations reached the lead. All three were real, and all three were on the decision sheet.",
+    "Twelve decisions were recorded. The lead made three (E-116, E-117, E-124); all three were real questions and on the decision sheet. Midflight settled two itself, both 'the plan stands' (E-110: tax after the promo discount and payloads in kg; E-123: kg again). Seven were assumptions one task stated about another, recorded as agreed. No false alarm reached the lead."
+  ]
+}
