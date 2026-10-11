@@ -194,9 +194,14 @@ class CheckInService:
 
 
 def _current_claim(claims: Sequence[Claim], actor: Participant, task_id: str) -> Claim | None:
+    """The agent's claim for this task: the active one, else the last one it closed.
+
+    A withdrawn claim isn't shown. The agent gave it up, so for this task it has no claim,
+    and its old verdict and findings would only mislead whoever picks the task up next.
+    """
     mine = [c for c in claims if c.task_id == task_id and c.agent_id == actor.id]
     active = [c for c in mine if c.state in ACTIVE_CLAIM_STATES]
-    pool = active or mine
+    pool = active or [c for c in mine if c.state is ClaimState.CLOSED]
     return max(pool, key=lambda c: c.created_at) if pool else None
 
 
