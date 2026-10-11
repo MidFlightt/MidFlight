@@ -19,6 +19,8 @@ has everything needed to check them or run them again.
 | `run.py` | The driver: sets up a trial, runs the agents, merges, scores, records |
 | `midflight-only.mcp.json` | The MCP configuration run B's agents get: only Midflight |
 | `walkthrough.py` | One simulated run of the whole workflow, written to `docs/pages/walkthrough.html` |
+| `local_midflight.py`, `midflight-local.mcp.json` | A Midflight for one trial on this machine, in memory, with a scripted reviewer: for comparing two versions of the code on the same case. Its first lines say how to run a trial against it |
+| `reply_size.py` | Replays a recorded trial's Midflight calls in memory and adds up how much text Midflight sends back. No tokens spent |
 | `cases/<case>/README.md` | The case: the product, the parts, the surprises |
 | `cases/<case>/case.py` | **The exact words every agent is given**, per approach and phase |
 | `cases/<case>/starter/` | The near-empty repository every trial starts from |

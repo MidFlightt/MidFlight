@@ -29,6 +29,23 @@ Two cases:
 | Agent turns | 62 | 133 | 164 |
 | The lead had to step in | never (nobody could ask) | 1 time | 4 times, 2 of them only for false alarms |
 
+**Update, October 11.** We changed Midflight in response to what follows and ran the
+heavier case again ([what changed](#what-the-experiment-found-wrong-with-midflight)):
+
+| HireBot Pro | A: team chat | B: Midflight on October 9 | B: Midflight on October 11 |
+| --- | --- | --- | --- |
+| Checks passing right after merging | 14 of 14 | 13 of 14 | **14 of 14** |
+| Fix rounds to pass all | 0 | 1 | **0** |
+| Cost of all agents and the fixer | $1.81 | $2.68 | **$2.21** |
+| Agent turns | 133 | 164 | **133** |
+| The lead had to step in | 1 time | 4 times | **1 time** |
+| False alarms that stopped an agent | none | 7 | **none** |
+
+On this case Midflight now matches the team chat on correctness and on the lead's
+effort, and costs about 22% more. It is still one run each, so the gap that is left may
+be noise. The findings below are the ones from October 9 and are kept as they were
+written.
+
 1. **The shared team-chat file was the best approach in both cases.** Every check passed
    at merge, with no repairs, for less than Midflight cost.
 2. **Midflight did not beat it, and on the heavier case it was clearly worse:** about
@@ -252,6 +269,71 @@ in 19 of 20 reviews and sends 15 of those to the right decider; no false alarm r
 lead in 45 reviews, and 4 asked an agent to revise for nothing
 ([evals/results.md](../evals/results.md)). In the simulated run, the lead acted once, on
 the cancellation fee; Midflight settled what `total` means itself.
+
+### The rerun (October 11)
+
+The same trial, the same prompts and checks, on the changed Midflight
+([B2](../experiment/cases/hirebot-pro/results/B2/)):
+
+- **Phase 1: nothing reached the lead.** All five claims were approved. In B1 two false
+  alarms stopped two agents here.
+- **The seam that broke B1 was agreed in phase 1.** Reports stated "I will read bookings
+  via a module-level `BOOKINGS` dict in app/bookings.py", Bookings saw it at check-in and
+  built it, and Midflight recorded it as agreed. Seven such agreements in the run.
+- **One escalation, and it was the real one.** The cancellation fee went to the lead as a
+  product question with both sides. The lead answered once.
+- **The `total` question never became a conflict.** After the decision, Bookings stated
+  how it would store the fee and named Reports; that was recorded as agreed. In B1 it
+  took a second round with the lead.
+- **14 of 14 at merge**, no fix round, $2.21 against $2.68.
+
+What it doesn't show: Midflight settling a technical question itself. None came up,
+because the agents agreed first. And the hosted service still locked agents out at
+start-up 17 times; one cause was found and fixed during this run (a request the
+connector held open for two minutes), another is still open, and the AWS limit of 10
+simultaneous requests makes both worse.
+
+### Shorter replies (S-13, October 11)
+
+The logs of B2 showed where Midflight's extra cost over the chat file came from: not more
+calls, but longer replies. Everything a reply holds stays in the agent's context and is
+read again on every later step, and over half of Midflight's reply text had already been
+sent to the same agent. S-13 makes a reply say each thing once (D34): a check-in ends with
+a marker, and an agent that passes it back gets only what is new.
+
+Two trials on the same day, same prompts and checks, against a Midflight on the same
+machine with a scripted reviewer (it raises the one real conflict, as the live reviewer
+did in B2): [B3](../experiment/cases/hirebot-pro/results/B3/) on the code as it was, and
+[B4](../experiment/cases/hirebot-pro/results/B4/) with S-13.
+
+| | B3, before | B4, with S-13 |
+| --- | --- | --- |
+| Checks passed at merge | 14 of 14 | 14 of 14 |
+| Fix rounds, lead actions | 0, 1 | 0, 1 |
+| Cost of the five agents | $2.21 | $1.76 |
+| Steps the agents took | 89 | 73 |
+| Text Midflight sent back | 124,000 characters | 70,000 characters |
+| Claims refused and sent again | 6 | 1 |
+
+- **The agents used the marker without being told to by their developer.** 12 of the 16
+  check-ins after an agent's first passed it. Inside one session they always did; 4 of
+  the 7 sessions that were resumed with a new message left it out once and got everything.
+- **Part of the gain is fewer refused claims, and that part may be luck.** In B3 five
+  claims were refused because the agent copied a contract's id with its version attached
+  (`agent v1`). S-13 writes the id by itself and B4 had none. B2, on the old wording, had
+  none either.
+- **B3 cost what B2 cost on the live service** ($2.21 both), so the local setup is a fair
+  stand-in for cost.
+
+What it doesn't show: one trial each, so the size of the gain is not established. The
+reviewer was scripted, so nothing here is about the reviewer. Every agent was signed in
+as the lead, as in all our trials, and the lead is sent every decision in the project;
+real teammates are sent fewer. The chat-file run (A1, $1.81) is from October 9 and was
+not repeated.
+
+To measure reply sizes without spending tokens, `experiment/reply_size.py` replays B2's
+calls in memory: 82,000 characters back before S-13, 51,000 with it when agents pass the
+marker.
 
 To see the whole workflow with these changes, step by step, open
 [the walkthrough](pages/walkthrough.html): what each agent told Midflight and exactly what

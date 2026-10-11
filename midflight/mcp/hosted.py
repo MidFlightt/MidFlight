@@ -145,11 +145,12 @@ def build_hosted_server(
         return member.developer_name if member else participant_id
 
     def with_directives(text: str, member: Participant, task_id: str | None = None) -> str:
+        # A peek: the agent is shown only the directives, so this isn't a check-in.
         try:
-            reply = check_in_json(services.check_ins.check_in(member, task_id))
+            reply = check_in_json(services.check_ins.check_in(member, task_id, peek=True))
         except ServiceError:
             return text
-        return f"{text}\n\n{directives_block(reply['directives'])}"
+        return f"{text}\n\n{directives_block(reply['directives'], reply['delivered_now'])}"
 
     # Joining a project -----------------------------------------------------------------
 
@@ -206,11 +207,17 @@ def build_hosted_server(
     # Agent work ------------------------------------------------------------------------
 
     @server.tool(description=CHECK_IN)
-    def check_in(task_id: str | None = None, project_id: str | None = None) -> str:
+    def check_in(
+        task_id: str | None = None,
+        project_id: str | None = None,
+        since: str | None = None,
+    ) -> str:
         return answer(
             lambda: check_in_text(
                 check_in_json(
-                    services.check_ins.check_in(membership(project_id).participant, task_id)
+                    services.check_ins.check_in(
+                        membership(project_id).participant, task_id, since=since
+                    )
                 )
             )
         )
@@ -224,7 +231,7 @@ def build_hosted_server(
         acceptance_criteria: list[str] | None = None,
         provides: list[InterfaceUse] | None = None,
         consumes: list[InterfaceUse] | None = None,
-        no_interfaces: bool = False,
+        no_interfaces: bool | None = None,
         assumptions: list[str] | None = None,
         files: list[str] | None = None,
         requirement_ids: list[str] | None = None,
@@ -235,6 +242,17 @@ def build_hosted_server(
     ) -> str:
         def act() -> str:
             member = membership(project_id).participant
+            # A revision says only what changes: a part left out stays as it was (D34).
+            before = store.get_claim(claim_id) if claim_id else None
+            if before is not None and before.agent_id != member.id:
+                before = None
+
+            def kept[T](given: T | None, name: str, default: T) -> T:
+                if given is not None:
+                    return given
+                return getattr(before, name) if before is not None else default
+
+            same_interfaces = provides is None and consumes is None
             if status is not None:
                 if claim_id is None:
                     return f"To set status {status}, pass the claim_id."
@@ -250,15 +268,21 @@ def build_hosted_server(
                 branch=branch,
                 base_sha=base_sha,
                 plan_version=plan_version,
-                requirement_ids=requirement_ids or [],
-                files=files or [],
-                provides=provides or [],
-                consumes=consumes or [],
-                no_interfaces=no_interfaces,
-                assumptions=assumptions or [],
-                acceptance_criteria=acceptance_criteria or [],
+                requirement_ids=kept(requirement_ids, "requirement_ids", []),
+                files=kept(files, "files", []),
+                provides=kept(provides, "provides", []),
+                consumes=kept(consumes, "consumes", []),
+                no_interfaces=(
+                    no_interfaces
+                    if no_interfaces is not None
+                    else bool(before and before.no_interfaces and same_interfaces)
+                ),
+                assumptions=kept(assumptions, "assumptions", []),
+                acceptance_criteria=kept(acceptance_criteria, "acceptance_criteria", []),
                 reason=reason,
             )
+            # A revision on the same plan version got the contract list with the first.
+            known = before is not None and before.plan_version == plan_version
             result = services.claims.submit(member, submission)
             if not wait_for_review(result.job_id):
                 text = (
@@ -268,7 +292,8 @@ def build_hosted_server(
                 )
                 return with_directives(text, member, task_id)
             verdict = verdict_json(services.claims.verdict(result.claim_id, result.revision))
-            return f"{verdict_text(verdict)}\n\n{directives_block(verdict['directives'])}"
+            text = verdict_text(verdict, same_contracts=known)
+            return f"{text}\n\n{directives_block(verdict['directives'], ())}"
 
         return answer(act)
 
