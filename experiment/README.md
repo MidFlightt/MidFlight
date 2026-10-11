@@ -45,7 +45,7 @@ has everything needed to check them or run them again.
 | --- | --- | --- | --- |
 | [`hirebot-small`](cases/hirebot-small/README.md) | 3 | by hand, 8 checks | field names between a page and two small APIs |
 | [`hirebot-pro`](cases/hirebot-pro/README.md) | 5 | automatically, 14 checks | real business rules, a change touching four parts, a decision only the lead can make |
-| [`pigeonpost`](cases/pigeonpost/README.md) | 6 | automatically, 20 checks | six things that happen after the plan is written; separate laptops; agents starting at different times. Not run yet |
+| [`pigeonpost`](cases/pigeonpost/README.md) | 6 | automatically, 20 checks | six things that happen after the plan is written; separate laptops; agents starting at different times |
 
 ## Running a trial
 

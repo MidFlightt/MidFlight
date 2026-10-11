@@ -1,8 +1,60 @@
 # Benchmark: PigeonPost
 
-A third experiment case, built on October 10, 2026. **It has not been run yet**: this page
-explains the scenario, how a trial works, and how to run it on your own laptop. The first
-two cases and their results are in [experiment.md](experiment.md).
+A third experiment case, built and first run on October 10, 2026. This page explains the
+scenario, how a trial works, what the first three trials showed, and how to run it on
+your own laptop. The first two cases and their results are in
+[experiment.md](experiment.md).
+
+## First results
+
+One trial per approach, so read this as a first look.
+
+| | N: no channel | A: team chat | B: Midflight |
+| --- | --- | --- | --- |
+| Checks passing right after merging | 13 of 20 | 18 of 20 | **20 of 20** |
+| Mid-flight events held | 3 of 6 | 5 of 6 | 6 of 6 |
+| Fix rounds to pass all | 2 | 1 | 0 |
+| Cost of the agents and the fixer | $2.06 | $1.88 | $2.69 |
+| Agent turns | 126 | 105 | 177 |
+| The lead answered | never (nobody could ask) | 5 posts | 3 escalations |
+
+1. **No channel shipped three wrong rules, and nothing crashed.** The roost served
+   payloads in grams, so a 6 kg parcel was accepted; pricing charged tax before the promo
+   discount; dispatch refunded a cancellation in full while billing kept 4.00. Each agent
+   told only its own developer.
+2. **The team chat fixed two of those three.** The agents posted their developers' notes,
+   the lead answered, and the grams and the tax were changed back before the merge. It was
+   also the cheapest run.
+3. **The team chat lost the cancellation fee.** The lead's 25% decision reached both
+   agents. Each kept its own developer's instruction, wrote "CONFLICT for lead" again, and
+   waited. The lead, whose instructions say to answer what it hasn't answered yet, didn't
+   repeat itself. The refund and the revenue were merged wrong.
+4. **Midflight passed every check at merge.** The same second round happened there:
+   dispatch still refunded in full after the lead's first ruling. Midflight raised it
+   again as an open question, the lead ruled again, and both parts built the 25% fee.
+   Midflight settled the tax and the grams itself ("the plan stands"), and no false alarm
+   reached the lead.
+5. **Midflight cost the most:** 43% more agent spend than the team chat, 72 more turns,
+   and four more minutes of agent time. The repair round it avoided cost the team chat
+   $0.12.
+
+What this does and doesn't show:
+
+- **The difference between A and B is one event, in one trial each.** It rests on what
+  happens when an agent is told one thing by its developer and another by the lead. A
+  lead who repeated the decision in the chat might have closed it. In Midflight the
+  repeat wasn't left to the lead noticing: the question stayed open until it was decided.
+- **The team chat is still a strong approach.** It held five of six events on a case
+  built to be hard for it.
+- **This case leans toward Midflight on purpose** (see below). It says Midflight can win
+  on its home ground, not that it wins in general. In both earlier cases the team chat
+  won or tied.
+- **B's cost leaves out** the lead's own agent ($0.37, against $0.14 in the team chat),
+  the harness's warm-up calls ($0.64), and Midflight's reviewer on AWS. Five agent starts
+  came up without Midflight's tools and were restarted by the driver.
+
+Every message, reply, and check is in
+[`experiment/cases/pigeonpost/results/`](../experiment/cases/pigeonpost/results/).
 
 ## What it compares
 
@@ -190,11 +242,13 @@ python experiment/run.py pigeonpost A1 auto
   claude mcp add --transport http --scope user midflight-live https://5hwub7vaxiyz6oezhxrs3qivaa0cvjvy.lambda-url.us-east-1.on.aws/mcp
   ```
 
-- Install the **MidFlightt** GitHub App on any repository you own. An empty one is fine;
-  the trial never pushes to it.
+- Create an empty GitHub repository and install the **MidFlightt** GitHub App on it. The
+  trial never pushes to it.
 - In Claude Code, ask: "Create a Midflight project for `<you>/<that repository>`". It
-  answers with a project id such as `midflight-1234`. Use a new project for every
-  Midflight trial, because a project remembers earlier decisions.
+  answers with a project id such as `midflight-1234`.
+
+A project remembers earlier decisions, and a repository can have only one Midflight
+project. So every Midflight trial needs its own new, empty repository.
 
 Then give the project id to the run:
 
@@ -231,5 +285,4 @@ Things to know:
 - Midflight's check on pushed code (`midflight/verify`) is not part of this case.
 - The driver's steps were tested without agents (set-up, the chat tool with six posts at
   once, merging, scoring, recording) and with two real turns of the lead in the team-chat
-  approach. A full trial, and the lead's turns in the Midflight approach, had not been
-  run when this page was written.
+  approach, before the three trials above.
