@@ -264,7 +264,7 @@ def merge(trial: Trial) -> None:
     if trial.laptops:  # every developer pushes their branch; the merge happens on main
         for agent, branch in trial.agents.items():
             laptop = trial.folder(agent)
-            if git(laptop, "status", "--porcelain").stdout.strip():
+            if git(laptop, "status", "--porcelain", "--untracked-files=no").stdout.strip():
                 report.append(f"{branch}: uncommitted changes were left out")
             git(laptop, "push", "-q", "origin", branch)
         git(main, "fetch", "-q", "origin")
@@ -527,10 +527,12 @@ def stats(trial: Trial, show: bool = True) -> dict:
                             totals["lead_actions"] += short == "resolve_escalation"
                         command = str(block.get("input", {}).get("command", ""))
                         for verb in ("read", "post"):
-                            if f"chat.py {verb}" in command:
+                            times = command.count(f"chat.py {verb}")  # one command can post twice
+                            if times:
                                 chat = totals["chat_calls"]
-                                chat[verb] = chat.get(verb, 0) + 1
-                                totals["lead_actions"] += agent == "lead" and verb == "post"
+                                chat[verb] = chat.get(verb, 0) + times
+                                if agent == "lead" and verb == "post":
+                                    totals["lead_actions"] += times
     # The lead's agent stands in for a person, so its spend is kept apart.
     totals["lead_cost"] = round(totals["cost_by_agent"].pop("lead", 0.0), 4)
     totals["cost"] = round(sum(totals["cost_by_agent"].values()), 4)
