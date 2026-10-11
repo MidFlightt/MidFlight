@@ -397,3 +397,28 @@ for tests and local runs. Tests use the fakes only.
   means no review, never approval.
 - **`GitHub`** raises `GitHubUnavailable` (with `retry_after` when known) on errors,
   rate limits, and timeouts, which marks the project stale (UC-15).
+
+### Fresh flights on an existing repository
+
+`start_new_flight(project_id, request_id, expected_coord_rev)` is an explicit lead
+operation. It archives the current project and atomically switches the repository
+lookup to a new project. The approved plan becomes version 1 and active signed-in
+members retain their roles. Claims, decisions/escalations, directives, jobs and
+verifications remain in the archived project. Archived projects are excluded from
+`my_projects`; their records remain available for audit. Old writes are refused.
+
+Project adds `archived_at`, `successor_project_id`, and `flight_request_id`.
+`Store.replace_flight` performs the archive, successor, memberships, plan, lookups
+and audit writes in one transaction, conditional on the old coordination revision.
+The initial implementation supports up to 25 signed-in members. Token-only teams
+must migrate memberships first. Other members' script tokens are not copied.
+
+`POST /projects/{pid}/flights` accepts `request_id`, `expected_coord_rev`, and an
+optional approved `source_plan_version` (default: current). A lead script token is
+required. It returns `{project, token}` with a successor lead script token. Retrying
+with the same old token and request ID recovers the same result. Keep this response
+out of logs. Other reset request IDs on the archived project are refused. A plan
+change after the state read produces a conflict instead of resetting unseen work.
+
+This operation does not change local Git checkouts, start agents, or synchronize
+uncommitted source code. Stop the old sessions before resetting and use fresh chats.

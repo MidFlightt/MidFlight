@@ -181,7 +181,7 @@ class ProjectService:
         found = []
         for member in self._store.list_memberships(user.id):
             project = self._store.get_project(member.project_id)
-            if member.active and project is not None:
+            if member.active and project is not None and not project.archived_at:
                 found.append(Membership(project, member))
         return found
 
@@ -298,7 +298,13 @@ class ProjectService:
             idempotency_key=key,
         )
         self._store.commit(
-            Commit(project_id=project_id, idempotency_key=key, puts=puts, audit=[event])
+            Commit(
+                project_id=project_id,
+                idempotency_key=key,
+                puts=puts,
+                audit=[event],
+                bump_coord_rev=True,
+            )
         )
 
 

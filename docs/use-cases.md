@@ -1102,3 +1102,12 @@ Answered or tracked in [design-decisions.md](design-decisions.md):
 | 6 | Cross-task visibility (UC-07 2d)? | Open, Q3. Default: read-only view. |
 | 7 | Pre-push hook when Midflight is down (UC-16 2a)? | D8: warn and allow. |
 | 8 | Canonical plan change? | D2: `currency`. |
+
+### Lead starts a fresh flight
+
+The lead explicitly requests a fresh run on the same repository. Midflight checks
+the lead membership and expected coordination revision, copies the approved plan
+and active signed-in team into a new flight, archives the old flight, and returns
+the new project ID. Existing agents are not launched or resumed. On a retry with the
+same request ID, return the same successor. On stale state, a removed or non-lead
+caller, an unapproved source plan, or unsupported memberships, make no flight change.

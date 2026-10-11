@@ -106,6 +106,7 @@ async def test_connector_offers_the_tools_and_getting_started_instructions() -> 
     assert {
         "my_projects",
         "create_project",
+        "start_new_flight",
         "join_project",
         "check_in",
         "submit_claim",

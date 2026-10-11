@@ -37,6 +37,9 @@ def _services() -> Services:
 
 def run_job(job: Job, services: Services) -> None:
     """Run one job with its handler. Each handler is safe to run twice (INV-13)."""
+    project = services.store.get_project(job.project_id)
+    if project and project.archived_at:
+        return
     if job.kind is JobKind.CLAIM_REVIEW:
         services.claims.run_review(job)
     elif job.kind is JobKind.VERIFICATION:

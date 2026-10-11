@@ -70,6 +70,17 @@ class RevisionConflict(Exception):
 
 
 class Store(Protocol):
+    def replace_flight(
+        self,
+        archived: Project,
+        successor: Project,
+        members: Sequence[Participant],
+        plan: Plan | None,
+        audit: Sequence[AuditEvent],
+    ) -> None:
+        """Atomically archive a flight and publish its successor; CAS on archived.coord_rev."""
+        ...
+
     def commit(self, commit: Commit) -> CommitResult:
         """Apply `commit` atomically, or raise RevisionConflict and write nothing."""
         ...

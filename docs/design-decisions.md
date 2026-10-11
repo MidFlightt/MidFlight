@@ -112,3 +112,12 @@ Simplifications adopted in the [development plan](development-plan.md#architectu
 | Q4 | Does the submission need a publicly hosted dashboard? | No. The lead works through their AI client with the lead tools (`project_status`, plan and escalation tools, D16). A read-only status page served by the backend is stretch task X-3. | requirements §13, D16 |
 | Q5 | Input size limits, retry limits, review timeout | 60 s claim wait; 2 worker retries; limits set in M-5 | requirements §13 |
 | Q6 | Official submission cutoff | Finish Oct 10, submit Oct 11 | requirements §13 |
+
+## Fresh-flight reset (proposed)
+
+A repository has one active coordination project and may have archived predecessors.
+Starting a fresh flight creates a new partition rather than deleting claims and
+resolved decisions in place. A lead action with an idempotency key and coordination
+revision switches the repository atomically. This preserves audit history and keeps
+stale agent sessions from contaminating a fresh demo. Local Git reset remains an
+explicit operator action; it does not distribute collaborators' uncommitted code.
