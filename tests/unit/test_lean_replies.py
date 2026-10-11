@@ -36,7 +36,7 @@ from midflight.services.plans import PlanDraft
 from midflight.services.projects import ProjectService
 
 HELPER = "T1 exposes format_total() for the page to call"
-FIELDS = "checkout-response v1 (provider T1): total_cents: integer"
+FIELDS = "checkout-response (v1, provider T1): total_cents: integer"
 
 
 def marker(reply: str) -> str:
@@ -174,7 +174,7 @@ def test_without_the_directive_only_what_changed_is_listed() -> None:
     assert plan_lines(after, after["plan_changed_ids"]) == [
         "",
         "Build against:",
-        "  checkout-response v2 (provider T1): total_cents: integer, currency: string",
+        "  checkout-response (v2, provider T1): total_cents: integer, currency: string",
         "",
         "Unchanged since the check-in you named: R-1.",
     ]
@@ -417,7 +417,7 @@ async def test_a_revision_onto_a_new_plan_version_gets_the_contract_list() -> No
             "submit_claim",
             **claim_args(claim_id=claim_id_in(first), plan_version=2),
         )
-    assert "rev 2" in revised and "checkout-response v2 (provider T1)" in revised
+    assert "rev 2" in revised and "checkout-response (v2, provider T1)" in revised
 
 
 @pytest.mark.anyio
