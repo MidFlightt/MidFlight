@@ -41,7 +41,13 @@ the lead's up-front work in the Midflight approach.
 | --- | --- | --- | --- | --- | --- | --- |
 | [N1](results/N1/) | No channel | 13 of 14 | 1 | $1.17 | 62 | never (nobody could ask) |
 | [A1](results/A1/) | Team chat | 14 of 14 | 0 | $1.81 | 133 | 1 time |
-| [B1](results/B1/) | Midflight | 13 of 14 | 1 | $2.68 | 164 | 4 times, 2 only for false alarms |
+| [B1](results/B1/) | Midflight, as it was on October 9 | 13 of 14 | 1 | $2.68 | 164 | 4 times, 2 only for false alarms |
+| [B2](results/B2/) | Midflight, after the changes of October 10 and 11 | 14 of 14 | 0 | $2.21 | 133 | 1 time |
+
+B2 is the same trial run again on the changed Midflight (the reviewer's second look,
+assumptions passed on and recorded as agreed, technical questions settled without the
+lead). One thing reached the lead, the real disagreement, and no agent was stopped for
+a false alarm. The seam that failed in B1 was agreed between the two agents in phase 1.
 
 Both failures are C13, the revenue report, for different reasons:
 
@@ -52,5 +58,7 @@ Both failures are C13, the revenue report, for different reasons:
   that assumption in every claim, and Midflight never passed it on.
 
 Each run's `summary.json` ends with the lead's notes: what was asked, what was answered,
-and for B1 all nine escalations (two real, seven false alarms). The write-up is
+and for B1 all nine escalations (two real, seven false alarms). A first attempt at B2
+was discarded because of a bug in the hosted service, described in B2's notes. The
+write-up is
 [docs/experiment.md](../../../docs/experiment.md).

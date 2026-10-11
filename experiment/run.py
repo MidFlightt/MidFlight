@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,10 @@ MIDFLIGHT_TOOLS = [
     f"mcp__midflight-live__{name}"
     for name in ("check_in", "submit_claim", "acknowledge_directive", "project_status")
 ]
+# Which Midflight run B's agents use: the live one, or another (experiment/local_midflight.py).
+MCP_CONFIG = Path(
+    os.environ.get("MIDFLIGHT_MCP_CONFIG") or HERE / "midflight-only.mcp.json"
+).resolve()
 GIT_ID = ["-c", "user.name=Experiment", "-c", "user.email=experiment@example.com"]
 APPROACHES = {"N": "no channel", "A": "team-chat file", "B": "Midflight"}
 LIMIT_TEXT = "hit your session limit"
@@ -357,7 +362,7 @@ def call(
             # Only these MCP servers: none, or only Midflight (others slow the start).
             "--strict-mcp-config"]  # fmt: skip
     if use_midflight:
-        args += ["--mcp-config", str(HERE / "midflight-only.mcp.json")]
+        args += ["--mcp-config", str(MCP_CONFIG)]
     if session:
         args += ["--resume", session]
     (trial.root / "prompts" / f"{name}.txt").write_text(prompt, encoding="utf-8")
@@ -431,7 +436,7 @@ def warm_up(trial: Trial) -> None:
     sign-in, so agents starting together don't race to do either."""
     args = [claude_exe(), "-p", "--model", MODEL, "--max-turns", "3",
             "--output-format", "stream-json", "--verbose", "--strict-mcp-config",
-            "--mcp-config", str(HERE / "midflight-only.mcp.json"),
+            "--mcp-config", str(MCP_CONFIG),
             "--allowedTools", "mcp__midflight-live__my_projects", *MIDFLIGHT_TOOLS]  # fmt: skip
     log = trial.root / "logs" / f"warmup-{int(time.time())}.jsonl"
     prompt = "Call the Midflight my_projects tool once and reply with one word: ready."

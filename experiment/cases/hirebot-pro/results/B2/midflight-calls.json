@@ -1,0 +1,1116 @@
+[
+ {
+  "agent": "t1",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T1"
+  }
+ },
+ {
+  "agent": "t1",
+  "phase": "p1",
+  "tool": "submit_claim",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T1",
+   "plan_version": 5,
+   "branch": "t1-catalog",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/catalog.py"
+   ],
+   "requirement_ids": [
+    "R-1"
+   ],
+   "provides": [
+    {
+     "contract_id": "agent",
+     "fields": {
+      "handle": "string",
+      "name": "string",
+      "skills": "array",
+      "hourly_rate": "integer",
+      "weekly_capacity": "integer"
+     }
+    }
+   ],
+   "no_interfaces": false,
+   "assumptions": [
+    "Router is mounted by app/main.py so routes are GET /api/agents and GET /api/agents/{handle}",
+    "T3 (bookings) reads agents via the catalog module's data; weekly_capacity is the static total, bookings tracks hours left itself",
+    "T2 (pricing) uses hourly_rate in whole credits per hour",
+    "Unknown handle returns HTTP 404; skill filter matches exactly, case-insensitive"
+   ],
+   "acceptance_criteria": [
+    "GET /api/agents returns all 6 agents with contract fields",
+    "GET /api/agents?skill=python returns only agents with that skill",
+    "GET /api/agents/{handle} returns one agent, 404 if unknown"
+   ]
+  }
+ },
+ {
+  "agent": "t1",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T1"
+  }
+ },
+ {
+  "agent": "t1",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T1"
+  }
+ },
+ {
+  "agent": "t2",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T2"
+  }
+ },
+ {
+  "agent": "t2",
+  "phase": "p1",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T2",
+   "project_id": "midflight-9854",
+   "plan_version": 5,
+   "branch": "t2-pricing",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/pricing.py"
+   ],
+   "provides": [
+    {
+     "contract_id": "quote-request",
+     "fields": {
+      "items": "array",
+      "promo_code": "string"
+     }
+    },
+    {
+     "contract_id": "order-line",
+     "fields": {
+      "agent": "string",
+      "hours": "integer"
+     }
+    },
+    {
+     "contract_id": "quote",
+     "fields": {
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    }
+   ],
+   "assumptions": [
+    "T1: hourly_rate is whole credits per hour, keyed by handle. I only edit app/pricing.py and don't know T1's catalog code interface, so I embed the README rate table in pricing.py rather than import from catalog.",
+    "T3: bookings will call POST /api/quote or import pricing.compute_quote(items, promo_code) and get the quote ints; order-line.agent is the handle.",
+    "Errors: unknown promo, unknown agent, or non-positive hours return HTTP 400 with {detail: message}.",
+    "promo_code is optional (null or absent means none); promo discount is capped at the post-volume amount so totals never go negative.",
+    "Rounding half up: volume discount per line = round_half_up(10% of line), tax = round_half_up(8% of base)."
+   ],
+   "acceptance_criteria": [
+    "POST /api/quote returns subtotal, volume_discount, promo_discount, tax, total as integers per rules 1-6",
+    "BEEPBOOP takes 50 off; other codes give 400",
+    "lines of 20+ hours get 10% off, rounded half up"
+   ],
+   "requirement_ids": [
+    "R-2"
+   ]
+  }
+ },
+ {
+  "agent": "t2",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T2"
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T3"
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "p1",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T3",
+   "project_id": "midflight-9854",
+   "plan_version": 5,
+   "branch": "t3-bookings",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/bookings.py"
+   ],
+   "requirement_ids": [
+    "R-3"
+   ],
+   "provides": [
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "items": "array",
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    },
+    {
+     "contract_id": "availability",
+     "fields": {
+      "handle": "string",
+      "available": "integer"
+     }
+    }
+   ],
+   "consumes": [
+    {
+     "contract_id": "quote-request",
+     "fields": {
+      "items": "array",
+      "promo_code": "string"
+     }
+    },
+    {
+     "contract_id": "order-line",
+     "fields": {
+      "agent": "string",
+      "hours": "integer"
+     }
+    },
+    {
+     "contract_id": "quote",
+     "fields": {
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    }
+   ],
+   "assumptions": [
+    "T2: pricing.compute_quote(items, promo_code) exists, takes list of dicts {agent, hours} and optional promo_code, returns quote dict/object with int fields; raises an exception (ValueError-like) for bad promo code; I convert to HTTP 400",
+    "T1: catalog module exposes agents data, but I do not rely on its internal names: weekly capacity per handle is read from catalog if available, else I use the README table; bookings tracks hours left itself in memory",
+    "T3 (mine): booking POST body is the quote-request {items:[{agent,hours}], promo_code}; response is the booking contract; unknown booking -> 404, unknown agent -> 404/400, insufficient hours -> 409; availability is GET /api/agents/{handle}/availability",
+    "Reports (T4) will read bookings via a module-level BOOKINGS dict of booking dicts (id,status,items,total...) in app/bookings.py"
+   ],
+   "acceptance_criteria": [
+    "Booking reserves hours atomically; any shortfall refuses whole booking and reserves nothing",
+    "Cancel restores hours and is idempotent",
+    "Availability returns capacity minus confirmed booked hours"
+   ]
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T3"
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T4"
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "p1",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T4",
+   "project_id": "midflight-9854",
+   "plan_version": 5,
+   "branch": "t4-reports",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/reports.py"
+   ],
+   "provides": [
+    {
+     "contract_id": "report",
+     "fields": {
+      "revenue": "integer",
+      "confirmed": "integer",
+      "cancelled": "integer",
+      "hours": "object"
+     }
+    }
+   ],
+   "consumes": [
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "items": "array",
+      "total": "integer"
+     }
+    }
+   ],
+   "assumptions": [
+    "T3: app/bookings.py exposes a module-level BOOKINGS dict mapping id -> booking dict (id, status, items, total), as T3 said in C-29.",
+    "T3: booking status is exactly 'confirmed' or 'cancelled'; total is an integer in whole credits.",
+    "T3: each item in booking items is a dict with 'agent' (the handle string) and 'hours' (integer), matching order-line.agent from E-18.",
+    "T4 decision: revenue = sum of total over confirmed bookings only; cancelled bookings earn nothing.",
+    "T4 decision: hours is an object {handle: hours} that includes only agents with confirmed booked hours.",
+    "T4: endpoint is GET /api/report, read live from app.bookings.BOOKINGS at request time (imported lazily)."
+   ],
+   "acceptance_criteria": [
+    "GET /api/report returns revenue, confirmed, cancelled, hours",
+    "Cancelled bookings are excluded from revenue and hours",
+    "Empty state returns zeros and an empty hours object"
+   ]
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T4"
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T5"
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "p1",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T5",
+   "project_id": "midflight-9854",
+   "plan_version": 5,
+   "branch": "t5-cli",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "cli/hirebot.py"
+   ],
+   "requirement_ids": [
+    "R-5"
+   ],
+   "no_interfaces": false,
+   "consumes": [
+    {
+     "contract_id": "agent",
+     "fields": {
+      "handle": "string",
+      "hourly_rate": "integer",
+      "weekly_capacity": "integer"
+     }
+    },
+    {
+     "contract_id": "quote",
+     "fields": {
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    },
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "total": "integer",
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "tax": "integer"
+     }
+    },
+    {
+     "contract_id": "availability",
+     "fields": {
+      "available": "integer"
+     }
+    },
+    {
+     "contract_id": "report",
+     "fields": {
+      "revenue": "integer",
+      "confirmed": "integer",
+      "cancelled": "integer",
+      "hours": "object"
+     }
+    },
+    {
+     "contract_id": "quote-request",
+     "fields": {
+      "items": "array",
+      "promo_code": "string"
+     }
+    }
+   ],
+   "assumptions": [
+    "T1: GET /api/agents[?skill=] returns a JSON array of agent objects (handle, hourly_rate, weekly_capacity)",
+    "T2: POST /api/quote body {items:[{agent,hours}], promo_code} returns the quote ints; promo_code may be omitted/null when none",
+    "T3: POST /api/bookings takes the same body and returns booking JSON with id,status and quote ints; GET /api/bookings/{id}; POST /api/bookings/{id}/cancel; GET /api/agents/{handle}/availability returns {handle, available}",
+    "T4: GET /api/report returns {revenue, confirmed, cancelled, hours:{handle:int}}",
+    "All APIs report errors with a non-2xx status and JSON body containing 'detail' (string or list)"
+   ],
+   "acceptance_criteria": [
+    "Each README command prints exactly its listed keys and exits 0",
+    "Any error prints 'error: <message>' and exits 1"
+   ]
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "p1",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T5"
+  }
+ },
+ {
+  "agent": "t1",
+  "phase": "p2",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T1"
+  }
+ },
+ {
+  "agent": "t2",
+  "phase": "p2",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T2"
+  }
+ },
+ {
+  "agent": "t2",
+  "phase": "p2",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T2",
+   "project_id": "midflight-9854",
+   "claim_id": "C-28",
+   "plan_version": 6,
+   "branch": "t2-pricing",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/pricing.py"
+   ],
+   "provides": [
+    {
+     "contract_id": "quote-request",
+     "fields": {
+      "items": "array",
+      "promo_code": "string",
+      "rush": "boolean"
+     }
+    },
+    {
+     "contract_id": "order-line",
+     "fields": {
+      "agent": "string",
+      "hours": "number"
+     }
+    },
+    {
+     "contract_id": "quote",
+     "fields": {
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    }
+   ],
+   "assumptions": [
+    "T1: hourly_rate is whole credits per hour, keyed by handle. I only edit app/pricing.py and don't know T1's catalog code interface, so I embed the README rate table in pricing.py rather than import from catalog.",
+    "T3: pricing.compute_quote(items, promo_code=None, rush=False) takes a list of dicts {agent, hours} (hours may be a multiple of 0.5) and returns a dict of int fields incl. rush_fee; raises ValueError for bad promo, agent, or hours; T3 converts to HTTP 400. POST /api/quote also returns 400 on these.",
+    "T5: POST /api/quote body {items:[{agent,hours}], promo_code, rush}; promo_code and rush may be omitted/null (rush defaults false); response includes rush_fee (0 when not rush). The CLI should print rush_fee right after promo_discount.",
+    "Hours must be a multiple of 0.5 and at least 0.5, else 400. Volume discount applies at 20 hours or more per line.",
+    "Rush fee = round_half_up(25% of subtotal - volume - promo); tax = round_half_up(8% of base + rush_fee). Promo discount is capped at the post-volume amount."
+   ],
+   "acceptance_criteria": [
+    "POST /api/quote returns subtotal, volume_discount, promo_discount, rush_fee, tax, total as integers",
+    "Half-hour lines such as meeting-ghost=2.5 are priced; non-multiples of 0.5 give 400",
+    "rush adds 25% fee, taxed at 8%, included in total",
+    "BEEPBOOP takes 50 off; other codes give 400"
+   ],
+   "requirement_ids": [
+    "R-2",
+    "R-6",
+    "R-7"
+   ]
+  }
+ },
+ {
+  "agent": "t2",
+  "phase": "p2",
+  "tool": "acknowledge_directive",
+  "input": {
+   "directive_id": "D-32",
+   "project_id": "midflight-9854",
+   "task_id": "T2",
+   "response": "acknowledged"
+  }
+ },
+ {
+  "agent": "t2",
+  "phase": "p2",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T2"
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "p2",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T3"
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "p2",
+  "tool": "acknowledge_directive",
+  "input": {
+   "directive_id": "D-33",
+   "project_id": "midflight-9854",
+   "response": "acknowledged",
+   "note": "Revising claim for plan v6: fractional hours, rush_fee in booking, available as number. Also adding full refund on cancel per developer."
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "p2",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T3",
+   "project_id": "midflight-9854",
+   "claim_id": "C-29",
+   "plan_version": 6,
+   "branch": "t3-bookings",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/bookings.py"
+   ],
+   "requirement_ids": [
+    "R-3",
+    "R-6",
+    "R-7"
+   ],
+   "provides": [
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "items": "array",
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    },
+    {
+     "contract_id": "availability",
+     "fields": {
+      "handle": "string",
+      "available": "number"
+     }
+    }
+   ],
+   "consumes": [
+    {
+     "contract_id": "quote-request",
+     "fields": {
+      "items": "array",
+      "promo_code": "string",
+      "rush": "boolean"
+     }
+    },
+    {
+     "contract_id": "order-line",
+     "fields": {
+      "agent": "string",
+      "hours": "number"
+     }
+    },
+    {
+     "contract_id": "quote",
+     "fields": {
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    }
+   ],
+   "assumptions": [
+    "T2: pricing.compute_quote(items, promo_code=None, rush=False) takes list of dicts {agent, hours} (hours multiple of 0.5) and returns dict of int fields incl. rush_fee; raises ValueError for bad promo/agent/hours; T3 converts to HTTP 400",
+    "T3: booking items hold hours as number (int or float, multiples of 0.5); booking status is exactly confirmed or cancelled; module-level BOOKINGS dict id -> booking dict (T4 reads it)",
+    "T3: on cancel the customer is refunded in full (developer decision); booking keeps its quote ints, status becomes cancelled, and an extra field refunded (integer, = total) is added to the cancelled booking. T4: revenue should count confirmed bookings only, so cancelled earn nothing",
+    "T1: weekly capacity per handle comes from README table copy in bookings; hours left tracked by bookings"
+   ],
+   "acceptance_criteria": [
+    "Booking reserves hours atomically (halves supported); shortfall refuses whole booking",
+    "Cancel restores hours, refunds in full, idempotent",
+    "Availability returns capacity minus confirmed hours as number",
+    "rush flag passed to pricing and rush_fee returned"
+   ]
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "p2",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T3"
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "p2",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T4"
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "p2",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T4",
+   "project_id": "midflight-9854",
+   "claim_id": "C-30",
+   "plan_version": 6,
+   "branch": "t4-reports",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/reports.py"
+   ],
+   "requirement_ids": [
+    "R-4",
+    "R-6"
+   ],
+   "provides": [
+    {
+     "contract_id": "report",
+     "fields": {
+      "revenue": "integer",
+      "confirmed": "integer",
+      "cancelled": "integer",
+      "hours": "object"
+     }
+    }
+   ],
+   "consumes": [
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "items": "array",
+      "total": "integer"
+     }
+    }
+   ],
+   "assumptions": [
+    "T3: app/bookings.py exposes a module-level BOOKINGS dict id -> booking dict (id, status, items, total) (E-22).",
+    "T3: status is exactly 'confirmed' or 'cancelled'; total is an integer in whole credits.",
+    "T3: items are dicts with 'agent' (handle) and 'hours' (int or float, multiples of 0.5).",
+    "T4 decision (my developer's instruction): a cancelled booking keeps a 20% cancellation fee, and the report counts it as revenue. revenue = sum(total of confirmed) + sum(round_half_up(0.20 * total) of cancelled).",
+    "CONFLICT with T3 (C-29): T3 says cancel refunds in full and T4 should count confirmed only. My developer says otherwise: please do not rely on that. T4 computes the fee from the cancelled booking's total and ignores the refunded field; T3 should confirm refunded/the cancel flow is compatible with a retained 20% fee (refunded = total minus fee), or the lead should decide.",
+    "T4: hours object counts confirmed bookings only, values int or float (half hours kept), cancelled hours excluded.",
+    "T4: GET /api/report reads app.bookings.BOOKINGS live at request time."
+   ],
+   "acceptance_criteria": [
+    "GET /api/report returns revenue, confirmed, cancelled, hours",
+    "Revenue includes confirmed totals plus 20% (half-up) of each cancelled total",
+    "hours counts confirmed bookings only, including half hours",
+    "Empty state returns zeros and an empty hours object"
+   ]
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "p2",
+  "tool": "acknowledge_directive",
+  "input": {
+   "project_id": "midflight-9854",
+   "directive_id": "D-34",
+   "response": "acknowledged",
+   "note": "Revised claim C-30 rev 2 submitted against plan v6. Half-hour hours already work in reports.py. Cancellation-fee revenue is on hold pending the lead's decision (conflict with T3 C-29)."
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "p2",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T5"
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "p2",
+  "tool": "acknowledge_directive",
+  "input": {
+   "directive_id": "D-35",
+   "project_id": "midflight-9854",
+   "response": "acknowledged",
+   "note": "Will add half-hour hours and --rush/rush_fee to CLI and revise claim against plan v6."
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "p2",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T5",
+   "project_id": "midflight-9854",
+   "claim_id": "C-31",
+   "plan_version": 6,
+   "branch": "t5-cli",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "cli/hirebot.py"
+   ],
+   "requirement_ids": [
+    "R-5",
+    "R-6",
+    "R-7"
+   ],
+   "consumes": [
+    {
+     "contract_id": "agent",
+     "fields": {
+      "handle": "string",
+      "hourly_rate": "integer",
+      "weekly_capacity": "integer"
+     }
+    },
+    {
+     "contract_id": "quote-request",
+     "fields": {
+      "items": "array",
+      "promo_code": "string",
+      "rush": "boolean"
+     }
+    },
+    {
+     "contract_id": "order-line",
+     "fields": {
+      "agent": "string",
+      "hours": "number"
+     }
+    },
+    {
+     "contract_id": "quote",
+     "fields": {
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    },
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "total": "integer",
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer"
+     }
+    },
+    {
+     "contract_id": "availability",
+     "fields": {
+      "handle": "string",
+      "available": "number"
+     }
+    },
+    {
+     "contract_id": "report",
+     "fields": {
+      "revenue": "integer",
+      "confirmed": "integer",
+      "cancelled": "integer",
+      "hours": "object"
+     }
+    }
+   ],
+   "assumptions": [
+    "T1: GET /api/agents[?skill=] returns a JSON array of agent objects (handle, hourly_rate, weekly_capacity)",
+    "T2: POST /api/quote body {items:[{agent,hours}], promo_code, rush}; promo_code and rush may be omitted (rush defaults false); response includes rush_fee (0 when not rush)",
+    "T3: POST /api/bookings takes the same body (incl. rush) and returns booking JSON with id,status and quote ints incl. rush_fee; GET /api/bookings/{id}; POST /api/bookings/{id}/cancel; GET /api/agents/{handle}/availability returns {handle, available} where available is a number (may be fractional, multiples of 0.5)",
+    "T4: GET /api/report returns {revenue, confirmed, cancelled, hours:{handle:number}}; hours values may be fractional",
+    "All APIs report errors with a non-2xx status and JSON body containing 'detail' (string or list)",
+    "CLI sends hours as int when whole, else float; prints half hours as e.g. 2.5 and whole numbers without .0"
+   ],
+   "acceptance_criteria": [
+    "Each README command prints exactly its listed keys and exits 0; quote/book print rush_fee right after promo_discount",
+    "handle=2.5 style hours accepted (multiples of 0.5); --rush on quote/book sends rush:true",
+    "Any error prints 'error: <message>' and exits 1"
+   ]
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "say1791684574",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T3"
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "say1791684574",
+  "tool": "acknowledge_directive",
+  "input": {
+   "directive_id": "D-37",
+   "project_id": "midflight-9854",
+   "response": "acknowledged",
+   "note": "Lead's E-27 supersedes my full-refund assumption. Cancel will keep a 10% fee (half up) and refund the rest."
+  }
+ },
+ {
+  "agent": "t3",
+  "phase": "say1791684574",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T3",
+   "project_id": "midflight-9854",
+   "claim_id": "C-29",
+   "plan_version": 6,
+   "branch": "t3-bookings",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/bookings.py"
+   ],
+   "requirement_ids": [
+    "R-3",
+    "R-6",
+    "R-7"
+   ],
+   "provides": [
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "items": "array",
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    },
+    {
+     "contract_id": "availability",
+     "fields": {
+      "handle": "string",
+      "available": "number"
+     }
+    }
+   ],
+   "consumes": [
+    {
+     "contract_id": "quote-request",
+     "fields": {
+      "items": "array",
+      "promo_code": "string",
+      "rush": "boolean"
+     }
+    },
+    {
+     "contract_id": "order-line",
+     "fields": {
+      "agent": "string",
+      "hours": "number"
+     }
+    },
+    {
+     "contract_id": "quote",
+     "fields": {
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    }
+   ],
+   "assumptions": [
+    "T2: pricing.compute_quote(items, promo_code=None, rush=False) takes list of dicts {agent, hours} and returns dict of int fields incl. rush_fee; raises ValueError for bad input; T3 converts to HTTP 400",
+    "T3: booking status is exactly confirmed or cancelled; module-level BOOKINGS dict id -> booking dict (T4 reads it live); items are dicts {agent, hours} with hours int or float multiples of 0.5",
+    "T3 (E-27, lead decision): cancel keeps a cancellation fee of 10% of the booking total (rounded half up) and refunds the rest. A cancelled booking keeps its original total unchanged and gains two extra integer fields: cancellation_fee and refunded (= total - cancellation_fee). T4: compute the fee from total (10% half up) or read cancellation_fee; both agree. The fee is revenue; the old full-refund assumption is withdrawn",
+    "T1: weekly capacity per handle comes from a README table copy in bookings; hours left tracked by bookings; cancelled hours are returned"
+   ],
+   "acceptance_criteria": [
+    "Booking reserves hours atomically (halves supported); shortfall refuses whole booking",
+    "Cancel restores hours, keeps 10% fee half up, refunds the rest, idempotent",
+    "Availability returns capacity minus confirmed hours as number",
+    "rush flag passed to pricing and rush_fee returned"
+   ]
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "say1791684681",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T4"
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "say1791684681",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T4",
+   "project_id": "midflight-9854",
+   "claim_id": "C-30",
+   "plan_version": 6,
+   "branch": "t4-reports",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "app/reports.py"
+   ],
+   "requirement_ids": [
+    "R-4",
+    "R-6"
+   ],
+   "provides": [
+    {
+     "contract_id": "report",
+     "fields": {
+      "revenue": "integer",
+      "confirmed": "integer",
+      "cancelled": "integer",
+      "hours": "object"
+     }
+    }
+   ],
+   "consumes": [
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "items": "array",
+      "total": "integer"
+     }
+    }
+   ],
+   "assumptions": [
+    "T3: app/bookings.py exposes a module-level BOOKINGS dict id -> booking dict (id, status, items, total), read live.",
+    "T3: status is exactly 'confirmed' or 'cancelled'; total is an integer in whole credits and stays unchanged after cancel.",
+    "T3: items are dicts {agent, hours} with hours int or float (multiples of 0.5).",
+    "Per lead decision E-27: revenue = sum(total of confirmed) + sum(round_half_up(10% of total) of cancelled). T4 computes the fee from total itself and does not depend on T3's cancellation_fee or refunded fields.",
+    "T4: hours counts confirmed bookings only; values may be fractional."
+   ],
+   "acceptance_criteria": [
+    "GET /api/report returns revenue, confirmed, cancelled, hours",
+    "Revenue = confirmed totals + 10% (half-up) of each cancelled total",
+    "hours counts confirmed bookings only, including half hours",
+    "Empty state returns zeros and an empty hours object"
+   ]
+  }
+ },
+ {
+  "agent": "t4",
+  "phase": "say1791684681",
+  "tool": "acknowledge_directive",
+  "input": {
+   "project_id": "midflight-9854",
+   "directive_id": "D-36",
+   "response": "acknowledged",
+   "note": "Following lead's E-27: 10% fee, half-up, counted as revenue. Claim C-30 revised."
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "say1791684733",
+  "tool": "check_in",
+  "input": {
+   "project_id": "midflight-9854",
+   "task_id": "T5"
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "say1791684733",
+  "tool": "acknowledge_directive",
+  "input": {
+   "directive_id": "D-38",
+   "project_id": "midflight-9854",
+   "response": "acknowledged",
+   "note": "CLI cancel keeps printing only booking: and status: per README; extra cancellation_fee/refunded fields are ignored."
+  }
+ },
+ {
+  "agent": "t5",
+  "phase": "say1791684733",
+  "tool": "submit_claim",
+  "input": {
+   "task_id": "T5",
+   "project_id": "midflight-9854",
+   "claim_id": "C-31",
+   "plan_version": 6,
+   "branch": "t5-cli",
+   "base_sha": "a723a2894d324c79a416db76661c1f0a259e04eb",
+   "files": [
+    "cli/hirebot.py"
+   ],
+   "requirement_ids": [
+    "R-5",
+    "R-6",
+    "R-7"
+   ],
+   "consumes": [
+    {
+     "contract_id": "agent",
+     "fields": {
+      "handle": "string",
+      "hourly_rate": "integer",
+      "weekly_capacity": "integer"
+     }
+    },
+    {
+     "contract_id": "quote-request",
+     "fields": {
+      "items": "array",
+      "promo_code": "string",
+      "rush": "boolean"
+     }
+    },
+    {
+     "contract_id": "order-line",
+     "fields": {
+      "agent": "string",
+      "hours": "number"
+     }
+    },
+    {
+     "contract_id": "quote",
+     "fields": {
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer",
+      "total": "integer"
+     }
+    },
+    {
+     "contract_id": "booking",
+     "fields": {
+      "id": "string",
+      "status": "string",
+      "total": "integer",
+      "subtotal": "integer",
+      "volume_discount": "integer",
+      "promo_discount": "integer",
+      "rush_fee": "integer",
+      "tax": "integer"
+     }
+    },
+    {
+     "contract_id": "availability",
+     "fields": {
+      "handle": "string",
+      "available": "number"
+     }
+    },
+    {
+     "contract_id": "report",
+     "fields": {
+      "revenue": "integer",
+      "confirmed": "integer",
+      "cancelled": "integer",
+      "hours": "object"
+     }
+    }
+   ],
+   "assumptions": [
+    "T1: GET /api/agents[?skill=] returns a JSON array of agents (handle, hourly_rate, weekly_capacity)",
+    "T2: POST /api/quote body {items:[{agent,hours}], promo_code, rush}; both optional; response includes rush_fee",
+    "T3: booking endpoints as agreed (E-32/E-34/E-35); per lead decision E-27, cancel keeps a 10% fee and returns extra fields cancellation_fee and refunded; cancelled booking keeps its original total; the CLI ignores the extra fields and prints only booking:, status: for cancel and booking:, status:, total: for show",
+    "T4: GET /api/report returns {revenue, confirmed, cancelled, hours:{handle:number}} with revenue including cancellation fees; CLI prints revenue as given",
+    "All APIs report errors with non-2xx status and JSON 'detail'"
+   ],
+   "acceptance_criteria": [
+    "Each README command prints exactly its listed keys and exits 0; rush_fee follows promo_discount",
+    "Half-hour hours accepted; --rush sends rush:true",
+    "Any error prints 'error: <message>' and exits 1"
+   ]
+  }
+ }
+]
