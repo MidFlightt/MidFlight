@@ -9,12 +9,21 @@ It also carries what the plan can't: what other tasks' claims assume about this 
 (D27), the escalations the lead hasn't decided yet (D28), and the decisions already made
 (D30, D31). An agent sees the ones its claim is part of. The lead sees every open
 escalation, and everything Midflight settled without them, so they can overturn it.
+
+Everything a reply carries stays in the agent's context and is paid for again on each
+later step. So each reply carries a marker, and an agent that passes it back as `since`
+is told what that earlier reply already held and hasn't changed (D34): the task's
+requirements and contracts, decisions, and neighbours' assumptions. The connector
+leaves those out. The marker travels with the conversation, not the account, so two
+sessions signed in as one person never hide anything from each other, and a session
+that lost its context simply sends no marker and gets everything.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from midflight.domain.models import (
     Claim,
@@ -31,7 +40,7 @@ from midflight.domain.models import (
     SyncState,
     Task,
 )
-from midflight.domain.neighbours import NeighbourAssumption, assumptions_about
+from midflight.domain.neighbours import MAX_LENGTH, NeighbourAssumption, assumptions_about
 from midflight.domain.states import (
     ACTIVE_CLAIM_STATES,
     OPEN_DIRECTIVE_STATES,
@@ -40,7 +49,7 @@ from midflight.domain.states import (
 from midflight.ports import Clock, Commit, Store
 from midflight.services.audit import audit_event, new_correlation_id
 from midflight.services.claims import ClaimService, Verdict
-from midflight.services.decisions import MIDFLIGHT, decisions_in_force
+from midflight.services.decisions import MIDFLIGHT, decisions_in_force, is_agreement
 from midflight.services.errors import InvalidRequest, NotFound, PermissionDenied, StateConflict
 
 
@@ -62,6 +71,40 @@ class CheckIn:
     escalations: Sequence[Escalation] = ()
     you_decide: bool = False  # the escalations are the lead's own to resolve
     decisions: Sequence[Escalation] = ()
+    # To pass back as `since` at the next check-in.
+    marker: str = ""
+    since_read: bool = False  # the caller's `since` named an earlier check-in on this task
+    # What the check-in that gave out `since` already held, unchanged since (D34).
+    plan_seen: bool = False  # the task's requirements and contracts
+    # The requirements and contracts that are new or different since then; None when
+    # that check-in can't be compared with this one.
+    plan_changed_ids: Sequence[str] | None = None
+    seen_decision_ids: Collection[str] = ()
+    seen_assumptions: Collection[NeighbourAssumption] = ()
+
+
+# Anything saved this close to a check-in may have missed its reply, so it is sent again.
+MARKER_SLACK = timedelta(seconds=5)
+MARKER_FORMAT = "%Y%m%dT%H%M%SZ"
+
+
+def marker_for(task_id: str, at: datetime) -> str:
+    """Names one check-in on one task: `T3.20261011T011233Z`."""
+    return f"{task_id}.{at.astimezone(UTC).strftime(MARKER_FORMAT)}"
+
+
+def read_marker(marker: str | None, task_id: str, now: datetime) -> datetime | None:
+    """When the check-in that gave out `marker` happened, less the slack. None for no
+    marker, another task's, one from the future, or anything unreadable: the agent is
+    then sent everything, which is always safe."""
+    task, _, stamp = (marker or "").strip().rpartition(".")
+    if task != task_id:
+        return None
+    try:
+        at = datetime.strptime(stamp, MARKER_FORMAT).replace(tzinfo=UTC)
+    except ValueError:
+        return None
+    return at - MARKER_SLACK if at <= now else None
 
 
 class CheckInService:
@@ -70,7 +113,17 @@ class CheckInService:
         self._clock = clock
         self._claims = claims
 
-    def check_in(self, actor: Participant, task_id: str | None = None) -> CheckIn:
+    def check_in(
+        self,
+        actor: Participant,
+        task_id: str | None = None,
+        peek: bool = False,
+        since: str | None = None,
+    ) -> CheckIn:
+        """`since` is the marker of an earlier reply the agent still has.
+
+        `peek` is for a caller that shows the agent only part of the reply (the open
+        directives, the push blockers). It doesn't count as a check-in."""
         if not actor.active:
             raise PermissionDenied("you were removed from this project")
         project = self._store.get_project(actor.project_id)
@@ -98,11 +151,9 @@ class CheckInService:
             if d.state in OPEN_DIRECTIVE_STATES and (not _queued(d) or d.id in delivered_ids)
         ]
 
+        now = self._clock.now()
         cursor = actor.model_copy(
-            update={
-                "last_check_in_at": self._clock.now(),
-                "last_check_in_rev": project.coord_rev,
-            }
+            update={"last_check_in_at": now, "last_check_in_rev": project.coord_rev}
         )
         key = f"check-in:{actor.id}:{new_correlation_id()}"
         audit = (
@@ -123,14 +174,11 @@ class CheckInService:
             if delivered_now
             else []
         )
-        self._store.commit(
-            Commit(
-                project_id=project.id,
-                idempotency_key=key,
-                puts=[cursor, *delivered_now],
-                audit=audit,
+        puts = [*delivered_now] if peek else [cursor, *delivered_now]
+        if puts:
+            self._store.commit(
+                Commit(project_id=project.id, idempotency_key=key, puts=puts, audit=audit)
             )
-        )
 
         claims = self._store.list_claims(project.id)
         claim = _current_claim(claims, actor, task.id)
@@ -152,6 +200,15 @@ class CheckInService:
             if (lead and d.resolved_by == MIDFLIGHT)
             or (claim is not None and claim.id in d.claim_ids)
         ]
+        # An assumption recorded as agreed is listed once, with the decisions.
+        agreed = {d.reason[:MAX_LENGTH] for d in decisions if is_agreement(d)}
+        assumed = [
+            a
+            for a in assumptions_about(task, claim.files if claim else [], claims)
+            if a.text not in agreed
+        ]
+        had = read_marker(since, task.id, now)
+        changed_in_plan = self._plan_changes(plan, task, had)
         return CheckIn(
             plan_version=plan.version,
             task=task,
@@ -167,11 +224,78 @@ class CheckInService:
             stale_reason=project.sync_reason if stale else None,
             ready_to_push=not blockers,
             push_blockers=blockers,
-            assumed_by_others=assumptions_about(task, claim.files if claim else [], claims),
+            assumed_by_others=assumed,
             escalations=undecided,
             you_decide=lead,
             decisions=decisions,
+            marker=marker_for(task.id, now),
+            since_read=had is not None,
+            plan_seen=changed_in_plan == [],
+            plan_changed_ids=changed_in_plan,
+            seen_decision_ids=self._seen_decisions(decisions, claim, lead, had),
+            seen_assumptions=self._seen_assumptions(assumed, claims, had),
         )
+
+    def _plan_changes(self, plan: Plan, task: Task, since: datetime | None) -> list[str] | None:
+        """The task's requirements and contracts that the plan in force at `since` didn't
+        have as they are now, and the ones it had that are gone. Empty when nothing
+        differs: a new plan version that left the task alone (another task was
+        reassigned, say) changes nothing here. None when there is nothing to compare
+        with: no marker, no plan then, or the task wasn't this owner's or had another
+        title."""
+        if since is None:
+            return None
+        earlier = [
+            p
+            for p in self._store.list_plans(plan.project_id)
+            if p.approved_at is not None and p.approved_at < since
+        ]
+        if not earlier:
+            return None
+        now, then = _context(plan, task), _context(max(earlier, key=lambda p: p.version), task)
+        if now is None or then is None:
+            return None
+        different = [i for i, content in now.items() if then.get(i) != content]
+        return [*different, *(i for i in then if i not in now)]
+
+    def _seen_decisions(
+        self,
+        decisions: Sequence[Escalation],
+        claim: Claim | None,
+        lead: bool,
+        since: datetime | None,
+    ) -> list[str]:
+        """Decisions made before the agent's last check-in, which listed them."""
+        if since is None:
+            return []
+        if not lead:
+            # An agent is shown the decisions its claim is part of: none before it had one.
+            first = self._store.claim_history(claim.id)[:1] if claim else []
+            if not first or first[0].created_at >= since:
+                return []
+        return [d.id for d in decisions if d.resolved_at is not None and d.resolved_at < since]
+
+    def _seen_assumptions(
+        self,
+        assumed: Sequence[NeighbourAssumption],
+        claims: Sequence[Claim],
+        since: datetime | None,
+    ) -> list[NeighbourAssumption]:
+        """Assumptions the neighbour's claim already stated at the agent's last check-in."""
+        if since is None:
+            return []
+        latest = {c.id: c for c in claims}
+        stated: dict[str, set[str]] = {}
+        for claim_id in {a.claim_id for a in assumed}:
+            claim = latest[claim_id]
+            if claim.created_at >= since:
+                # Revised since: only what the revision before it also said is old news.
+                earlier = [c for c in self._store.claim_history(claim_id) if c.created_at < since]
+                if not earlier:
+                    continue
+                claim = earlier[-1]
+            stated[claim_id] = {text[:MAX_LENGTH] for text in claim.assumptions}
+        return [a for a in assumed if a.text in stated.get(a.claim_id, ())]
 
     def _task(self, plan: Plan, actor: Participant, task_id: str | None) -> Task:
         if task_id is None:
@@ -191,6 +315,20 @@ class CheckInService:
                 "Your own check-in already lists every contract your task uses (Q3).",
             )
         return task
+
+
+def _context(plan: Plan, like: Task) -> dict[str, object] | None:
+    """What a check-in says about a task from the plan alone: each requirement and
+    contract by id, in a form that compares."""
+    task = plan.task(like.id)
+    if task is None or task.owner != like.owner or task.title != like.title:
+        return None
+    requirements = [r for r in plan.requirements if r.id in task.requirement_ids]
+    contracts = [c for c in (plan.contract(i) for i in (*task.provides, *task.consumes)) if c]
+    # A contract's version follows the plan's, so it changes when nothing else does.
+    return {r.id: r.model_dump(mode="json") for r in requirements} | {
+        c.id: c.model_dump(mode="json", exclude={"version"}) for c in contracts
+    }
 
 
 def _current_claim(claims: Sequence[Claim], actor: Participant, task_id: str) -> Claim | None:

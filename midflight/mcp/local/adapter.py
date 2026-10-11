@@ -80,10 +80,10 @@ def build_server(
 
     def with_directives(api: MidflightApi, text: str, task_id: str | None = None) -> str:
         try:
-            reply = api.check_in(task_id)
+            reply = api.check_in(task_id, peek=True)
         except (MidflightUnavailable, NotSignedIn, Refused):
             return text
-        return f"{text}\n\n{directives_block(reply['directives'])}"
+        return f"{text}\n\n{directives_block(reply['directives'], reply['delivered_now'])}"
 
     @server.tool(description=SUBMIT_CLAIM)
     def submit_claim(
@@ -135,7 +135,9 @@ def build_server(
                 job = api.job(submitted["job_id"])
                 if job["job"]["state"] in DONE_STATES and job["verdict"]:
                     verdict = job["verdict"]
-                    return f"{verdict_text(verdict)}\n\n{directives_block(verdict['directives'])}"
+                    return (
+                        f"{verdict_text(verdict)}\n\n{directives_block(verdict['directives'], ())}"
+                    )
                 if time.monotonic() >= deadline:
                     text = (
                         f"Claim {submitted['claim_id']} rev {submitted['revision']}: PENDING. "
@@ -149,8 +151,8 @@ def build_server(
         return guarded(act)
 
     @server.tool(description=CHECK_IN)
-    def check_in(task_id: str | None = None) -> str:
-        return guarded(lambda api: check_in_text(api.check_in(task_id)))
+    def check_in(task_id: str | None = None, since: str | None = None) -> str:
+        return guarded(lambda api: check_in_text(api.check_in(task_id, since=since)))
 
     @server.tool(description=ACKNOWLEDGE_DIRECTIVE)
     def acknowledge_directive(

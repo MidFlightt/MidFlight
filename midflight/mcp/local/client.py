@@ -36,8 +36,11 @@ class MidflightApi:
         )
         return cls(http, project_id)
 
-    def check_in(self, task_id: str | None = None) -> dict[str, Any]:
-        return self._call("POST", f"/projects/{self.project_id}/check-in", {"task_id": task_id})
+    def check_in(
+        self, task_id: str | None = None, peek: bool = False, since: str | None = None
+    ) -> dict[str, Any]:
+        body = {"task_id": task_id, "peek": peek, "since": since}
+        return self._call("POST", f"/projects/{self.project_id}/check-in", body)
 
     def submit_claim(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._call("POST", f"/projects/{self.project_id}/claims", body)
