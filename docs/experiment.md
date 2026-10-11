@@ -29,6 +29,23 @@ Two cases:
 | Agent turns | 62 | 133 | 164 |
 | The lead had to step in | never (nobody could ask) | 1 time | 4 times, 2 of them only for false alarms |
 
+**Update, October 11.** We changed Midflight in response to what follows and ran the
+heavier case again ([what changed](#what-the-experiment-found-wrong-with-midflight)):
+
+| HireBot Pro | A: team chat | B: Midflight on October 9 | B: Midflight on October 11 |
+| --- | --- | --- | --- |
+| Checks passing right after merging | 14 of 14 | 13 of 14 | **14 of 14** |
+| Fix rounds to pass all | 0 | 1 | **0** |
+| Cost of all agents and the fixer | $1.81 | $2.68 | **$2.21** |
+| Agent turns | 133 | 164 | **133** |
+| The lead had to step in | 1 time | 4 times | **1 time** |
+| False alarms that stopped an agent | none | 7 | **none** |
+
+On this case Midflight now matches the team chat on correctness and on the lead's
+effort, and costs about 22% more. It is still one run each, so the gap that is left may
+be noise. The findings below are the ones from October 9 and are kept as they were
+written.
+
 1. **The shared team-chat file was the best approach in both cases.** Every check passed
    at merge, with no repairs, for less than Midflight cost.
 2. **Midflight did not beat it, and on the heavier case it was clearly worse:** about
@@ -252,6 +269,29 @@ in 19 of 20 reviews and sends 15 of those to the right decider; no false alarm r
 lead in 45 reviews, and 4 asked an agent to revise for nothing
 ([evals/results.md](../evals/results.md)). In the simulated run, the lead acted once, on
 the cancellation fee; Midflight settled what `total` means itself.
+
+### The rerun (October 11)
+
+The same trial, the same prompts and checks, on the changed Midflight
+([B2](../experiment/cases/hirebot-pro/results/B2/)):
+
+- **Phase 1: nothing reached the lead.** All five claims were approved. In B1 two false
+  alarms stopped two agents here.
+- **The seam that broke B1 was agreed in phase 1.** Reports stated "I will read bookings
+  via a module-level `BOOKINGS` dict in app/bookings.py", Bookings saw it at check-in and
+  built it, and Midflight recorded it as agreed. Seven such agreements in the run.
+- **One escalation, and it was the real one.** The cancellation fee went to the lead as a
+  product question with both sides. The lead answered once.
+- **The `total` question never became a conflict.** After the decision, Bookings stated
+  how it would store the fee and named Reports; that was recorded as agreed. In B1 it
+  took a second round with the lead.
+- **14 of 14 at merge**, no fix round, $2.21 against $2.68.
+
+What it doesn't show: Midflight settling a technical question itself. None came up,
+because the agents agreed first. And the hosted service still locked agents out at
+start-up 17 times; one cause was found and fixed during this run (a request the
+connector held open for two minutes), another is still open, and the AWS limit of 10
+simultaneous requests makes both worse.
 
 To see the whole workflow with these changes, step by step, open
 [the walkthrough](pages/walkthrough.html): what each agent told Midflight and exactly what
