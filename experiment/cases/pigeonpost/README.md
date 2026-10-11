@@ -47,6 +47,27 @@ reasons for each choice and the ways the case leans toward Midflight, is
 
 Run B needs a fresh Midflight project: `auto <project id>`.
 
-## Results
+## Results (October 10, 2026)
 
-None yet. `python experiment/run.py pigeonpost all table` prints every recorded run.
+One trial per approach.
+
+| Run | Approach | Checks at merge | Events held | Fix rounds | Agent cost | Turns | The lead answered |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [N1](results/N1/) | No channel | 13 of 20 | 3 of 6 | 2 | $2.06 | 126 | never (nobody could ask) |
+| [A1](results/A1/) | Team chat | 18 of 20 | 5 of 6 | 1 | $1.88 | 105 | 5 posts |
+| [B1](results/B1/) | Midflight | 20 of 20 | 6 of 6 | 0 | $2.69 | 177 | 3 escalations |
+
+- **N1** lost the three events that depend on a developer's private note: the
+  cancellation fee, tax before the promo discount, and payloads in grams. Nothing crashed.
+- **A1** fixed the tax and the grams through the chat, and lost the cancellation fee: both
+  agents read the lead's decision, kept their own developer's instruction, and asked
+  again; the lead didn't repeat itself.
+- **B1** passed everything at merge. The same second round happened (dispatch kept the
+  full refund after the lead's first ruling), Midflight raised it again, the lead ruled
+  again, and both parts built it.
+
+B1's cost leaves out the lead's agent ($0.37), the harness's warm-up calls ($0.64), and
+Midflight's own reviewer. Each run's `summary.json` ends with notes on what happened. The
+write-up is [docs/benchmark-pigeonpost.md](../../../docs/benchmark-pigeonpost.md).
+
+`python experiment/run.py pigeonpost all table` prints every recorded run.
