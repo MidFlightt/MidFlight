@@ -2,8 +2,8 @@
 
 A spoken explanation of the benchmark and its result, about two minutes at a normal pace
 (roughly 300 words). Each scene has what to show and what to say. The numbers are from
-[benchmark-pigeonpost-markers.md](benchmark-pigeonpost-markers.md) and
-[benchmark-pigeonpost.md](benchmark-pigeonpost.md); if a run is repeated, change them
+[benchmark-pigeonpost-markers.md](../benchmark-pigeonpost-markers.md) and
+[benchmark-pigeonpost.md](../benchmark-pigeonpost.md); if a run is repeated, change them
 here too.
 
 ## Scene 1: the question (15 seconds)

@@ -1,11 +1,12 @@
 # Hackathon demo
 
-> Frederik rewrites the demo sequence below in task F-1, starting from the
-> [storyboard draft](development-plan.md#demo-storyboard). The full scenario list
-> with expected results is [requirements §11](requirements.md#11-required-demonstration-and-evaluation),
-> traced to use cases in [use-cases.md](use-cases.md#demo-traceability).
-> An animated version can be generated with the Remotion prompt in
-> [video-prompt.md](video-prompt.md).
+> The scenarios Midflight has to show, on the small checkout project. The full list with
+> expected results is [requirements §11](requirements.md#11-required-demonstration-and-evaluation),
+> traced to use cases in [use-cases.md](use-cases.md#demo-traceability); every one runs as
+> a test, traced in [pages/scenarios.html](pages/scenarios.html).
+> The 3:00 submission video uses the heavier HireBot Pro case instead: see the
+> [storyboard](video/video-storyboard.md). A live two-person version on PigeonPost is
+> the [demo script](guides/pigeonpost-demo-script.md).
 
 Use the synthetic checkout project (`midflight-demo-shop`), two Claude Code sessions
 (T1 backend, T2 frontend), and a human integration lead. Demonstrate a coherent
@@ -39,8 +40,6 @@ The headline scenarios. Requirements §11 has the full list.
 6. Quick cuts: an escalation resolved by the lead, the stale banner during a
    simulated rate limit, injected instructions ignored.
 
-The local claim prototype (`midflight/claims.py`) only compares declared files and
-interface names. Shared-plan checks, model reasoning, GitHub integration, and AWS
-runtime are not implemented yet. A convincing demo must distinguish simulated
-failures from live API behavior and must not equate file overlap with semantic
-incompatibility.
+A demo must distinguish simulated failures from live API behavior (the outage is
+switched on by the lead with `simulate_github_outage`) and must not equate
+file overlap with semantic incompatibility.
