@@ -183,3 +183,16 @@ def test_a_made_up_token_is_refused(base_url: str) -> None:
         headers={"Authorization": "Bearer not-a-real-token", "Accept": "application/json"},
     )
     assert response.status_code == 401
+
+
+def test_the_connector_offers_no_event_stream(base_url: str) -> None:
+    """A signed-in GET asks for a stream of server events. This server answers each
+    request by itself and has no such stream, so it must say so at once: on AWS an open
+    stream holds a whole Lambda until it times out, and a few of them lock everyone out."""
+    token = sign_in(base_url, "somesh")["access_token"]
+    headers = {"Authorization": f"Bearer {token}", "Accept": "text/event-stream"}
+    response = httpx.get(f"{base_url}/mcp", headers=headers, timeout=5)
+    assert response.status_code == 405
+    assert response.headers["allow"] == "POST"
+    # Without a token the answer is still "sign in first", so clients can find out how.
+    assert httpx.get(f"{base_url}/mcp", timeout=5).status_code == 401
