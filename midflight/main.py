@@ -33,6 +33,8 @@ from urllib.parse import urlparse
 from fastapi import FastAPI
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from midflight import demo
 from midflight.adapters.clock import SystemClock
@@ -104,8 +106,35 @@ def create_server(
         demo.seed(store, demo.local_tokens(), clock.now())
 
     app = create_app(services, lifespan=lifespan, webhook_secret=settings.github_webhook_secret)
-    app.mount("/", mcp_app)  # the REST routes match first; everything else is MCP and sign-in
+    # The REST routes match first; everything else is MCP and sign-in.
+    app.mount("/", _without_event_stream(mcp_app))
     return Server(app, services, projects, oauth)
+
+
+def _without_event_stream(mcp_app: ASGIApp) -> ASGIApp:
+    """Answer a signed-in `GET /mcp` with 405, as the MCP specification allows.
+
+    A GET asks for a stream of events from the server. Midflight answers each request by
+    itself and sends no such events, but the MCP library would still hold the stream
+    open. On AWS that keeps a whole Lambda busy until it times out, and a few clients
+    connecting at once use up every instance, locking everyone out. Without a token the
+    request passes through, so the client still gets the "sign in first" answer.
+    """
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        wants_stream = (
+            scope["type"] == "http"
+            and scope["method"] == "GET"
+            and scope["path"].rstrip("/") == "/mcp"
+            and any(name == b"authorization" for name, _value in scope["headers"])
+        )
+        if wants_stream:
+            response = Response(status_code=405, headers={"Allow": "POST"})
+            await response(scope, receive, send)
+        else:
+            await mcp_app(scope, receive, send)
+
+    return app
 
 
 def _repo_access(settings: Settings) -> RepoAccess:
