@@ -48,8 +48,18 @@ def check_in_json(c: CheckIn) -> dict[str, Any]:
         "stale_reason": c.stale_reason,
         "ready_to_push": c.ready_to_push,
         "push_blockers": list(c.push_blockers),
+        # `seen`: the reply that gave out the caller's `since` marker already held it (D34).
+        "marker": c.marker,
+        "since_read": c.since_read,
+        "plan_seen": c.plan_seen,
+        "plan_changed_ids": None if c.plan_changed_ids is None else list(c.plan_changed_ids),
         "assumed_by_others": [
-            {"task_id": a.task_id, "claim_id": a.claim_id, "text": a.text}
+            {
+                "task_id": a.task_id,
+                "claim_id": a.claim_id,
+                "text": a.text,
+                "seen": a in c.seen_assumptions,
+            }
             for a in c.assumed_by_others
         ],
         "escalations": [
@@ -58,7 +68,13 @@ def check_in_json(c: CheckIn) -> dict[str, Any]:
         ],
         "you_decide": c.you_decide,
         "decisions": [
-            {"id": d.id, "how": decided_by(d), "reason": d.reason, "claim_ids": d.claim_ids}
+            {
+                "id": d.id,
+                "how": decided_by(d),
+                "reason": d.reason,
+                "claim_ids": d.claim_ids,
+                "seen": d.id in c.seen_decision_ids,
+            }
             for d in c.decisions
         ],
     }

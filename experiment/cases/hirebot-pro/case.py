@@ -8,7 +8,10 @@ only the coordination line differs:
 - B ("midflight"): connected to Midflight, with a plan and the contracts between parts.
 """
 
-PROJECT_B = "midflight-9854"
+import os
+
+# The live trial's project, or the one a local Midflight printed (local_midflight.py).
+PROJECT_B = os.environ.get("MIDFLIGHT_EXPERIMENT_PROJECT") or "midflight-9854"
 
 # agent -> its git branch
 BRANCHES = {

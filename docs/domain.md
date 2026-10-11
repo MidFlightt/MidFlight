@@ -222,8 +222,8 @@ the local adapter fills them from git and reads `MIDFLIGHT_URL`, `MIDFLIGHT_TOKE
 
 | Tool | Input | Returns |
 | --- | --- | --- |
-| `submit_claim` | The claim (new or revised), or `status: withdrawn` / `status: closed` (D11) | Verdict, agreed contracts, findings with corrections. Waits up to 60 s; after that returns `pending` and a job id, and the verdict arrives with the next `check_in`. |
-| `check_in` | Task id | What changed since the last check-in: plan version, claim state, findings, new directives, stale warning. Also what other tasks' claims assume about this task (D27), the open escalations (the ones this claim is part of, or all of them for the lead, D28), and the decisions in force: the ones about this task, or for the lead everything Midflight settled (D30, D31) |
+| `submit_claim` | The claim (new or revised), or `status: withdrawn` / `status: closed` (D11). A revision passes the `claim_id` and only the parts that change; a part left out stays as it was (D34) | Verdict, agreed contracts (named, not listed again, for a revision on the same plan version), findings with corrections. Waits up to 60 s; after that returns `pending` and a job id, and the verdict arrives with the next `check_in`. |
+| `check_in` | Task id, and optionally `since`: the marker an earlier reply ended with (D34) | With `since`, what that earlier reply already held and hasn't changed is named instead of repeated; without it, everything. What changed since the last check-in: plan version, claim state, findings, new directives, stale warning. Also what other tasks' claims assume about this task (D27), the open escalations (the ones this claim is part of, or all of them for the lead, D28), and the decisions in force: the ones about this task, or for the lead everything Midflight settled (D30, D31) |
 | `acknowledge_directive` | Directive id, response (`acknowledged`, `rejected`, `needs_clarification`), optional note | The recorded response |
 
 **Agent instructions** (decision D10). The adapter sends this text as the MCP
@@ -298,6 +298,8 @@ own task):
 | Field | Meaning |
 | --- | --- |
 | `plan_version`, `changed` | The current plan, and whether anything changed since the agent's last check-in |
+| `marker`, `since_read` | The marker to pass back as `since` next time, and whether the `since` in this request named an earlier check-in on this task (D34). The request also takes `peek: true` from a caller that shows the agent only the directives: it then doesn't count as a check-in. |
+| `plan_seen`, `plan_changed_ids` | With a readable `since`: whether the task's requirements and contracts are as that reply had them, and the ids that are new, different, or gone. `null` when there is nothing to compare with. Each entry of `decisions` and `assumed_by_others` has `seen`: that reply already held it. |
 | `task`, `requirements`, `contracts` | The task's plan context: its requirements and every contract it provides or consumes, with fields (FR-07) |
 | `claim` | The agent's current claim verdict for the task, or `null` before the first claim |
 | `directives`, `delivered_now` | Open directives; ids that became `delivered` with this reply. Held while stale. |

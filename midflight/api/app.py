@@ -105,6 +105,10 @@ class OptionalReason(Model):
 
 class CheckInRequest(Model):
     task_id: str | None = None
+    # True when the caller shows the agent only the directives: not a check-in.
+    peek: bool = False
+    # The marker of an earlier reply the agent still has (D34).
+    since: str | None = None
 
 
 class AckRequest(Model):
@@ -270,13 +274,15 @@ def create_app(
     @app.post("/projects/{pid}/check-in")
     def check_in(pid: str, body: CheckInRequest, actor: Caller) -> dict[str, Any]:
         in_project(pid, actor)
-        return check_in_json(services.check_ins.check_in(actor, body.task_id))
+        return check_in_json(
+            services.check_ins.check_in(actor, body.task_id, body.peek, body.since)
+        )
 
     @app.post("/projects/{pid}/push-check")
     def push_check(pid: str, body: CheckInRequest, actor: Caller) -> PlainTextResponse:
         """For the pre-push hook: 200 if ready to push, 409 with the reasons if not."""
         in_project(pid, actor)
-        reply = services.check_ins.check_in(actor, body.task_id)
+        reply = services.check_ins.check_in(actor, body.task_id, peek=True)
         if reply.ready_to_push:
             return PlainTextResponse(f"Midflight: {reply.task.id} is ready to push.\n")
         lines = [f"Midflight: {reply.task.id} isn't ready to push:"]
