@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 import boto3
@@ -45,6 +45,7 @@ from midflight.domain.models import (
     Verification,
 )
 from midflight.ports import Commit, CommitResult, RevisionConflict
+from midflight.services.errors import StateConflict
 
 # The parts of a saved claim revision that may still change: its verdict.
 _CLAIM_VERDICT_FIELDS = {"state", "findings"}
@@ -88,6 +89,8 @@ class DynamoStore:
             return CommitResult(applied=False, duplicate=True, coord_rev=int(applied["rev"]["N"]))
 
         stored = self.get_project(commit.project_id)
+        if stored and stored.archived_at:
+            raise StateConflict("This flight is archived; select the active flight.")
         if commit.expected_coord_rev is not None:
             actual = stored.coord_rev if stored else 0
             if actual != commit.expected_coord_rev:
@@ -101,7 +104,8 @@ class DynamoStore:
         ops: list[dict[str, Any]] = []
         project_index = None
         if (
-            new_project is not None
+            stored is not None
+            or new_project is not None
             or commit.bump_coord_rev
             or commit.expected_coord_rev is not None
         ):
@@ -143,11 +147,49 @@ class DynamoStore:
                 return CommitResult(False, True, current.coord_rev if current else 0)
             if project_index in failed:
                 current = self.get_project(commit.project_id)
+                if current and current.archived_at:
+                    raise StateConflict(
+                        "This flight is archived; select the active flight."
+                    ) from error
                 raise RevisionConflict(
                     commit.expected_coord_rev or 0, current.coord_rev if current else 0
                 ) from error
             raise
         return CommitResult(applied=True, duplicate=False, coord_rev=new_rev)
+
+    def replace_flight(
+        self,
+        archived: Project,
+        successor: Project,
+        members: Sequence[Participant],
+        plan: Plan | None,
+        audit: Sequence[AuditEvent],
+    ) -> None:
+        for entity in [successor, *members, *([plan] if plan else [])]:
+            self._check(successor.id, entity)
+        old = self._put(_pk(archived.id), "META", archived)
+        old["Put"]["Item"]["coord_rev"] = {"N": str(archived.coord_rev)}
+        old["Put"]["Item"]["archived_at"] = {"S": archived.archived_at.isoformat()}
+        old["Put"].update(
+            ConditionExpression="coord_rev = :rev AND attribute_not_exists(archived_at)",
+            ExpressionAttributeValues={":rev": {"N": str(archived.coord_rev)}},
+        )
+        new = self._project_update(Commit(successor.id, "new-flight"), None, successor)
+        ops = [old, new, *self._project_lookups(None, successor)]
+        if archived.join_code:
+            ops.append(self._delete(f"JOIN#{archived.join_code}", "LOOKUP"))
+        for entity in [*members, *([plan] if plan else [])]:
+            ops += self._entity_puts(entity)
+        for event in audit:
+            ops.append(self._put(_pk(event.project_id), _audit_sk(event), event))
+        if len(ops) > 100:
+            raise StateConflict("Too many members for an atomic new flight.")
+        try:
+            self._db.transact_write_items(TransactItems=ops)
+        except ClientError as error:
+            if error.response["Error"]["Code"] == "TransactionCanceledException":
+                raise StateConflict("Flight changed; read its state and retry.") from error
+            raise
 
     def next_id(self, project_id: str, prefix: str) -> str:
         # Numbered across all projects, so ids never collide between teams.
@@ -205,6 +247,10 @@ class DynamoStore:
             values[":expected"] = {"N": str(commit.expected_coord_rev)}
         elif stored is None:
             update["ConditionExpression"] = "attribute_not_exists(PK)"
+        condition = update.get("ConditionExpression")
+        update["ConditionExpression"] = (
+            f"({condition}) AND " if condition else ""
+        ) + "attribute_not_exists(archived_at)"
         return {"Update": update}
 
     def _project_lookups(self, stored: Project | None, project: Project) -> list[dict[str, Any]]:

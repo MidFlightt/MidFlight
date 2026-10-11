@@ -9,6 +9,7 @@ from __future__ import annotations
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Sequence
 from typing import Any
 
 from midflight.domain.models import (
@@ -26,6 +27,7 @@ from midflight.domain.models import (
     Verification,
 )
 from midflight.ports import Commit, CommitResult, RevisionConflict
+from midflight.services.errors import StateConflict
 
 # The parts of a saved claim revision that may still change: its verdict.
 _CLAIM_VERDICT_FIELDS = {"state", "findings"}
@@ -57,6 +59,8 @@ class MemoryStore:
                 return CommitResult(applied=False, duplicate=True, coord_rev=rev)
 
             stored = self._projects.get(commit.project_id)
+            if stored and stored.archived_at:
+                raise StateConflict("This flight is archived; select the active flight.")
             if commit.expected_coord_rev is not None:
                 actual = stored.coord_rev if stored else 0
                 if actual != commit.expected_coord_rev:
@@ -83,6 +87,28 @@ class MemoryStore:
             self._audit.extend(commit.audit)
             self._applied[commit.idempotency_key] = project.coord_rev
             return CommitResult(applied=True, duplicate=False, coord_rev=project.coord_rev)
+
+    def replace_flight(
+        self,
+        archived: Project,
+        successor: Project,
+        members: Sequence[Participant],
+        plan: Plan | None,
+        audit: Sequence[AuditEvent],
+    ) -> None:
+        with self._lock:
+            current = self._projects.get(archived.id)
+            if current is None or current.archived_at or current.coord_rev != archived.coord_rev:
+                raise StateConflict("Flight changed; read its state and retry.")
+            if successor.id in self._projects:
+                raise StateConflict("Successor already exists.")
+            for entity in [successor, *members, *([plan] if plan else [])]:
+                self._check(successor.id, entity)
+            self._audit.extend(audit)
+            self._projects[archived.id] = archived
+            self._projects[successor.id] = successor
+            for entity in [*members, *([plan] if plan else [])]:
+                self._put(entity)
 
     def next_id(self, project_id: str, prefix: str) -> str:
         with self._lock:
@@ -240,13 +266,25 @@ class MemoryStore:
 
     def find_project_by_join_code(self, join_code: str) -> Project | None:
         with self._lock:
-            return next((p for p in self._projects.values() if p.join_code == join_code), None)
+            return next(
+                (
+                    p
+                    for p in self._projects.values()
+                    if p.join_code == join_code and not p.archived_at
+                ),
+                None,
+            )
 
     def find_project_by_repository(self, repository: str) -> Project | None:
         with self._lock:
             wanted = repository.lower()
             return next(
-                (p for p in self._projects.values() if p.repository.lower() == wanted), None
+                (
+                    p
+                    for p in self._projects.values()
+                    if p.repository.lower() == wanted and not p.archived_at
+                ),
+                None,
             )
 
     def list_memberships(self, user_id: str) -> list[Participant]:

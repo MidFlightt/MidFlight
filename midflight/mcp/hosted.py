@@ -192,6 +192,27 @@ def build_hosted_server(
 
         return answer(act)
 
+    @server.tool(
+        description="Start a fresh flight on the same repository. Lead only. "
+        "Archives history; copies the approved plan and members. "
+        "Returns the new project ID. Reuse request_id on retry; pass the current coord_rev. "
+        "Does not change Git files or start agents."
+    )
+    def start_new_flight(project_id: str, request_id: str, expected_coord_rev: int) -> str:
+        def act() -> str:
+            user = me()
+            members = [
+                m
+                for m in store.list_memberships(user.id)
+                if m.project_id == project_id and m.active
+            ]
+            if not members:
+                raise PermissionDenied("You are not a member of this flight.")
+            result = services.flights.start(members[0], request_id, expected_coord_rev)
+            return result.model_dump_json()
+
+        return answer(act)
+
     @server.tool(description="Join a Midflight project with the join code your lead shared.")
     def join_project(join_code: str) -> str:
         def act() -> str:

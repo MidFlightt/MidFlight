@@ -192,6 +192,9 @@ class User(Model):
 
 
 class Project(Model):
+    archived_at: AwareDatetime | None = None
+    successor_project_id: Id | None = None
+    flight_request_id: str | None = None
     id: Id
     name: str = ""
     repository: Repository

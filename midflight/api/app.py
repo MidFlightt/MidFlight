@@ -5,6 +5,8 @@ adds the hosted MCP connector and sign-in on top, for local runs and for AWS.
 Errors are JSON `{error, detail, hint}`; refusals with findings include them too.
 """
 
+import hashlib
+import hmac
 from dataclasses import dataclass
 from typing import Annotated, Any
 
@@ -33,6 +35,7 @@ from midflight.services.claims import ClaimService, ClaimSubmission, parse_revie
 from midflight.services.directives import ACK_NOTE, DirectiveService
 from midflight.services.errors import NotFound, PermissionDenied, ServiceError
 from midflight.services.escalations import EscalationService
+from midflight.services.flights import FlightService
 from midflight.services.participants import ParticipantService
 from midflight.services.plans import PlanDraft, PlanService
 from midflight.services.sync import SyncService
@@ -44,6 +47,7 @@ from midflight.services.verification import VerificationService
 @dataclass(frozen=True)
 class Services:
     store: Store
+    flights: FlightService
     claims: ClaimService
     plans: PlanService
     participants: ParticipantService
@@ -74,6 +78,7 @@ def build_services(
         inline.register(JobKind.VERIFICATION, verifications.run)
     return Services(
         store=store,
+        flights=FlightService(store, clock),
         claims=claims,
         plans=PlanService(store, clock, runner),
         participants=ParticipantService(store, clock),
@@ -86,6 +91,12 @@ def build_services(
 
 
 # Request bodies ------------------------------------------------------------------------
+
+
+class NewFlightBody(Model):
+    source_plan_version: int | None = None
+    request_id: Text
+    expected_coord_rev: int
 
 
 class RegisterRequest(Model):
@@ -174,6 +185,30 @@ def create_app(
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.post("/projects/{pid}/flights")
+    def start_flight(pid: str, body: NewFlightBody, actor: Caller, request: Request) -> Any:
+        in_project(pid, actor)
+        # The authenticated script can retry a lost response with the same old token.
+        # A distinct successor token keeps the archived membership immutable.
+        secret = request.headers["authorization"].split(None, 1)[1]
+        token = (
+            "mf_"
+            + hmac.new(
+                secret.encode(), f"new-flight:{pid}:{body.request_id}".encode(), hashlib.sha256
+            ).hexdigest()
+        )
+        project = services.flights.start(
+            actor,
+            body.request_id,
+            body.expected_coord_rev,
+            lead_token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            source_plan_version=body.source_plan_version,
+        )
+        member = services.store.get_participant(project.lead_id)
+        if member.token_hash != hashlib.sha256(token.encode()).hexdigest():
+            raise PermissionDenied("This reset was initiated through a different credential.")
+        return {"project": dump(project), "token": token}
 
     # Participants (UC-01)
 
