@@ -2,7 +2,7 @@
 
 A short, repeatable demo on the PigeonPost project (`pigeonpost-65f8`, repository
 `MidFlightt/pigeonpost`). It shows the three moments from
-[demo.md](demo.md)'s acceptance scenarios:
+[demo.md](../demo.md)'s acceptance scenarios:
 
 1. **A claim is rejected before any code is written**, with the fix in the same reply.
 2. **The lead changes the plan**, and only the tasks it touches hear about it.

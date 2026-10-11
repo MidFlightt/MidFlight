@@ -1,8 +1,8 @@
 # Demo video storyboard (3:00)
 
 The submission video for the "Hand it off" challenge. It replaces the `total` /
-`total_cents` storyboard in [demo.md](demo.md) with the HireBot Pro case from the
-[experiment](experiment.md), because the small case doesn't show what Midflight is for.
+`total_cents` storyboard in [demo.md](../demo.md) with the HireBot Pro case from the
+[experiment](../experiment.md), because the small case doesn't show what Midflight is for.
 
 Every line of on-screen text is real output or a true statement. Where a scene is rebuilt
 from the October 9 logs, it carries a corner label saying so.
@@ -129,7 +129,7 @@ happens if a person carries one to the other.
   directive, and approves nothing until it's fresh."
 - **Source:** live capture against the hosted service.
 - **Careful:** don't say an already-green check is revoked. The outage limitation in
-  [requirements.md](requirements.md) says Midflight may be unable to update a published
+  [requirements.md](../requirements.md) says Midflight may be unable to update a published
   check while GitHub is down.
 
 ### 8. Failure path 3: the tool returns garbage (2:12–2:32)
@@ -206,5 +206,5 @@ HireBot text. `Title`, `Outage`, `UnderHood`, and `Close` need only wording chan
   agent to review the branches and then copies its findings into the team chat. Change the
   shots to whatever he really does.
 - **The shared-file comparison** (the team chat won both cases) belongs in the writeup,
-  with a link to [experiment.md](experiment.md). The video's honest number is the six
+  with a link to [experiment.md](../experiment.md). The video's honest number is the six
   false alarms in scene 8.

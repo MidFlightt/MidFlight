@@ -2,7 +2,7 @@
 
 A guide for two people who each have Claude Code and want to try Midflight for real: one
 shared repository, two developers, six parts. It uses the same product and plan as the
-[PigeonPost benchmark](benchmark-pigeonpost.md), but here the two of you are the
+[PigeonPost benchmark](../benchmark-pigeonpost.md), but here the two of you are the
 developers and Midflight keeps your agents aligned.
 
 Plan about two hours. One of you is the **lead** (Somesh in this guide); the other is the
@@ -201,7 +201,7 @@ full") and watch where it surfaces.
    It starts your app, types the customer's commands, and prints each check with
    `"passed": true` or `false`, and at the end how many checks each kind of event passed.
    The checks are explained in
-   [checks.md](../experiment/cases/pigeonpost/checks.md). The first trials scored 13
+   [checks.md](../../experiment/cases/pigeonpost/checks.md). The first trials scored 13
    (no channel), 18 (team chat), and 20 (Midflight) of 20.
 
 ## Starting over

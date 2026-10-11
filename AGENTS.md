@@ -32,6 +32,7 @@ with join codes, plan-change directives (S-6), escalations (S-7), the Bedrock re
 (M-6, S-10), stale handling with a demo fault switch (M-7), the pre-push hook (M-4), and
 CI (M-1).
 Since October 10 Midflight also passes assumptions between tasks, settles technical questions between agents itself, and asks the lead only for product decisions (S-11, S-12; D27 to D33).
+Since October 11 a reply says each thing once, and a `check_in` that passes back the marker of an earlier reply gets only what is new (S-13; D34).
 Open: the full eval (S-8; a first part is in `evals/`) and people's tasks. The [code guide](docs/code-guide.md) explains
 every file. Don't assume a module exists; check first.
 
@@ -49,7 +50,10 @@ every file. Don't assume a module exists; check first.
 | Human, step by step | [docs/step-by-step.md](docs/step-by-step.md) | Each person's steps with prompts to paste into an agent |
 | Visual overviews | [docs/pages/development-plan.html](docs/pages/development-plan.html), [docs/pages/use-cases.html](docs/pages/use-cases.html), [docs/pages/walkthrough.html](docs/pages/walkthrough.html) | Open in a browser after cloning. The walkthrough is one simulated run, step by step: what each agent told Midflight and what it answered |
 | Team process | [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, PRs, reviews |
-| Demo | [docs/demo.md](docs/demo.md) | Acceptance scenarios and the video storyboard |
+| Demo and video | [docs/demo.md](docs/demo.md), [docs/video/](docs/video/) | Acceptance scenarios; the storyboard and build sheet of the submission video |
+| What we measured | [docs/experiment.md](docs/experiment.md), [docs/benchmark-pigeonpost.md](docs/benchmark-pigeonpost.md), [experiment/README.md](experiment/README.md) | Midflight against no channel and a team chat on three cases, with every prompt and reply recorded |
+| Trying it as two people | [docs/guides/](docs/guides/) | Building PigeonPost with Midflight, with each person's prompts |
+| Every document | [docs/README.md](docs/README.md) | The index |
 | Background only | [docs/archive/](docs/archive/) | Earlier design notes. Superseded where they disagree with the files above. |
 
 ### When documents disagree

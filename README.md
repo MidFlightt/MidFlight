@@ -97,6 +97,37 @@ Ready to push: no.
   - directive D-2 is delivered; answer it first
 ```
 
+## What we measured
+
+We ran Midflight against two simpler ways for a team's agents to coordinate: no channel
+at all (each agent only hears from its own developer) and a shared team-chat file. Every
+agent was a headless Claude Code session on the same model. One trial per approach, so
+read these as a first look, not a proof.
+
+Checks passing right after merging, and what the agents cost:
+
+| Case | No channel | Team chat | Midflight |
+| --- | --- | --- | --- |
+| HireBot: 3 agents, 8 checks | 4 of 8, $0.77 | 8 of 8, $0.96 | 8 of 8, $1.12 |
+| HireBot Pro: 5 agents, 14 checks (October 9) | 13 of 14, $1.17 | 14 of 14, $1.81 | 13 of 14, $2.68 |
+| HireBot Pro, Midflight after our fixes (October 11) | | | 14 of 14, $2.21 |
+| PigeonPost: 6 agents on separate laptops, 20 checks | 13 of 20, $2.06 | 18 of 20, $1.88 | 20 of 20, $2.69 |
+| PigeonPost, Midflight with check-in markers (October 11) | | | 20 of 20, $2.35 |
+
+- **The team chat won the first two cases**, and Midflight's own false alarms were the
+  reason. We changed Midflight because of that: it now passes assumptions between tasks,
+  settles technical questions itself, and asks the lead only for product decisions.
+- **PigeonPost is built to be Midflight's home ground:** things that happen after the
+  plan is written, on separate laptops. There it was the only approach to pass every
+  check at merge.
+- **Midflight costs the most in every case.**
+
+The write-ups are [docs/experiment.md](docs/experiment.md),
+[docs/benchmark-pigeonpost.md](docs/benchmark-pigeonpost.md), and
+[docs/benchmark-pigeonpost-markers.md](docs/benchmark-pigeonpost-markers.md). Every
+message every agent was given, every reply, and every check is recorded in
+[`experiment/`](experiment/README.md).
+
 ## How a team uses it
 
 Midflight is one hosted service. Nobody clones this repo or runs a server.
@@ -146,21 +177,30 @@ an AI reviewer on Amazon Bedrock whose findings are validated before they count.
 GitHub App reads commits and publishes checks. Details:
 [docs/architecture.md](docs/architecture.md) and the [code guide](docs/code-guide.md).
 
+## What's in this repository
+
+| Path | What it is |
+| --- | --- |
+| `midflight/` | The service: domain rules, services, the MCP connector, the REST API, AWS adapters, the pre-push hook |
+| `tests/` | Unit and integration tests, and one YAML scenario per demo scenario |
+| `infra/` | The AWS SAM template and deploy scripts ([infra/README.md](infra/README.md)) |
+| `experiment/` | The benchmark driver, the three cases, and every recorded run ([experiment/README.md](experiment/README.md)) |
+| `evals/` | The AI reviewer measured on recorded escalations ([evals/results.md](evals/results.md)) |
+| `docs/` | Everything written down ([index](docs/README.md)) |
+
 ## Documentation
+
+The full index is [docs/README.md](docs/README.md). The ones to read first:
 
 | Document | What it covers |
 | --- | --- |
 | [docs/code-guide.md](docs/code-guide.md) | How the code is organized, file by file, and what happens when people use it |
-| [AGENTS.md](AGENTS.md) | Entry point for coding agents: rules, commands, ownership |
-| [docs/development-plan.md](docs/development-plan.md) | Tasks, owners, gates, and the human steps ([visual version](docs/pages/development-plan.html)) |
-| [docs/use-cases.md](docs/use-cases.md) | UC-01 to UC-16 with sequence diagrams ([visual version](docs/pages/use-cases.html)) |
-| [docs/domain.md](docs/domain.md) | Exact names, states, tools, REST paths, and invariants |
-| [docs/design-decisions.md](docs/design-decisions.md) | Decisions D1–D20 and open questions |
-| [docs/requirements.md](docs/requirements.md) | Requirements, demo scenarios, definition of done |
 | [docs/architecture.md](docs/architecture.md) | Where everything runs, with technology links |
-| [docs/demo.md](docs/demo.md) | Demo scenarios and storyboard; [video-prompt.md](docs/video-prompt.md) generates an animated version |
-| [infra/README.md](infra/README.md) | Deploying to AWS |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, pull requests, reviews |
+| [docs/experiment.md](docs/experiment.md) | What we measured, what it found wrong with Midflight, and what we changed |
+| [docs/domain.md](docs/domain.md) | Exact names, states, tools, REST paths, and invariants |
+| [docs/design-decisions.md](docs/design-decisions.md) | Decisions D1 to D34 and open questions |
+| [docs/guides/pigeonpost-with-a-friend.md](docs/guides/pigeonpost-with-a-friend.md) | Try Midflight for real: two people, one repository, about two hours |
+| [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) | Rules for coding agents; branches, pull requests, reviews |
 
 ## Responsible AI
 
