@@ -170,3 +170,7 @@ GitHub App reads commits and publishes checks. Details:
 - Every decision is logged with its reason; requirement conflicts go to a human.
 - Sign-in tokens and codes are stored only as hashes; secrets live in AWS Secrets Manager.
 - The demo uses a synthetic project with no real user data.
+
+## License
+
+[MIT](LICENSE). Copyright (c) 2026 Team Yoga.
