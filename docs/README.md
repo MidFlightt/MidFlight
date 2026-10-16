@@ -3,6 +3,13 @@
 Everything in this folder, grouped by what you came for. The project's front page is the
 [README](../README.md).
 
+## Graph Hacks (October 2026)
+
+- [Teammate overview](graph-hacks/teammate-overview.md): scope, changes, and approach.
+- [Full development plan](graph-hacks/development-plan.md): architecture, phases, dependencies, code changes, and acceptance criteria.
+
+These are the proposed starting point for `graph-hacks`. The AWS documents below describe the existing implementation.
+
 ## Start here
 
 | Document | What it covers |

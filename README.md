@@ -1,5 +1,7 @@
 # Midflight
 
+> **Graph Hacks branch:** Start with the [teammate overview](docs/graph-hacks/teammate-overview.md) and [full development plan](docs/graph-hacks/development-plan.md). These describe the proposed FalkorDB-only hackathon scope; the implementation below is the existing baseline.
+
 Keeps a team's coding agents aligned with the plan, and with each other, while they work.
 
 Agentic AI Hackathon project by **Team Yoga**: Somesh Agrawal (lead), Frederik
