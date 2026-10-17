@@ -1,10 +1,14 @@
 # MidFlight for Graph Hacks — full development plan
 
-Status: proposed implementation plan, recorded October 16, 2026. Implementation has not started in this branch.
+Status: proposed implementation plan, recorded October 16, 2026. The first isolated persistence proof is implemented in a review branch; application migration has not started.
 
 This is the Graph Hacks starting point for the official [MidFlight repository](https://github.com/MidFlightt/MidFlight), based on inspected commit `2b6a31bf62e09c127d33b325131b4dbcb912be43`. Its existing test suite and lint checks passed during inspection; that is baseline evidence, not validation of this proposed migration.
 
 For the short version, see the [teammate overview](teammate-overview.md). This plan supersedes the earlier DynamoDB-plus-FalkorDB proposal for this hackathon. Existing AWS documentation describes the current implementation, not this target architecture. No team assignments are prescribed here.
+
+## Implementation evidence
+
+- **GH-01 — persistence proof:** [design, reproduction, results, and limits](../../experiment/falkordb-proof/README.md). Real FalkorDB tests exercise concurrent updates, retries, stale reviews, runtime rollback, reader isolation, and restart recovery. This is not yet the full `Store` adapter or background worker.
 
 ## 1. Objective
 
