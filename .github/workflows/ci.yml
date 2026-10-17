@@ -23,3 +23,15 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
+
+  falkordb-store:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked --extra falkordb
+      # The fixtures create and remove their own pinned Docker server and volume.
+      - run: uv run --extra falkordb pytest --falkordb tests/unit/test_store.py tests/integration/test_falkor_store.py

@@ -1,6 +1,6 @@
 # MidFlight for Graph Hacks — full development plan
 
-Status: proposed implementation plan, recorded October 16, 2026. The first isolated persistence proof is implemented in a review branch; application migration has not started.
+Status: implementation underway, October 16, 2026. GH-01 is merged; GH-02 adds the full Store adapter for review. Runtime migration and graph-based impact remain pending.
 
 This is the Graph Hacks starting point for the official [MidFlight repository](https://github.com/MidFlightt/MidFlight), based on inspected commit `2b6a31bf62e09c127d33b325131b4dbcb912be43`. Its existing test suite and lint checks passed during inspection; that is baseline evidence, not validation of this proposed migration.
 
@@ -9,6 +9,11 @@ For the short version, see the [teammate overview](teammate-overview.md). This p
 ## Implementation evidence
 
 - **GH-01 — persistence proof:** [design, reproduction, results, and limits](../../experiment/falkordb-proof/README.md). Real FalkorDB tests exercise concurrent updates, retries, stale reviews, runtime rollback, reader isolation, and restart recovery. This is not yet the full `Store` adapter or background worker.
+
+Implementation checkpoint: **GH-01** (isolated persistence proof) is merged.
+**GH-02** implements the full existing Store interface and real-database contract tests;
+see [adapter design and verification](falkor-store.md). Runtime selection, the durable
+worker, and task/contract dependency materialization remain follow-up work.
 
 ## 1. Objective
 

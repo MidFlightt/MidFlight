@@ -14,3 +14,6 @@ def plan_v1() -> Plan:
 @pytest.fixture
 def plan_v2() -> Plan:
     return make_plan(2)
+
+
+pytest_plugins = ["falkor_support"]
