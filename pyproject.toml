@@ -14,6 +14,9 @@ dependencies = [
     "uvicorn>=0.54.0",
 ]
 
+[project.optional-dependencies]
+falkordb = ["falkordb==1.8.0", "redis==8.1.0"]
+
 [project.scripts]
 midflight-server = "midflight.main:run"
 

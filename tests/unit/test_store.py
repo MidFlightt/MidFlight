@@ -1,7 +1,7 @@
-"""The Store contract: every test runs against MemoryStore and DynamoStore (on moto).
+"""The Store contract: MemoryStore, DynamoStore (moto), and opt-in real FalkorDB.
 
 Atomic commits, the coord_rev compare-and-set, idempotency, history protection, and the
-lookups the hosted connector needs. If the two stores ever disagree, a test here fails.
+lookups the hosted connector needs. Every adapter must preserve these behaviors.
 """
 
 from __future__ import annotations
@@ -27,8 +27,13 @@ from midflight.services.plans import PlanDraft
 from midflight.services.verification import WorkflowRun
 
 
-@pytest.fixture(params=["memory", "dynamo"])
+@pytest.fixture(params=["memory", "dynamo", "falkor"])
 def store(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> Iterator[Store]:
+    if request.param == "falkor":
+        s = request.getfixturevalue("falkor_store")
+        seed(s)
+        yield s
+        return
     if request.param == "memory":
         s: Any = MemoryStore()
         seed(s)
