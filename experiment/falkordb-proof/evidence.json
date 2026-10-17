@@ -1,0 +1,168 @@
+{
+  "recorded_at": "2026-10-16T17:05:29.856081-07:00",
+  "baseline_commit": "1dfd6b2cd754a23fbf1dad9facbcdc148c618cb3",
+  "python": "3.14.8",
+  "environment": {
+    "image": "falkordb/falkordb:v4.22.1@sha256:b0bdcac2cbaff989e77cb0610439b7a9289e86de033ccbbd4368b66fb680ae7a",
+    "image_id": "sha256:b0bdcac2cbaff989e77cb0610439b7a9289e86de033ccbbd4368b66fb680ae7a",
+    "architecture": "arm64",
+    "modules": [
+      {
+        "name": "graph",
+        "ver": 42201,
+        "path": "/var/lib/falkordb/bin/falkordb.so",
+        "args": [
+          "TIMEOUT",
+          "10000",
+          "MAX_QUEUED_QUERIES",
+          "100"
+        ]
+      },
+      {
+        "name": "vectorset",
+        "ver": 1,
+        "path": "",
+        "args": []
+      }
+    ],
+    "persistence": {
+      "save": "",
+      "appendonly": "yes",
+      "appendfsync": "always"
+    }
+  },
+  "command": "uv run --project experiment/falkordb-proof --locked pytest -c experiment/falkordb-proof/pyproject.toml experiment/falkordb-proof --junitxml=.midflight/falkordb-proof/results.xml --proof-metadata=.midflight/falkordb-proof/environment.json",
+  "passed": 23,
+  "failed": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "test": "test_claim_job_audit_receipt_and_revision_are_one_commit",
+      "outcome": "passed",
+      "seconds": 0.99
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[0]",
+      "outcome": "passed",
+      "seconds": 0.02
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[1]",
+      "outcome": "passed",
+      "seconds": 0.015
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[2]",
+      "outcome": "passed",
+      "seconds": 0.018
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[3]",
+      "outcome": "passed",
+      "seconds": 0.014
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[4]",
+      "outcome": "passed",
+      "seconds": 0.016
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[5]",
+      "outcome": "passed",
+      "seconds": 0.021
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[6]",
+      "outcome": "passed",
+      "seconds": 0.015
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[7]",
+      "outcome": "passed",
+      "seconds": 0.015
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[8]",
+      "outcome": "passed",
+      "seconds": 0.016
+    },
+    {
+      "test": "test_concurrent_compare_and_set_has_exactly_one_winner[9]",
+      "outcome": "passed",
+      "seconds": 0.016
+    },
+    {
+      "test": "test_four_writers_retry_conflicts_without_losing_updates",
+      "outcome": "passed",
+      "seconds": 0.093
+    },
+    {
+      "test": "test_concurrent_duplicate_requests_apply_once",
+      "outcome": "passed",
+      "seconds": 0.016
+    },
+    {
+      "test": "test_lost_reply_retry_returns_original_result_even_after_later_writes",
+      "outcome": "passed",
+      "seconds": 0.01
+    },
+    {
+      "test": "test_same_key_with_different_payload_is_rejected",
+      "outcome": "passed",
+      "seconds": 0.009
+    },
+    {
+      "test": "test_stale_review_writes_nothing_then_fresh_review_completes_once",
+      "outcome": "passed",
+      "seconds": 0.013
+    },
+    {
+      "test": "test_runtime_failure_rolls_back_mutations_and_retry_marker",
+      "outcome": "passed",
+      "seconds": 0.007
+    },
+    {
+      "test": "test_readers_never_observe_a_partial_bundle",
+      "outcome": "passed",
+      "seconds": 0.136
+    },
+    {
+      "test": "test_fresh_python_process_recovers_pending_job",
+      "outcome": "passed",
+      "seconds": 0.109
+    },
+    {
+      "test": "test_killed_database_recovers_acknowledged_commit_and_pending_job",
+      "outcome": "passed",
+      "seconds": 0.29
+    },
+    {
+      "test": "test_crash_during_writes_recovers_whole_commits_and_allows_safe_retry",
+      "outcome": "passed",
+      "seconds": 0.425
+    },
+    {
+      "test": "test_graphs_are_isolated_even_with_identical_project_and_request_ids",
+      "outcome": "passed",
+      "seconds": 0.021
+    },
+    {
+      "test": "test_graph_unavailable_is_an_error_not_empty_context",
+      "outcome": "passed",
+      "seconds": 0.477
+    }
+  ],
+  "source_sha256": {
+    "proof_store.py": "287fe41ea806c3d3b55e38759e8252e42ea9336e2651dd836040aeaa5ca842a3",
+    "test_proof.py": "e7dcee4794066aad5013d00051f294bf6da5c4940ce0022c3593ff28828ede02",
+    "conftest.py": "f8221782afea24e1ed049adb78d383057b379529e88553aee7ba0c3b7fb20b42",
+    "pyproject.toml": "f0641de32d8ce41ff86c38f904a3aaaa231d6859e596a4db09a224cfcd19f8f9",
+    "uv.lock": "d56b1fd5dc7a459bf206dd2c6bba95af66df7ac9ec2219dbe380efd21a394d01"
+  },
+  "existing_suite": {
+    "command": "uv run pytest -o addopts='' -q",
+    "passed": 433,
+    "seconds": 5.97
+  },
+  "scope": "Standalone commit mechanism; not the application Store adapter or worker. See README for limitations."
+}
