@@ -66,6 +66,22 @@ class FalkorStore:
     def __init__(self, graph: Any) -> None:
         self.graph = graph
         self._client: Any = None
+        # Establish labels/indexes before requests can compile queries against an
+        # empty graph. On the pinned engine, racing first-project queries compiled
+        # before MFProject exists can all observe an absent project (GH-02 CI).
+        # Startup is synchronous; no requests may use this store until it returns.
+        for model in (*_TYPES, User):
+            self._query(f"CREATE INDEX ON :MF{model.__name__}(key)")
+            if model is not Plan:
+                self._query(f"CREATE INDEX ON :MF{model.__name__}(id)")
+        for label, field in (
+            ("MFReceipt", "key"),
+            ("MFIdentity", "key"),
+            ("MFCounter", "prefix"),
+            ("MFAuth", "key"),
+            ("MFAuditEvent", "project_id"),
+        ):
+            self._query(f"CREATE INDEX ON :{label}({field})")
 
     @classmethod
     def connect(cls, *, graph_name: str, **connection: Any) -> FalkorStore:
@@ -80,7 +96,11 @@ class FalkorStore:
         # durable receipt makes replay safe; counters must not auto-replay.
         connection["retry"] = Retry(NoBackoff(), 0)
         client = FalkorDB(**connection)
-        store = cls(client.select_graph(graph_name))
+        try:
+            store = cls(client.select_graph(graph_name))
+        except Exception:
+            client.connection.close()
+            raise
         store._client = client
         return store
 

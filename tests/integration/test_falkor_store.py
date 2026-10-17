@@ -269,7 +269,8 @@ def test_readback_lookups_filters_and_missing_records(falkor_store):
     falkor_store.delete_auth("client", "absent")
 
 
-def test_concurrent_project_creation_has_one_cas_winner(falkor_store):
+@pytest.mark.parametrize("round_number", range(10))
+def test_concurrent_project_creation_has_one_cas_winner(falkor_store, round_number):
     from midflight.domain.models import Project
 
     def write(i):

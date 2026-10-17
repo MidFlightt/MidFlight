@@ -24,6 +24,11 @@ Connection keyword arguments go to the FalkorDB client, including authentication
 and TLS settings. Supply secrets through deployment configuration, never source.
 The constructor also accepts an existing client Graph; the caller owns that connection.
 Use a dedicated graph per deployment and provision its persistence before use.
+Construction synchronously initializes labels and ID/key indexes before any requests
+are accepted. Do not bypass this initialization: the first CI run found that concurrent
+project-creation queries compiled against absent labels could all pass the empty-project
+revision check on the pinned engine. Indexed schema initialization plus ten independent
+empty-graph race tests guard this case. Initialize the single service before starting workers.
 
 Run all store contract tests and adapter failure tests with:
 
@@ -93,7 +98,7 @@ of records, jobs, audit, auth, users, receipts and counters through a fresh conn
 Errors propagate rather than masquerading as missing data. Successful persistence
 requires the pinned, durable server configuration; see GH-01 for its evidence and
 limits. This does not prove disk failure recovery, replication, production load or
-multi-worker execution. Queries currently scan typed labels; indexes and load bounds
-need measurement before scaling beyond the small hackathon deployment. The worker
+multi-worker execution. ID/key lookups are indexed; filtered lists still scan typed labels. Additional indexes
+and load bounds need measurement before scaling beyond the small hackathon deployment. The worker
 must still recover and execute stored jobs, and runtime wiring must explicitly select
 FalkorDB and its matching runner before deployment.
