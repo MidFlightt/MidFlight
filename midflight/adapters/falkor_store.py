@@ -71,9 +71,9 @@ class FalkorStore:
         # before MFProject exists can all observe an absent project (GH-02 CI).
         # Startup is synchronous; no requests may use this store until it returns.
         for model in (*_TYPES, User):
-            self._query(f"CREATE INDEX ON :MF{model.__name__}(key)")
+            self._ensure_index("MF" + model.__name__, "key")
             if model is not Plan:
-                self._query(f"CREATE INDEX ON :MF{model.__name__}(id)")
+                self._ensure_index("MF" + model.__name__, "id")
         for label, field in (
             ("MFReceipt", "key"),
             ("MFIdentity", "key"),
@@ -81,7 +81,16 @@ class FalkorStore:
             ("MFAuth", "key"),
             ("MFAuditEvent", "project_id"),
         ):
+            self._ensure_index(label, field)
+
+    def _ensure_index(self, label: str, field: str) -> None:
+        from redis.exceptions import ResponseError
+
+        try:
             self._query(f"CREATE INDEX ON :{label}({field})")
+        except ResponseError as exc:
+            if str(exc) != f"Attribute '{field}' is already indexed":
+                raise
 
     @classmethod
     def connect(cls, *, graph_name: str, **connection: Any) -> FalkorStore:
